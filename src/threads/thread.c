@@ -163,6 +163,8 @@ thread_print_stats (void)
 
 /* The default policy for choosing to which CPU to assign a
  * new thread is a round-robin policy.
+ *
+ * EDIT: PUT LOAD BALANCE HERE?
  */
 static struct cpu *
 choose_cpu_for_new_thread (struct thread *t)
