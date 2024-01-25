@@ -98,6 +98,8 @@ thread_init_on_ap (void)
   ASSERT(cpu != NULL);
   sched_init (&cpu->rq);
   spinlock_init (&cpu->rq.lock);
+  //ADDED, initialize sema
+  sema_init(&cpu->cpusema, 0);
   struct thread *cur_thread = running_thread ();
   init_boot_thread (cur_thread, cpu);
 }

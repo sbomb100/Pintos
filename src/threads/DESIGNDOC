@@ -31,6 +31,8 @@ Spencer Bone <spencerbone99@vt.edu>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+Added a semaphore to CPU struct: used for timer
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),

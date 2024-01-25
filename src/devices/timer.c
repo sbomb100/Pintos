@@ -93,8 +93,20 @@ timer_sleep (int64_t ticks)
   ASSERT (intr_get_level () == INTR_ON);
   
   int64_t start = timer_ticks ();
-  while (timer_elapsed (start) < ticks) //busy wait loop, make it actually wait
-    thread_yield (); //do a monitor instead?
+
+  while (timer_elapsed (start) < ticks){ //amount of time passed < time to sleep
+  
+    // preparation, setting up for sleep (register to receive wakeup in the future)
+    //thread_block(...);  // threads blocks here
+    // now that thread was woken up, cleanup if any and return
+
+    sema_down(&get_cpu()->cpusema); //try to get the cpus semaphore
+    //will wake up when it has sema
+  }
+  //add to ready queue
+  
+  //relinquish semma so that the next thread can try
+  sema_up(&get_cpu()->cpusema);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,14 +183,21 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
+  // find out if any threads need waking up (check blocked list and their time?)
+  //if so, find them and call `thread_unblock()` on them
+
   /* CPU 0 is in charge of maintaining wall-clock time */
   if (get_cpu ()->id == 0) 
     {
       ticks++;
       timer_settime (timer_ticks () * NSEC_PER_SEC / TIMER_FREQ);
     }
-    
+  //i dont quite get what the tick is for
   thread_tick ();
+
+  //check threads if they can run
+  sema_up(&get_cpu()->cpusema);
+  sema_down(&get_cpu()->cpusema);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
