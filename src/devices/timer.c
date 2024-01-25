@@ -95,16 +95,10 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   while (timer_elapsed (start) < ticks){ //amount of time passed < time to sleep
-  
-    // preparation, setting up for sleep (register to receive wakeup in the future)
-    //thread_block(...);  // threads blocks here
-    // now that thread was woken up, cleanup if any and return
-
+    //go to bed
     sema_down(&get_cpu()->cpusema); //try to get the cpus semaphore
-    //will wake up when it has sema
   }
-  //add to ready queue
-  
+  //it woke up! now add to ready queue ((done by thread_unblock->sched_unblock)
   //relinquish semma so that the next thread can try
   sema_up(&get_cpu()->cpusema);
 }
@@ -192,12 +186,12 @@ timer_interrupt (struct intr_frame *args UNUSED)
       ticks++;
       timer_settime (timer_ticks () * NSEC_PER_SEC / TIMER_FREQ);
     }
-  //i dont quite get what the tick is for
+  //i dont quite get what the tick is for <Spencer Bone>
   thread_tick ();
 
   //check threads if they can run
-  sema_up(&get_cpu()->cpusema);
-  sema_down(&get_cpu()->cpusema);
+  sema_up(&get_cpu()->cpusema); //grabs a thread (it will wake up in sleep func)
+  sema_down(&get_cpu()->cpusema); //says "stop looking at threads and move on"
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

@@ -6,7 +6,7 @@
 #include "threads/scheduler.h"
 #include <stdint.h>
 #include "threads/interrupt.h"
-#include "threads/synch.h"
+#include "threads/synch.h" //for cpu semaphore
 
 #define NCPU_MAX 8      /* Max number of cpus */
 

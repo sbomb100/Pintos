@@ -119,5 +119,15 @@ sched_tick (struct ready_queue *curr_rq, struct thread *current UNUSED)
 void
 sched_block (struct ready_queue *rq UNUSED, struct thread *current UNUSED)
 {
+  //if blocked, remove from ready queue?
+  ;
+}
+/*
+  Add a thread back to queue
+*/
+void
+sched_thread (struct ready_queue *rq UNUSED, struct thread *current UNUSED)
+{
+  //if blocked, remove from ready queue?
   ;
 }
