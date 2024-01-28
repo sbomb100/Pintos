@@ -28,6 +28,9 @@ static unsigned loops_per_tick;
 /* The current time wall clock time in nanoseconds */
 static uint64_t cur_time = 0;
 
+/* List of currently sleeping threads */
+struct list blocked_list;
+
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -40,6 +43,7 @@ void
 timer_init (void) 
 {
   intr_register_ext (0x20 + IRQ_TIMER, timer_interrupt, "8254 Timer");
+  list_init(&blocked_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -90,17 +94,21 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
+  if (ticks <= 0)
+    return;
   ASSERT (intr_get_level () == INTR_ON);
-  
-  int64_t start = timer_ticks ();
 
-  while (timer_elapsed (start) < ticks){ //amount of time passed < time to sleep
-    //go to bed
-    sema_down(&get_cpu()->cpusema); //try to get the cpus semaphore
-  }
-  //it woke up! now add to ready queue ((done by thread_unblock->sched_unblock)
-  //relinquish semma so that the next thread can try
-  sema_up(&get_cpu()->cpusema);
+  struct thread *curr = thread_current ();
+  int64_t start = timer_ticks ();
+  curr->wake_tick = start + ticks;
+
+  /* adds thread to list of blocked threads */
+  intr_disable();
+  list_push_back(&blocked_list, &curr->blocked_elem);
+  intr_enable();
+
+  /* blocks thread */
+  sema_down(&curr->timer_sema);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -189,9 +197,23 @@ timer_interrupt (struct intr_frame *args UNUSED)
   //i dont quite get what the tick is for <Spencer Bone>
   thread_tick ();
 
-  //check threads if they can run
-  sema_up(&get_cpu()->cpusema); //grabs a thread (it will wake up in sleep func)
-  sema_down(&get_cpu()->cpusema); //says "stop looking at threads and move on"
+  /* Wakes up all threads that have slept enough. */
+  struct list_elem *e = list_begin(&blocked_list);
+  struct list_elem *curr;
+  int64_t curr_tick = timer_ticks();
+  
+  while (e != list_end(&blocked_list))
+  {
+    curr = e;
+    e = list_next(e);
+    struct thread *t = list_entry(curr, struct thread, blocked_elem);
+    /* Checks if the thread needs to wake up yet. */
+    if (t->wake_tick <= curr_tick)
+    {
+      list_remove(curr);
+      sema_up(&t->timer_sema); /* Unblocks thread. */
+    }
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

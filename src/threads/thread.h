@@ -90,6 +90,12 @@ struct thread
   enum thread_status status; /* Thread state. */
   char name[THREAD_NAME_MAX]; /* Name (for debugging purposes). */
   uint8_t *stack; /* Saved stack pointer. */
+
+  /* Used in timer.c */
+  int64_t wake_tick; /* countdown until the thread should be unblocked*/
+  struct semaphore timer_sema;
+  struct list_elem blocked_elem;
+
   int nice; /* Nice value. */
   struct list_elem allelem; /* List element for all threads list. */
 

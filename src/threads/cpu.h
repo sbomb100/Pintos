@@ -6,7 +6,6 @@
 #include "threads/scheduler.h"
 #include <stdint.h>
 #include "threads/interrupt.h"
-#include "threads/synch.h" //for cpu semaphore
 
 #define NCPU_MAX 8      /* Max number of cpus */
 
@@ -39,9 +38,6 @@ struct cpu
   
   /* Cpu-local storage variable; see below */
   struct cpu *cpu;
-
-  /* semaphore for timer*/
-  struct semaphore cpusema;
 };
 
 /* Some information about the system */
