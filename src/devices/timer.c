@@ -30,13 +30,14 @@ static uint64_t cur_time = 0;
 
 /* List of currently sleeping threads */
 struct list blocked_list;
+struct spinlock blocked_lock;
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
-
+bool compare_wake_ticks(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -103,12 +104,20 @@ timer_sleep (int64_t ticks)
   curr->wake_tick = start + ticks;
 
   /* adds thread to list of blocked threads */
-  intr_disable();
-  list_push_back(&blocked_list, &curr->blocked_elem);
-  intr_enable();
+  spinlock_acquire(&blocked_lock);
+  
+  list_insert_ordered(&blocked_list, &curr->blocked_elem, compare_wake_ticks, NULL);
+  thread_block(&blocked_lock);
 
-  /* blocks thread */
-  sema_down(&curr->timer_sema);
+  spinlock_release(&blocked_lock);
+}
+
+/* Comparator function for inserting a thread into the blocked list. Used in timer.c */
+bool compare_wake_ticks(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *a_thread = list_entry(a, struct thread, blocked_elem);
+  struct thread *b_thread = list_entry(b, struct thread, blocked_elem);
+  return a_thread->wake_tick < b_thread->wake_tick;
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -198,22 +207,21 @@ timer_interrupt (struct intr_frame *args UNUSED)
   thread_tick ();
 
   /* Wakes up all threads that have slept enough. */
-  struct list_elem *e = list_begin(&blocked_list);
-  struct list_elem *curr;
-  int64_t curr_tick = timer_ticks();
-  
-  while (e != list_end(&blocked_list))
+  spinlock_acquire(&blocked_lock);
+
+  while (!list_empty(&blocked_list))
   {
-    curr = e;
-    e = list_next(e);
-    struct thread *t = list_entry(curr, struct thread, blocked_elem);
-    /* Checks if the thread needs to wake up yet. */
-    if (t->wake_tick <= curr_tick)
-    {
-      list_remove(curr);
-      sema_up(&t->timer_sema); /* Unblocks thread. */
-    }
+    /* All threads that can be removed will be at the front of the list. */
+    struct list_elem *e = list_begin(&blocked_list);
+    struct thread *t = list_entry(e, struct thread, blocked_elem);
+    /* Breaks when all threads that need to be woken up have been unblocked. */
+    if (t->wake_tick > ticks)
+      break;
+    thread_unblock(t);
+    list_remove(e);
   }
+
+  spinlock_release(&blocked_lock);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
