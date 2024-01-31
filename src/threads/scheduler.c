@@ -39,11 +39,12 @@ int64_t min_vruntime(struct list * ready_list, struct thread * curr) {
 */
 void update_vruntime(struct ready_queue * rq) {
     if( rq->curr == NULL ) return;
-
-    int64_t d = timer_gettime() - rq->curr->wake_tick;
+    
+    int64_t d = timer_gettime() - rq->curr->vruntime_0;
     uint32_t w_0 = prio_to_weight[20];
     uint32_t w = prio_to_weight[rq->curr->nice + 20];
     rq->curr->vruntime += d * (w_0 / w);
+    rq->curr->vruntime_0 = timer_gettime();
 }
 
 /*
@@ -151,7 +152,7 @@ sched_pick_next (struct ready_queue *curr_rq)
 
   struct thread *ret = list_entry(list_pop_front (&curr_rq->ready_list), struct thread, elem);
   curr_rq->nr_ready--;
-  ret->wake_tick = timer_gettime();
+  ret->vruntime_0 = timer_gettime();
   return ret;
 }
 
