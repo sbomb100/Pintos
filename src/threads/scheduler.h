@@ -40,6 +40,10 @@ struct ready_queue
                                  Allows O(1) access. */
 };
 
+int64_t min_vruntime(struct list *, struct thread *);
+void update_vruntime(struct ready_queue *);
+bool vruntime_cmp(const struct list_elem *, const struct list_elem *, void *);
+int64_t max(int64_t x, int64_t y);
 void sched_init (struct ready_queue *);
 enum sched_return_action sched_unblock (struct ready_queue *, struct thread *, int );
 void sched_yield (struct ready_queue *, struct thread *);

@@ -108,6 +108,7 @@ struct thread
   /* Shared between thread.c and synch.c. */
   struct list_elem elem; /* List element. */
 
+  int64_t vruntime; /* Used for CFS algorithm. */
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
