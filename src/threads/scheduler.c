@@ -6,6 +6,7 @@
 #include <debug.h>
 #include <stdbool.h>
 
+#include <stdio.h>
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 
@@ -31,6 +32,10 @@ int64_t min_vruntime(struct list * ready_list, struct thread * curr) {
         return curr->vruntime;
     }
     struct thread * min = list_entry(list_front(ready_list), struct thread, elem);
+
+    if ( curr == NULL ) {
+        return min->vruntime;
+    }
     return min->vruntime < curr->vruntime ? min->vruntime : curr->vruntime;
 }
 
@@ -107,6 +112,7 @@ sched_unblock (struct ready_queue *rq_to_add, struct thread *t, int initial)
   }
   else {
     t->vruntime = max(t->vruntime, min_vruntime(&rq_to_add->ready_list, rq_to_add->curr) - 20000000);
+    //TODO: min_vruntime should not ever decrease
   }
   //list_push_back (&rq_to_add->ready_list, &t->elem);
   list_insert_ordered(&rq_to_add->ready_list, &t->elem, vruntime_cmp, NULL);
@@ -178,7 +184,7 @@ sched_tick (struct ready_queue *curr_rq, struct thread *current)
     s += prio_to_weight[t->nice + 20];
   } 
   
-  int64_t ideal_runtime = 4000000 * n * w / s;
+  int64_t ideal_runtime = 4000000 * ((int64_t) n * (int64_t) w / (int64_t) s);
   update_vruntime(curr_rq);
   
   if (current->vruntime >= ideal_runtime)
