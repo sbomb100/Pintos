@@ -6,6 +6,7 @@
 #include "threads/scheduler.h"
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "list.h"
 
 #define NCPU_MAX 8      /* Max number of cpus */
 
@@ -35,7 +36,11 @@ struct cpu
   
   /* Ready queue. Owned by scheduler.c */
   struct ready_queue rq;
-  
+
+  /*blocked list for timer*/
+  struct list blocked_list;
+  struct spinlock blocked_lock;
+
   /* Cpu-local storage variable; see below */
   struct cpu *cpu;
 };

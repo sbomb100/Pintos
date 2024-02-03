@@ -560,6 +560,9 @@ init_boot_thread (struct thread *boot_thread, struct cpu *cpu)
   boot_thread->tid = allocate_tid ();
   boot_thread->cpu = cpu;
   cpu->rq.curr = boot_thread;
+  /*initialized the cpu's blockedlist(sleep list) and accompanying lock*/
+  list_init(&cpu->blocked_list);
+  spinlock_init(&cpu->blocked_lock);
 }
 
 /* Does basic initialization of T as a blocked thread named

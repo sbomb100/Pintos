@@ -29,8 +29,6 @@ static unsigned loops_per_tick;
 static uint64_t cur_time = 0;
 
 /* List of currently sleeping threads */
-struct list blocked_list;
-struct spinlock blocked_lock;
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
@@ -44,7 +42,6 @@ void
 timer_init (void) 
 {
   intr_register_ext (0x20 + IRQ_TIMER, timer_interrupt, "8254 Timer");
-  list_init(&blocked_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -103,13 +100,16 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
   curr->wake_tick = start + ticks;
 
+  struct cpu* cpu = curr->cpu;
+  struct spinlock* cpu_blocked_lock = &cpu->blocked_lock;
+  struct list* cpu_blocked_list = &cpu->blocked_list;
   /* adds thread to list of blocked threads */
-  spinlock_acquire(&blocked_lock);
+  spinlock_acquire(cpu_blocked_lock);
   
-  list_insert_ordered(&blocked_list, &curr->blocked_elem, compare_wake_ticks, NULL);
-  thread_block(&blocked_lock);
+  list_insert_ordered(cpu_blocked_list, &curr->blocked_elem, compare_wake_ticks, NULL);
+  thread_block(cpu_blocked_lock);
 
-  spinlock_release(&blocked_lock);
+  spinlock_release(cpu_blocked_lock);
 }
 
 /* Comparator function for inserting a thread into the blocked list. Used in timer.c */
@@ -206,13 +206,16 @@ timer_interrupt (struct intr_frame *args UNUSED)
   //i dont quite get what the tick is for <Spencer Bone>
   thread_tick ();
 
+  struct cpu* cpu = get_cpu();
+  struct spinlock* cpu_blocked_lock = &cpu->blocked_lock;
+  struct list* cpu_blocked_list = &cpu->blocked_list;
   /* Wakes up all threads that have slept enough. */
-  spinlock_acquire(&blocked_lock);
+  spinlock_acquire(cpu_blocked_lock);
 
-  while (!list_empty(&blocked_list))
+  while (!list_empty(cpu_blocked_list)) 
   {
     /* All threads that can be removed will be at the front of the list. */
-    struct list_elem *e = list_begin(&blocked_list);
+    struct list_elem *e = list_begin(cpu_blocked_list);
     struct thread *t = list_entry(e, struct thread, blocked_elem);
     /* Breaks when all threads that need to be woken up have been unblocked. */
     if (t->wake_tick > ticks)
@@ -221,7 +224,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
     list_remove(e);
   }
 
-  spinlock_release(&blocked_lock);
+  spinlock_release(cpu_blocked_lock);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
