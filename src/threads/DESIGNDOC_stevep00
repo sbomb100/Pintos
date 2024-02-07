@@ -1,0 +1,257 @@
+			+--------------------+
+			|        CS 4284     |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- YOU ----
+
+>> Fill in your name and email address
+
+Steve Park <stevep00@vt.edu>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+- in cpu.h: 
+1. struct list blocked_list, used to send blocked threads to a list to comb through in timer_tick.
+2. struct spinlock blocked_lock, synchronization tool for the blocked_list.
+
+- in thread.h:
+1. int64_t wake_tick, represents the time in nanoseconds when timer_sleep was called.
+2. struct list_elem blocked_elem, elem struct used to push the thread into the blocked_list.
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+- when timer_sleep is called, the time is saved in the thread's wake_tick field and is blocked using thread.c's thread_block function.
+  the thread is then sent to the blocked_list which is used in timer_interupt to look through all threads blocked by timer_sleep and unblocks
+  and that have spent sufficient time sleeping.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+- timer_interupt goes through the list and unblocks any thread that should be woken up.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+- a spinlock is used to ensure exlusive access in the blocked_list data structure.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+- the same spinlock which is used in timer_sleep is used in timer_interupt. This ensures only only thread may access the
+  blocked_list at any time, so race conditions cannot occur in this given scenario.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+- We first considered using a semaphore to synchronize sleeping threads. Though this technically worked, it was unnecessarily slow,
+  so we chose to instead chose to use a spinlock as our synchronization.
+
+>> A7: Every CPU has its own timer, and therefore executes the 
+>> interrupt handler independently. How has this affected your design?
+
+- We treat cpu 0 as the timer maintainer. Whenever timer_interrupt is called, we first check if
+  the cpu id is 0; if so, we updated the time and increment the ticks.
+
+			  ADVANCED SCHEDULER
+			  ==================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+- in thread.h:
+1. int64_t vruntime: used to calculate the virtual runtime of a thread. This is used
+  to determine which ready thread should be run next after a thread has yielded.
+2. int64_t vruntime_0: this is the tick at which the ready thread about to run starts running.
+3. int64_t actual_runtime: this is the unadjusted value, in nanoseconds, of how long the running thread
+  has been running. This is used in sched_tick to find if the thread has ran longer than the ideal runtime.
+
+- in scheduler.c:
+1. static const int64_t prio_to_weight[40]: converts a nice value to a weight, used in computing
+  time slices and ideal runtimes.
+
+- in scheduler.h:
+1. int64_t minvruntime: indicates the minimum virtual runtime of a given ready queue. We chose to have this
+  set as a field to allow other threads to access this information for load balancing.
+
+---- ALGORITHMS ----
+
+>> B2: Explain briefly what your scheduler does when each of the following happens:
+>> Thread is created
+>> Current thread blocks
+>> Thread is unblocked
+>> Current thread yields
+>> Timer tick arrives
+
+- In this scenario, Current thread will no longer be the running thread in the ready_queue struct.
+  The new running thread is Thread, assuming no other thread has a lower min_vruntime, and Current Thread is
+  not inserted back into the ready_queue until its status is changed to READY, which is done in thread.c.
+
+>> B3: What steps did you take to make sure that the idle thread is not 
+>> taken into account in any scheduling decisions?
+
+- idle threads will have the field curr set to NULL. To ensure no idle thread is
+  considered in scheduling decisions, such as in sched_tick or sched_unblock, a check
+  is made to make decisions based on whether the cpu is idle.
+
+---- RATIONALE ----
+
+>> B4: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
+- This is a simple example of Linux's "Completely Fair Scheduler", and ensures that threads
+  with lower virtual runtime get higher priority when the scheduler chooses which thread to run next.
+  The current disadvantages are that the underlying data structure which stores ready threads is a linked list,
+  which has a computation time of O(n). To improve this, Linux uses a Red-Black Tree to reduce the insertion time to
+  O(log(n)). This would be the first thing I would change had I have more time. In addition, I would also like to look further
+  into handing I/O bound threads. Currently, any unblocked thread is treated as if they were I/O, but I would like to
+  look into how other schedulers determine which system call the thread's process made to determine that it was
+  I/O.
+
+			     LOAD BALANCER
+			     =============
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+- We did not add any additional declarations for load balancing.
+
+---- ALGORITHMS ----
+
+>> C2: When is load balancing invoked? Is this enough to ensure
+>> that no CPUs are idle while there are threads in any ready queue?
+
+- Load balancing is called when the cpu's running thread is the idle_thread. This is called in idle(), and proved to be sufficient enough to
+  ensure no benchmark resulted in excessive idle ticks and load imbalances.
+
+>> C3: Briefly describe what happens in a call to load_balance()
+
+- if the average of the current CPU and the CPU with the largest weight is sufficiently large, then the current CPU will attempt to steal threads 
+  from the busiest CPU until the average is sufficiently small enough. The vruntime of migrated threads is adjusted to account for any sleeper bonus.
+
+>> C4: What steps are taken to ensure migrated threads do not
+>> monopolize the CPU if they had significantly lower vruntimes
+>> than the other threads when they migrated?
+
+- vruntimes of migrated threads are adjusted to vruntime_0 = vruntime - busiest_cpu_minvruntime + current_cpu_minvruntime. This assures any sleeper bonus
+  is acounted for.
+
+>> C5: Let's say hypothetically that CPU0 has 100 threads while 
+>> CPU1 has 102 threads, and each thread has the same nice value.
+>> CPU0 calls load_balance(). Do any tasks get migrated? If not,
+>> what are some possible advantages to refraining from migrating
+>> threads in that scenario?
+
+- The decision to migrate threads is made if the average of the two CPUs indicate a high enough imbalance. For this hypothetical, no threads
+  would migrate as the difference in weight of the two CPUs is too small to justify migration. The main advantage of this is processor affinity, where a 
+  thread may run faster in the CPU it is currently in due to data caching.
+
+---- SYNCHRONIZATION ----
+
+>> C6: How are race conditions avoided when a CPU looks at another
+>> CPU's load, or pulling threads from another CPU?
+
+- Our load balancer uses the ready queue's spinlock to ensure no race conditions may occur. The only shared data in this context is the ready_list, which 
+  maintains exclusive access through the ready queue's spinlock.
+
+>> C7: It is possible, although unlikely, that two CPUs may try to load
+>> balance from each other at the same time. How do you avoid potential
+>> deadlock?
+
+- Because exclusive access is ensured when accessing ready lists, what will happen in this scenario is one CPU will remove from the other's list and the other CPU will
+  recognize its imbalance is too low to attempt load balancing. For implementation, spinlocks are always acquired in the same order to avoid deadlocking (known as lock hierarchy).
+
+---- RATIONALE ----
+
+>> C8: If you deviated from the specifications, explain why. In what ways was your
+>> implementation superior to the one specified?
+
+- Our implementation deviates from the spec slightly. Instead of the conditional imbalance * 4 < busiest_cpu_load, we did imbalance * 8 < busiest_cpu_load.
+  We found that this resulted in fewer idle ticks.
+
+               MISC
+               ====
+
+>> D1: In Pintos, timer interrupts are issued periodically at a 
+>> predetermined frequency. In contrast, advanced systems like Linux have
+>> adopted a tickless kernel approach, where the timer interrupt is not
+>> issued periodically but rather set to arrive on-demand. Looking back at 
+>> at some of the inefficiencies that may have crept into your alarm clock,
+>> scheduler, and load balancer, in what ways would on-demand interrupts have
+>> been beneficial? Please be specific.
+
+- Our alarm clock rarely ensures that threads will sleep for exactly the amount of time it asked. For instance, if timer_tick occured every 4ms, and the thread requested
+  a sleep of 5ms, then it will remain asleep until the next timer_tick, which is at 8ms. An on-demand interrupt can ensure our thread actually does sleep for the 
+  correct amount of time.
+  
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+- This project was a bit easier than previous CS3214 projects. The time it took to
+  complete this project was fair.
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+- Understanding CFS and load balancing gave interesting insight towards how the OS handles
+  multithreaded processes such as CS3214's fork-join framework. I have a better understanding of
+  how certain policies may affect certain workloads and how CPU affinity may affect performance.
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+- The pintos documentation makes it sounds like a thread should yield in sched_tick when
+  vruntime is greater than or equal to the ideal_runtime. This is not the case for the tests,
+  the tests want the "actual runtime" to be greater than the ideal_runtime, actual being the 
+  nanoseconds of which the thread was runnign as opposed to the adjusted vruntime.
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+- There are no TAs for this course.
+
+>> Any other comments?
+
+- No.
