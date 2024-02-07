@@ -281,17 +281,17 @@ void sched_load_balance()
     min_vruntime(&cpus[mostJobs].rq.ready_list, NULL);
     int64_t busyminv = cpus[mostJobs].rq.min_vruntime;
     
-    spinlock_release(&cpus[mostJobs].rq.lock);
-
     // put stolen job in our queue
     spinlock_acquire(&get_cpu()->rq.lock);
     struct ready_queue *readyq = &get_cpu()->rq;
     min_vruntime(&readyq->ready_list, NULL);
     int64_t myminv = readyq->min_vruntime;
     stolen->vruntime_0 = stolen->vruntime - busyminv + myminv;
+    stolen->cpu = get_cpu();
     list_insert_ordered(&readyq->ready_list, &stolen->elem, vruntime_cmp, NULL);
     myJobs = ++(readyq->nr_ready);
     spinlock_release(&get_cpu()->rq.lock);
+    spinlock_release(&cpus[mostJobs].rq.lock);
  
     imbalance = (jobHighScore - myJobs) / 2;
   }
