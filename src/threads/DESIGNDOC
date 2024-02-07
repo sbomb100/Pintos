@@ -34,6 +34,8 @@ this allows for the timer_sleep to push threads into a cpu blocked list for easy
 - wake_tick in struct thread: 
 this allows for the timer_interrupt to know when to move a thread from the block to ready state
 
+- min_vruntime to ready_queue struct: it allows us to more accurately update the min_vruntime of a ready queue. This makes it faster and safer to access.
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),

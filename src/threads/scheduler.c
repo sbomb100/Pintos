@@ -278,15 +278,16 @@ void sched_load_balance()
     // take off first priority of busiest thread
     struct thread *stolen = list_entry(list_pop_front(&cpus[mostJobs].rq.ready_list), struct thread, elem);
     jobHighScore = --(cpus[mostJobs].rq.nr_ready);
-
-    int64_t busyminv = min_vruntime(&cpus[mostJobs].rq.ready_list, NULL);
+    min_vruntime(&cpus[mostJobs].rq.ready_list, NULL);
+    int64_t busyminv = cpus[mostJobs].rq.min_vruntime;
     
     spinlock_release(&cpus[mostJobs].rq.lock);
 
     // put stolen job in our queue
     spinlock_acquire(&get_cpu()->rq.lock);
     struct ready_queue *readyq = &get_cpu()->rq;
-    int64_t myminv = min_vruntime(&readyq->ready_list, NULL);
+    min_vruntime(&readyq->ready_list, NULL);
+    int64_t myminv = readyq->min_vruntime;
     stolen->vruntime_0 = stolen->vruntime - busyminv + myminv;
     list_insert_ordered(&readyq->ready_list, &stolen->elem, vruntime_cmp, NULL);
     myJobs = ++(readyq->nr_ready);
