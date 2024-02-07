@@ -484,6 +484,7 @@ idle (void *idle_started_ UNUSED)
        *
        * The baseline implementation does not ensure this.
        */
+      sched_load_balance();
       thread_block (NULL);
 
       /* Re-enable interrupts and wait for the next one.
