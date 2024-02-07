@@ -303,7 +303,7 @@ void sched_load_balance()
   }
   // If imbalance is small (imbalance * 4 < busiest_cpu_load) bail
   int64_t imbalance = (jobHighScore - myJobs) / 2;
-  if (8 * imbalance < jobHighScore || mostJobs == -1)
+  if (4 * imbalance < jobHighScore || mostJobs == -1)
   {
     return;
   }
@@ -336,7 +336,7 @@ void sched_load_balance()
     list_insert_ordered(&readyq->ready_list, &stolen->elem, vruntime_cmp, NULL);
     myJobs = ++(readyq->nr_ready);
 
-    imbalance = (jobHighScore - myJobs) / 2;
+    imbalance = (jobHighScore + myJobs) / 2;
   }
 
   spinlock_release(&get_cpu()->rq.lock);
