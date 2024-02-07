@@ -10,7 +10,7 @@
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 
-static const uint32_t prio_to_weight[40] = {
+static const int64_t prio_to_weight[40] = {
     /* -20 */    88761, 71755, 56483, 46273, 36291,
     /* -15 */    29154, 23254, 18705, 14949, 11916,
     /* -10 */    9548, 7620, 6100, 4904, 3906,
@@ -46,9 +46,10 @@ void update_vruntime(struct ready_queue * rq) {
     if( rq->curr == NULL ) return;
     
     int64_t d = timer_gettime() - rq->curr->vruntime_0;
-    uint32_t w_0 = prio_to_weight[20];
-    uint32_t w = prio_to_weight[rq->curr->nice + 20];
-    rq->curr->vruntime += d * (w_0 / w);
+    int64_t w_0 = prio_to_weight[20];
+    int64_t w = prio_to_weight[rq->curr->nice + 20];
+    rq->curr->vruntime += d * w_0 / w;
+    rq->curr->actual_runtime += d;
     rq->curr->vruntime_0 = timer_gettime();
 }
 
@@ -107,18 +108,20 @@ sched_init (struct ready_queue *curr_rq)
 enum sched_return_action
 sched_unblock (struct ready_queue *rq_to_add, struct thread *t, int initial)
 {
+  update_vruntime(rq_to_add);
   if ( initial == 1 ) {
     t->vruntime = min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
+    t->actual_runtime = min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
   }
   else {
     t->vruntime = max(t->vruntime, min_vruntime(&rq_to_add->ready_list, rq_to_add->curr) - 20000000);
+    t->actual_runtime = max(t->vruntime, min_vruntime(&rq_to_add->ready_list, rq_to_add->curr) - 20000000);
     //TODO: min_vruntime should not ever decrease
   }
   //list_push_back (&rq_to_add->ready_list, &t->elem);
   list_insert_ordered(&rq_to_add->ready_list, &t->elem, vruntime_cmp, NULL);
   rq_to_add->nr_ready++;
 
-  update_vruntime(rq_to_add);
   /* CPU is idle */
   if (!rq_to_add->curr || t->vruntime < rq_to_add->curr->vruntime )
     {
@@ -176,18 +179,18 @@ sched_tick (struct ready_queue *curr_rq, struct thread *current)
 {
   /* Enforce preemption. */
   unsigned long n = current == NULL ? curr_rq->nr_ready : curr_rq->nr_ready + 1;
-  uint32_t w = prio_to_weight[current->nice + 20];
-  uint32_t s = w;
+  int64_t w = prio_to_weight[current->nice + 20];
+  int64_t s = w;
 
   for ( struct list_elem * e = list_begin(&curr_rq->ready_list); e != list_end(&curr_rq->ready_list); e = list_next(e)) {
     struct thread * t = list_entry(e, struct thread, elem);
     s += prio_to_weight[t->nice + 20];
   } 
   
-  int64_t ideal_runtime = 4000000 * ((int64_t) n * (int64_t) w / (int64_t) s);
+  int64_t ideal_runtime = 4000000 * n * w / s;
   update_vruntime(curr_rq);
   
-  if (current->vruntime >= ideal_runtime)
+  if (current->actual_runtime >= ideal_runtime)
     {
       /* Start a new time slice. */
       curr_rq->thread_ticks = 0;

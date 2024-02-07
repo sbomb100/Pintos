@@ -111,6 +111,7 @@ struct thread
   /* Used for CFS algorithm. */
   int64_t vruntime; 
   int64_t vruntime_0;
+  int64_t actual_runtime;
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
