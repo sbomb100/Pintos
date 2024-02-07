@@ -7,7 +7,6 @@
 #include <debug.h>
 #include <stdbool.h>
 
-#include <stdio.h>
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 
@@ -179,6 +178,7 @@ sched_pick_next (struct ready_queue *curr_rq)
   struct thread *ret = list_entry(list_pop_front (&curr_rq->ready_list), struct thread, elem);
   curr_rq->nr_ready--;
   ret->vruntime_0 = timer_gettime();
+  ret->actual_runtime = 0;
   return ret;
 }
 
