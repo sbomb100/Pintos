@@ -230,9 +230,68 @@ sched_block (struct ready_queue *rq, struct thread *current UNUSED)
 /*
   Add a thread back to queue
 */
-void
-sched_thread (struct ready_queue *rq UNUSED, struct thread *current UNUSED)
+/**
+ * function for CPU ready queue balancing, called from idle() in threads.c
+ */
+void sched_load_balance()
 {
-  //if blocked, remove from ready queue?
-  ;
+  // check other ready queues
+  int mostJobs = -1;
+  unsigned int jobHighScore = 0;
+  int myJobs = 0;
+  
+  // a
+  for (unsigned int i = 0; i < ncpu; i++) // go through all cpus to find which is the busiest
+  {
+    spinlock_acquire(&cpus[i].rq.lock);
+    if (&cpus[i] != get_cpu())
+    {
+      
+      if (cpus[i].rq.nr_ready > 0 && cpus[i].rq.nr_ready > jobHighScore)
+      {
+        jobHighScore = cpus[i].rq.nr_ready;
+        mostJobs = i;
+      }
+      
+    } else {
+      myJobs = get_cpu()->rq.nr_ready;
+    }
+    spinlock_release(&cpus[i].rq.lock);
+  }
+  // If imbalance is small (imbalance * 4 < busiest_cpu_load) bail
+  int64_t imbalance = (jobHighScore - myJobs) / 2;
+  if (4 * imbalance < jobHighScore || mostJobs == -1)
+  {
+    return;
+  }
+  ASSERT(get_cpu() != &cpus[mostJobs]);
+  //changed to prioritize more balancing
+  while (8 * imbalance >= jobHighScore)
+  {
+    // take job from busiest cpu
+    spinlock_acquire(&cpus[mostJobs].rq.lock);
+    if (cpus[mostJobs].rq.nr_ready == 0) //fail saf
+    {
+      spinlock_release(&cpus[mostJobs].rq.lock);
+      return;
+    }
+    // take off first priority of busiest thread
+    struct thread *stolen = list_entry(list_pop_front(&cpus[mostJobs].rq.ready_list), struct thread, elem);
+    jobHighScore = --(cpus[mostJobs].rq.nr_ready);
+
+    int64_t busyminv = min_vruntime(&cpus[mostJobs].rq.ready_list, NULL);
+    
+    spinlock_release(&cpus[mostJobs].rq.lock);
+
+    // put stolen job in our queue
+    spinlock_acquire(&get_cpu()->rq.lock);
+    struct ready_queue *readyq = &get_cpu()->rq;
+    int64_t myminv = min_vruntime(&readyq->ready_list, NULL);
+    stolen->vruntime_0 = stolen->vruntime - busyminv + myminv;
+    list_insert_ordered(&readyq->ready_list, &stolen->elem, vruntime_cmp, NULL);
+    myJobs = ++(readyq->nr_ready);
+    spinlock_release(&get_cpu()->rq.lock);
+ 
+    imbalance = (jobHighScore - myJobs) / 2;
+  }
 }

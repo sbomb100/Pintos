@@ -9,9 +9,6 @@
 >> Fill in your name and email address
 
 Spencer Bone <spencerbone99@vt.edu>
--Steve
--Rebecca
--John
 
 ---- PRELIMINARIES ----
 
@@ -31,31 +28,49 @@ Spencer Bone <spencerbone99@vt.edu>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-Added a semaphore to CPU struct: used for timer
+- block_list and block_spinlick in the CPU struct: 
+this allows for the timer_sleep to push threads into a cpu blocked list for easy sleeps and wakeups
+
+- wake_tick in struct thread: 
+this allows for the timer_interrupt to know when to move a thread from the block to ready state
 
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+- timer_sleep(): tells a thread to be blocked using thread_block(blocked_lock) and go to a CPUs blocked list, as well as makes the thread possible to be interrupted to wake it up. It also sets the wake_tick to inform when it should be "woken up" and moved to the ready state in the CPU
+
+- timer_interrupt(): tracks the current tick, then checks all blocked threads on the current CPU to see if any should be waken up based on their wake_tick time being the same or before as the current tick using thread_unblock(t). 
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+
+- the main thing to reduce time in timer_interrupt() is an if statement that tells the process to stop checking later threads as soon as we hit a thread that isn't ready to wake up (as all threads after it will be even later time threads). This prevents checking over blocked_threads that we know can't wake up. To do this we have to make sure we insert in order based on tick wake up.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
 
+- by using a spinlock over the blocked_list, we can prevent multiple threads trying to block at the same time, as only one will have access to the list to block and the other will wait for access.
+
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+
+- This same spinlock for the blocked_list will prevent multiple threads from accessing the blocked_list when checking how many threads can wake up. This means only 1 thread will have access to the blocked_list at any point giving the process security against race conditions.
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
 
+- We chose this design because it made the most sense. Understandable code is code that can be easily communicated to work. Specifically, this design resembles how the semaphores work, as it has its own lock and blocked list, but by programming those ourselves we can clear the name for each piece of the puzzle. It also prevents any kind of awkward behaviors just using a semaphore might yeild. As the start of this 3 step project, the foundation needs to be solid.
+
 >> A7: Every CPU has its own timer, and therefore executes the 
 >> interrupt handler independently. How has this affected your design?
+
+- This encouraged us to give each CPU their respective blocked_list and block_spinlock to ensure there would be no overlap over some kind of global blocked thread list. By giving each CPU their own set of timer materials, they can all track their own threads since they are all counting the ticks anyways. This also makes it faster to sleep and wake up threads (as CPU lists are smaller than what would be a global list of blocked threads).
 
 			  ADVANCED SCHEDULER
 			  ==================
@@ -94,16 +109,24 @@ Added a semaphore to CPU struct: used for timer
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+Nothing was added into the data structs in order to make load balancing.
+
 ---- ALGORITHMS ----
 
 >> C2: When is load balancing invoked? Is this enough to ensure
 >> that no CPUs are idle while there are threads in any ready queue?
 
+We decided to only do load balancing when a CPU can no longer run a thread, aka they have an empty ready thread list. It still does leave slight idle time while moving over threads but it does do a good job of giving CPUs threads to work on.
+
 >> C3: Briefly describe what happens in a call to load_balance()
+
+First: find which CPU is busiest in terms of amount of threads. Second: check if its worth balancing. Third: keep taking threads from the busiest CPU until it is balanced enough (when the imbalance between CPUs is small enough)
 
 >> C4: What steps are taken to ensure migrated threads do not
 >> monopolize the CPU if they had significantly lower vruntimes
 >> than the other threads when they migrated?
+
+A new min_vruntime is given to any migrated threads to ensure their runtimes are adequately up to date in terms of time on a processor.
 
 >> C5: Let's say hypothetically that CPU0 has 100 threads while 
 >> CPU1 has 102 threads, and each thread has the same nice value.
@@ -111,19 +134,27 @@ Added a semaphore to CPU struct: used for timer
 >> what are some possible advantages to refraining from migrating
 >> threads in that scenario?
 
+No threads would migrate. This is because the ratio of work between the two CPUs isnt big enough to cause migration as migrating threads is a computation in and of itself. Also both CPUs have work they can do. So, by not migrating on every thread imbalance, we save computation time that is minimally beneficial.
+
 ---- SYNCHRONIZATION ----
 
 >> C6: How are race conditions avoided when a CPU looks at another
 >> CPU's load, or pulling threads from another CPU?
 
+- Each interaction between CPUs is covered with some kind of lock. Let it be the readyqueue lock or the blocked list lock. The loadbalancing specifically utilizes the ready queue lock to ensure the queues are kept the same during alteration.
+
 >> C7: It is possible, although unlikely, that two CPUs may try to load
 >> balance from each other at the same time. How do you avoid potential
 >> deadlock?
+
+- If 2 CPUs wanted to balance at the same time, one would most likely sit on a lock if they find that the same CPU is the busiest. This means one might empty part of the list while the other waits for its turn. This could yield in the second CPU trying to balance not getting as many jobs in which they will probably have to load balance again. However, this prevents deadlocks within the CPUs accesses to other CPUs ready queues.
 
 ---- RATIONALE ----
 
 >> C8: If you deviated from the specifications, explain why. In what ways was your
 >> implementation superior to the one specified?
+
+The main thing I did unlike the specification is alter the definition of small imbalance. Instead of 4*imbalance < load of the busiest CPU, i have 8 * imbalance < load of the busiest CPU. Through testing this yielded less idle time as CPUs will not try to load balance as much, which causes less computation when the idle thread is running therefore less idle time.
 
                MISC
                ====
@@ -135,6 +166,8 @@ Added a semaphore to CPU struct: used for timer
 >> at some of the inefficiencies that may have crept into your alarm clock,
 >> scheduler, and load balancer, in what ways would on-demand interrupts have
 >> been beneficial? Please be specific.
+
+- On demand interrupts would cause more to be done when it needs to. This means less checking values that aren't ready to wake up or probably less checks against load balancing when it isn't required. By making it to where values are checked when needed, many seconds of time over a long runtime of the scheduler would be saved as time not checking values and if threads should wake up is time spent doing other calculations.
 
 			   SURVEY QUESTIONS
 			   ================
@@ -148,14 +181,24 @@ the quarter.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+- I personally have a hard time with systems so this project was both good and a little to hard. I contributed the most to the load balancer so I found that to be a perfect amount of work, but the main scheduler and alarm itself had a lot of background information I had to know before taking a step. I do feel like there was too little time but during this project I was out with COVID19 for a week which definitely did its damage to the time able to be spent. 
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
+- looking at the scheduler was quite interesting as it was something that we simply abused in 3214, while now we are the ones who are making it to be abused. I like learning about how stuff I've already done was actually done behind the scenes.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
 
+- I used discourse for the few questions I had and was helped IMMENSELY. I think a good thing would be to make it more clear how to take the first steps as it took me 4 days of reading the specification in order to understand pintos enough to begin (time I feel was a little wasted as no progress was actually happening)
+
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
 
+- There are no TAs for this course but discourse was helpful.
+
 >> Any other comments?
+
+- None, Thank you!
