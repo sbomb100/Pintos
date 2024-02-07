@@ -31,6 +31,9 @@ struct ready_queue
                                  NULL if CPU is idle. */
   struct thread *idle_thread; /* This CPU's idle thread. */
 
+  /* Keeps track of the minimum virtual runtime for this ready queue. */
+  int64_t min_vruntime;
+
   /* The following fields are specific to a preemptive, round-robin
    * scheduling policy.  You may need to change them in your
    * implementation of project 1. */
@@ -40,7 +43,7 @@ struct ready_queue
                                  Allows O(1) access. */
 };
 
-int64_t min_vruntime(struct list *, struct thread *);
+void min_vruntime(struct list *, struct thread *);
 void update_vruntime(struct ready_queue *);
 bool vruntime_cmp(const struct list_elem *, const struct list_elem *, void *);
 int64_t max(int64_t x, int64_t y);
@@ -50,5 +53,5 @@ void sched_yield (struct ready_queue *, struct thread *);
 struct thread *sched_pick_next (struct ready_queue *);
 enum sched_return_action sched_tick (struct ready_queue *, struct thread *);
 void sched_block (struct ready_queue *, struct thread *);
-
+void sched_load_balance(void);
 #endif /* THREADS_SCHEDULER_H_ */

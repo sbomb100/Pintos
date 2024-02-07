@@ -92,7 +92,7 @@ struct thread
   uint8_t *stack; /* Saved stack pointer. */
 
   /* Used in timer.c */
-  int64_t wake_tick; /* countdown until the thread should be unblocked*/
+  int64_t wake_tick; /* the tick when the thread should be unblocked */
   struct semaphore timer_sema;
   struct list_elem blocked_elem;
 

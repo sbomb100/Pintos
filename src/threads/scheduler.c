@@ -3,6 +3,7 @@
 #include "threads/interrupt.h"
 #include "list.h"
 #include "threads/spinlock.h"
+#include "devices/timer.h"
 #include <debug.h>
 #include <stdbool.h>
 
@@ -24,21 +25,37 @@ static const int64_t prio_to_weight[40] = {
 /*
     Find the min vruntime of running/ready threads.
 */
-int64_t min_vruntime(struct list * ready_list, struct thread * curr) {
-    if ( list_empty(ready_list) ) {
-        if ( curr == NULL ) {
-            return 0;
-        }
-        return curr->vruntime;
+void min_vruntime(struct list *ready_list, struct thread *curr)
+{
+  int64_t prev_min = get_cpu()->rq.min_vruntime;
+  if (list_empty(ready_list))
+  {
+    if (curr == NULL)
+    {
+      get_cpu()->rq.min_vruntime = 0;
+      return;
     }
-    struct thread * min = list_entry(list_front(ready_list), struct thread, elem);
+    get_cpu()->rq.min_vruntime = curr->vruntime;
+    return;
+  }
+  struct thread *min = list_entry(list_front(ready_list), struct thread, elem);
 
-    if ( curr == NULL ) {
-        return min->vruntime;
-    }
-    return min->vruntime < curr->vruntime ? min->vruntime : curr->vruntime;
+  if (curr == NULL)
+  {
+    get_cpu()->rq.min_vruntime = min->vruntime;
+    return;
+  }
+  if (min->vruntime < curr->vruntime) {
+    get_cpu()->rq.min_vruntime = min->vruntime;
+  } else {
+    get_cpu()->rq.min_vruntime = curr->vruntime;
+  }
+  /* Checks if the newly calculated min_vruntime is smaller than the previous.
+     Forces min_vruntime to never decrease */
+  if (get_cpu()->rq.min_vruntime < prev_min) {
+    get_cpu()->rq.min_vruntime = prev_min;
+  }
 }
-
 /*
     Updates the running thread's vruntime.
 */
@@ -110,15 +127,15 @@ sched_unblock (struct ready_queue *rq_to_add, struct thread *t, int initial)
 {
   update_vruntime(rq_to_add);
   if ( initial == 1 ) {
-    t->vruntime = min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
-    t->actual_runtime = min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
+    min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
+    t->vruntime = get_cpu()->rq.min_vruntime;
+    t->actual_runtime = get_cpu()->rq.min_vruntime;
   }
   else {
-    t->vruntime = max(t->vruntime, min_vruntime(&rq_to_add->ready_list, rq_to_add->curr) - 20000000);
-    t->actual_runtime = max(t->vruntime, min_vruntime(&rq_to_add->ready_list, rq_to_add->curr) - 20000000);
-    //TODO: min_vruntime should not ever decrease
+    min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
+    t->vruntime = max(t->vruntime, get_cpu()->rq.min_vruntime - 20000000);
+    t->actual_runtime = max(t->vruntime, get_cpu()->rq.min_vruntime - 20000000);
   }
-  //list_push_back (&rq_to_add->ready_list, &t->elem);
   list_insert_ordered(&rq_to_add->ready_list, &t->elem, vruntime_cmp, NULL);
   rq_to_add->nr_ready++;
 
