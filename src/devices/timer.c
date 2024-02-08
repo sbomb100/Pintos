@@ -28,8 +28,6 @@ static unsigned loops_per_tick;
 /* The current time wall clock time in nanoseconds */
 static uint64_t cur_time = 0;
 
-/* List of currently sleeping threads */
-
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);

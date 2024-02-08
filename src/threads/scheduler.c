@@ -76,14 +76,8 @@ void min_vruntime(struct list *ready_list, struct thread *curr)
     get_cpu()->rq.min_vruntime = min->vruntime;
     return;
   }
-  if (min->vruntime < curr->vruntime)
-  {
-    get_cpu()->rq.min_vruntime = min->vruntime;
-  }
-  else
-  {
-    get_cpu()->rq.min_vruntime = curr->vruntime;
-  }
+  get_cpu()->rq.min_vruntime = min->vruntime < curr->vruntime ? min->vruntime : curr->vruntime;
+
   /* Checks if the newly calculated min_vruntime is smaller than the previous.
      Forces min_vruntime to never decrease */
   if (get_cpu()->rq.min_vruntime < prev_min)
@@ -166,13 +160,13 @@ enum sched_return_action
 sched_unblock(struct ready_queue *rq_to_add, struct thread *t, int initial)
 {
   update_vruntime(rq_to_add);
-  if (initial == 1)
+  if (initial == 1) // unblock new thread
   {
     min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
     t->vruntime = get_cpu()->rq.min_vruntime;
     t->actual_runtime = get_cpu()->rq.min_vruntime;
   }
-  else
+  else // unblock existing thread
   {
     min_vruntime(&rq_to_add->ready_list, rq_to_add->curr);
     t->vruntime = max(t->vruntime, get_cpu()->rq.min_vruntime - 20000000);
@@ -196,7 +190,6 @@ sched_unblock(struct ready_queue *rq_to_add, struct thread *t, int initial)
  */
 void sched_yield(struct ready_queue *curr_rq, struct thread *current)
 {
-  // list_push_back (&curr_rq->ready_list, &current->elem);
   update_vruntime(curr_rq);
   list_insert_ordered(&curr_rq->ready_list, &current->elem, vruntime_cmp, NULL);
   curr_rq->nr_ready++;
@@ -308,7 +301,7 @@ void sched_load_balance()
 
   // If imbalance is small (imbalance * 4 < busiest_cpu_load) bail
   int64_t imbalance = (weightHighScore - myWeight) / 2;
-  if (8 * imbalance < weightHighScore || mostJobs == -1)
+  if (4 * imbalance < weightHighScore || mostJobs == -1)
   {
     return;
   }
@@ -328,12 +321,11 @@ void sched_load_balance()
     // take off first priority of busiest thread
     struct thread *stolen = list_entry(list_pop_front(&cpus[mostJobs].rq.ready_list), struct thread, elem);
     weightHighScore = weightHighScore - (prio_to_weight[stolen->nice]); //update weight highscore
-    //ASSERT(!list_empty(&cpus[mostJobs].rq.ready_list));
     min_vruntime(&cpus[mostJobs].rq.ready_list, NULL);
     int64_t busyminv = cpus[mostJobs].rq.min_vruntime;
     cpus[mostJobs].rq.nr_ready--;
-    // put stolen job in our queue
 
+    // put stolen job in our queue
     struct ready_queue *readyq = &thisCpu->rq;
     min_vruntime(&readyq->ready_list, NULL);
     int64_t myminv = readyq->min_vruntime;

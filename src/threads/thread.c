@@ -581,7 +581,6 @@ init_thread (struct thread *t, const char *name, int nice)
   t->stack = (uint8_t *) t + PGSIZE;
   t->nice = nice;
   t->magic = THREAD_MAGIC;
-  sema_init(&t->timer_sema, 0);
   if (cpu_can_acquire_spinlock)
     spinlock_acquire (&all_lock);
   list_push_back (&all_list, &t->allelem);
