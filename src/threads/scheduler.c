@@ -321,7 +321,7 @@ void sched_load_balance()
   while (4 * imbalance >= weightHighScore)
   {
     // take job from busiest cpu
-    if (cpus[mostJobs].rq.nr_ready == 0) // fail saf
+    if (cpus[mostJobs].rq.nr_ready == 0 || list_empty(&cpus[mostJobs].rq.ready_list) ) // fail saf
     {
       break;
     }
@@ -331,7 +331,7 @@ void sched_load_balance()
     //ASSERT(!list_empty(&cpus[mostJobs].rq.ready_list));
     min_vruntime(&cpus[mostJobs].rq.ready_list, NULL);
     int64_t busyminv = cpus[mostJobs].rq.min_vruntime;
-
+    cpus[mostJobs].rq.nr_ready--;
     // put stolen job in our queue
 
     struct ready_queue *readyq = &thisCpu->rq;
@@ -341,6 +341,7 @@ void sched_load_balance()
     stolen->cpu = thisCpu;
     list_insert_ordered(&readyq->ready_list, &stolen->elem, vruntime_cmp, NULL);
     myWeight = myWeight + (prio_to_weight[stolen->nice]);
+    thisCpu->rq.nr_ready++;
 
     imbalance = (weightHighScore - myWeight) / 2;
   }
