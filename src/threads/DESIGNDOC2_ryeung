@@ -1,0 +1,219 @@
+			+--------------------+
+			|        CS 4284     |
+			| PROJECT 1: THREADS |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- YOU ----
+
+>> Fill in your name and email address
+
+Rebecca Yeung <ryeung@vt.edu>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+cpu.h:
+        struct list blocked_list;
+    A per-CPU list to store sleeping threads on their respective CPUs instead of using a global variable.
+        struct spinlock blocked_lock;
+    Allows for the safe insertion/removal of threads from the blocked list.
+
+thread.h:
+        int64_t wake_tick;
+    Keeps track of the tick when a thread should be unblocked. 'blocked_elem'
+        struct list_elem blocked_elem;
+    The structure that allows the thread to be placed in a blocked list.
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+The CPU acquires its spinlock before inserting the thread into the list. The threads are sorted into ascending order of when they will wake up on insertion. The function then calls thread_block() on the thread, which puts the thread to sleep before releasing the spinlock. Later, when the timer_interrupt() function is called, the CPU acquires the spinlock once again to remove and unblock all sleeping threads that need to be woken up, then releases the spinlock for the next interrupt.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+Since the threads are sorted in ascending order based on when they have to be unblocked, the interrupt handler doesn't have to look through the entire blocked list to find which threads to unblock. Instead, it can just unblock every thread until the wake up tick of the front thread exceeds the current tick.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+A spinlock is acquired before the insertion of anything into the blocked list, allowing only one thread to access that list at any time. It is released after the call to thread_block, allowing another function to access the list.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+It uses the same spinlock that timer_sleep() uses when reading and removing threads from the blocked list, so the blocked list can only be accessed by either a timer interrupt or a call to timer_sleep() and never both at the same time.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+Another design we considered was using semaphores instead of spinlocks and calling thread_block(). However, semaphores included a little extra overhead and didn't properly protect the blocked_list from race conditions. Using a spinlock protected the blocked_list and disabled interrupts, making it a more efficient and cleaner solution.
+
+>> A7: Every CPU has its own timer, and therefore executes the 
+>> interrupt handler independently. How has this affected your design?
+
+A per-CPU blocked list was used instead of a global list to keep track of the blocked threads. Each CPU's timer can go off independently of each other and be minimally affected when a timer interrupt occurs on another CPU.
+
+			  ADVANCED SCHEDULER
+			  ==================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+thread.h:
+        int64_t vruntime;
+    Stores the vruntime of the thread.
+        int64_t vruntime_0;
+    Stores the time when the vruntime was last update. This is used when updating the vruntime.
+        int64_t actual_runtime;
+    Stores how long (in nanoseconds) the thread has actually been running. This is compared to the ideal runtime to see if it should yield.
+
+scheduler.c:
+        int64_t min_vruntime;
+    Keeps track of a ready queue's minimum vruntime. Mainly used to ensure that the minimum vruntime never decreases.
+
+---- ALGORITHMS ----
+
+>> B2: Explain briefly what your scheduler does when each of the following happens:
+>> Thread is created
+    The minimum vruntime is updated and the newly created thread's vruntime is set to that value. Then the list is inserted into the ready queue. If the thread's vruntime is lower than the current running thread's, it forces the running thread to yield so the new thread can take its place.
+>> Current thread blocks
+    The vruntime of the current thread is updated and the scheduler picks the next thread to run.
+>> Thread is unblocked
+    The thread can recieve a sleeper bonus if its vruntime is too low compared to the other threads in the CPU so it doesn't take up all the CPU time until it catches up to the other threads. Otherwise, it is added to the ready queue. If the thread's vruntime is lower than the current thread's, the current thread yields in favor of this thread.
+>> Current thread yields
+    The current thread's vruntime is updated and it is added back into the ready queue.
+>> Timer tick arrives
+    The ideal runtime is calculated of the ready list and updates the vruntime of the current thread. Then, if the ready queue's ideal runtime has exceeded the current thread's runtime for this tick, this thread will yield and another thread will be scheduled to run on the CPU.
+
+>> B3: What steps did you take to make sure that the idle thread is not 
+>> taken into account in any scheduling decisions?
+
+A check is made when the scheduler unblocks a thread to see if the CPU is idle, and if it is, the CPU yields to try to schedule another thread. The idle thread also isn't in the ready queue so it clearly isn't considered when calculating runtimes.
+
+---- RATIONALE ----
+
+>> B4: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
+One of the simplications made for this project was to assume that all threads that are unblocked are I/O threads and can recieve a sleeper bonus if their vruntime is low enough. While this does make the implementation significantly easier, clearly not all threads are I/O threads, so there should be some way to identify and deal with these threads.
+
+			     LOAD BALANCER
+			     =============
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+No new data structures were added.
+
+---- ALGORITHMS ----
+
+>> C2: When is load balancing invoked? Is this enough to ensure
+>> that no CPUs are idle while there are threads in any ready queue?
+
+Load balancing is invoked in the call to idle. Whenever a CPU runs out of thread to run it will call the load balancing function to take threads from other CPUs, allowing to keep working.
+
+>> C3: Briefly describe what happens in a call to load_balance()
+
+The function loops through all the CPUS, looking for the one with the busiest load. Then it calculates the imbalance between the busiest CPU and the idle CPU and takes as many threads as needed to satisfy the imbalance.
+
+>> C4: What steps are taken to ensure migrated threads do not
+>> monopolize the CPU if they had significantly lower vruntimes
+>> than the other threads when they migrated?
+
+The vruntime of these threads are edited relative to the vruntimes of the other threads on the new CPU, with their sleeper bonus still attached if they recieved one.
+
+>> C5: Let's say hypothetically that CPU0 has 100 threads while 
+>> CPU1 has 102 threads, and each thread has the same nice value.
+>> CPU0 calls load_balance(). Do any tasks get migrated? If not,
+>> what are some possible advantages to refraining from migrating
+>> threads in that scenario?
+
+No tasks would be migrated in this situation unless one of the CPUs finishes significantly faster than the other. Assuming each thread runs for roughly an equal amount of time, by the time one of the CPU finishes, the other will also be completed by the time the first CPU's load balancing function exits.
+
+---- SYNCHRONIZATION ----
+
+>> C6: How are race conditions avoided when a CPU looks at another
+>> CPU's load, or pulling threads from another CPU?
+
+The load balancing function is locked by spinlocks both when finding the busiest CPU, and again when migrating threads between CPUs. Two CPUs would not be able to access the ready queue of another CPU at the same time.
+
+>> C7: It is possible, although unlikely, that two CPUs may try to load
+>> balance from each other at the same time. How do you avoid potential
+>> deadlock?
+
+By using a spinlock, the first CPU would load balance by taking threads from the second, then release the spinlock for the second CPU. By then, the second CPU will notice that there is not enough imbalance to take any threads.
+
+---- RATIONALE ----
+
+>> C8: If you deviated from the specifications, explain why. In what ways was your
+>> implementation superior to the one specified?
+
+No deviations were made.
+
+               MISC
+               ====
+
+>> D1: In Pintos, timer interrupts are issued periodically at a 
+>> predetermined frequency. In contrast, advanced systems like Linux have
+>> adopted a tickless kernel approach, where the timer interrupt is not
+>> issued periodically but rather set to arrive on-demand. Looking back at 
+>> at some of the inefficiencies that may have crept into your alarm clock,
+>> scheduler, and load balancer, in what ways would on-demand interrupts have
+>> been beneficial? Please be specific.
+
+The alarm clock relies on timer interrupts to check if a thread should be unblocked. If a thread can unblock in the middle of a time slice, it has to wait until the next interrupt before it can be unblocked. A similar situation occurs in the scheduler. The current thread is only checked against the ideal runtime when the timer interrupt handler is called. If a thread's runtime exceeds the ideal runtime in the middle of a time slice, it cannot immediately try to schedule the next thread and has to wait until the next timer interrupt. With on-demand interrupts, the load balancer can also be called right when the last thread finishes executing instead of waiting for the timer interrupt for the idle thread to be scheduled.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
