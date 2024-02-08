@@ -277,33 +277,38 @@ void sched_block(struct ready_queue *rq, struct thread *current UNUSED)
  */
 void sched_load_balance()
 {
-  // check other ready queues
-  int mostJobs = -1;
-  unsigned int jobHighScore = 0;
-  int myJobs = 0;
+  
+  int mostJobs = -1; /*index num of cpu with highest weight*/
+  int64_t weightHighScore = 0; 
+  int myWeight = 0;
 
-  // a
-  for (unsigned int i = 0; i < ncpu; i++) // go through all cpus to find which is the busiest
+  for (unsigned int i = 0; i < ncpu; i++) // go through all cpus to find which has highest weight /cpu_load
   {
     spinlock_acquire(&cpus[i].rq.lock);
-    if (&cpus[i] != get_cpu())
+    
+    int64_t totalWeight = 0;
+    struct list_elem* e = list_head (&cpus[i].rq.ready_list);
+    while ((e = list_next (e)) != list_end (&cpus[i].rq.ready_list)) 
     {
+      struct thread *t = list_entry(e, struct thread, elem);
+      totalWeight = totalWeight + prio_to_weight[t->nice];
+    }
 
-      if (cpus[i].rq.nr_ready > 0 && cpus[i].rq.nr_ready > jobHighScore)
-      {
-        jobHighScore = cpus[i].rq.nr_ready;
-        mostJobs = i;
-      }
-    }
-    else
+    if (totalWeight > weightHighScore && (&cpus[i] != get_cpu()))
     {
-      myJobs = get_cpu()->rq.nr_ready;
+      weightHighScore = totalWeight;
+      mostJobs = i;
     }
+    else if (&cpus[i] == get_cpu()){ // if this total weight is of the curr cpu
+      myWeight = totalWeight;
+    }
+    
     spinlock_release(&cpus[i].rq.lock);
   }
+
   // If imbalance is small (imbalance * 4 < busiest_cpu_load) bail
-  int64_t imbalance = (jobHighScore - myJobs) / 2;
-  if (4 * imbalance < jobHighScore || mostJobs == -1)
+  int64_t imbalance = (weightHighScore - myWeight) / 2;
+  if (8 * imbalance < weightHighScore || mostJobs == -1)
   {
     return;
   }
@@ -313,7 +318,7 @@ void sched_load_balance()
 
   spinlock_acquire(&get_cpu()->rq.lock);
   struct cpu* thisCpu = get_cpu();
-  while (4 * imbalance >= jobHighScore)
+  while (4 * imbalance >= weightHighScore)
   {
     // take job from busiest cpu
     if (cpus[mostJobs].rq.nr_ready == 0) // fail saf
@@ -322,7 +327,8 @@ void sched_load_balance()
     }
     // take off first priority of busiest thread
     struct thread *stolen = list_entry(list_pop_front(&cpus[mostJobs].rq.ready_list), struct thread, elem);
-    jobHighScore = --(cpus[mostJobs].rq.nr_ready);
+    weightHighScore = weightHighScore - (prio_to_weight[stolen->nice]); //update weight highscore
+    //ASSERT(!list_empty(&cpus[mostJobs].rq.ready_list));
     min_vruntime(&cpus[mostJobs].rq.ready_list, NULL);
     int64_t busyminv = cpus[mostJobs].rq.min_vruntime;
 
@@ -334,9 +340,9 @@ void sched_load_balance()
     stolen->vruntime_0 = stolen->vruntime - busyminv + myminv;
     stolen->cpu = thisCpu;
     list_insert_ordered(&readyq->ready_list, &stolen->elem, vruntime_cmp, NULL);
-    myJobs = ++(readyq->nr_ready);
+    myWeight = myWeight + (prio_to_weight[stolen->nice]);
 
-    imbalance = (jobHighScore + myJobs) / 2;
+    imbalance = (weightHighScore - myWeight) / 2;
   }
 
   spinlock_release(&get_cpu()->rq.lock);
