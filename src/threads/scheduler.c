@@ -280,11 +280,9 @@ void sched_load_balance()
     spinlock_acquire(&cpus[i].rq.lock);
     
     int64_t totalWeight = 0;
-    struct list_elem* e = list_head (&cpus[i].rq.ready_list);
-    while ((e = list_next (e)) != list_end (&cpus[i].rq.ready_list)) 
-    {
-      struct thread *t = list_entry(e, struct thread, elem);
-      totalWeight = totalWeight + prio_to_weight[t->nice];
+    for ( struct list_elem * e = list_begin(&cpus[i].rq.ready_list); e != list_end(&cpus[i].rq.ready_list); e = list_next(e)) {
+        struct thread *t = list_entry(e, struct thread, elem);
+        totalWeight = totalWeight + prio_to_weight[t->nice];
     }
 
     if (totalWeight > weightHighScore && (&cpus[i] != get_cpu()))
