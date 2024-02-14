@@ -3,7 +3,9 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include <sys/types.h>
+
+#include "filesys/filesys.h"
+//#include <sys/types.h>
 static void syscall_handler (struct intr_frame *);
 
 void
@@ -15,6 +17,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+  //f->esp == 
   printf ("system call!\n");
   thread_exit ();
 }
@@ -47,22 +50,22 @@ void exit(int status)
   Runs the executable whose name is given in cmd_line, passing any given arguments.
   returns: the new process's program id (pid) or -1 on failure
 */
-pid_t exec(const char *cmd_line)
-{
+//pid_t exec(const char *cmd_line)
+//{
   //process_execute(file name)
-}
+//}
 /*
   if pid alive, wait until terminate
   returns: 0 on success, non 0 on failure.
 
 */
-int wait(pid_t pid)
-{
+//int wait(pid_t pid)
+//{
   // We suggest that you implement process_wait() according to the comment at the top of the function
   // then implement the wait system call in terms of process_wait().
 
   //process_wait()
-}
+//}
 /*
   creates a file, however does not open the file
   returns: true on success, false otherwise
