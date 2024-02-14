@@ -21,6 +21,10 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+// 4096 byte string array for process_execute. Self-imposed limit on command line argument
+// length. saved in the bss.
+char argv[32][128];
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -38,11 +42,41 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
   
+  void * sp = PHYS_BASE;
+
   char *token, *save_ptr;
+
+  int32_t argc = 0;
   for ( token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
-    printf("TEST %s\n", token);
+    strlcpy(argv[argc], token, strlen(token) + 1);
+    printf("%d, %s %d\n", argc, argv[argc], strlen(argv[argc]));
+    argc++;
+  }
+  
+  for ( int32_t n = argc - 1; n >= 0; n-- ) {
+    sp -= strlen(argv[n]) + 1;
+    printf("%p %p\n", sp, argv[n]);
+    //strlcpy(sp, argv[n], strlen(argv[n]) + 1);
+    //memcpy(sp, argv[n], strlen(argv[n]) + 1);
+    printf("%p\n", sp);
   }
 
+  sp = (void *) ((int32_t) sp & (~3)); //round down to multiple of 4.
+  sp -= sizeof(char *);
+
+  for ( int32_t n = argc - 1; n >= 0; n-- ) {
+    printf("%p %s\n", sp, argv[n]);
+    //sp = argv[n];
+    sp -= sizeof(char *);
+  }
+
+  sp = argv;
+  sp -= sizeof(char **);
+  sp = (void *) argc;
+  sp -= sizeof(int);
+  sp = NULL;
+  
+  hex_dump((uintptr_t) PHYS_BASE - 128, PHYS_BASE, 128, 1);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
