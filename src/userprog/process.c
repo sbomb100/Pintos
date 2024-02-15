@@ -54,9 +54,13 @@ process_execute (const char *file_name)
   }
   
   for ( int32_t n = argc - 1; n >= 0; n-- ) {
-    sp -= strlen(argv[n]) + 1;
     printf("%p %p\n", sp, argv[n]);
-    //strlcpy(sp, argv[n], strlen(argv[n]) + 1);
+    for ( int32_t i = strlen(argv[n]) + 1; i >= 0; i-- ) {
+        sp--;
+        sp = &argv[n][i];
+        //printf("%p\n", sp);
+    }
+    //strlcpy((char *) sp, argv[n], strlen(argv[n]) + 1);
     //memcpy(sp, argv[n], strlen(argv[n]) + 1);
     printf("%p\n", sp);
   }
