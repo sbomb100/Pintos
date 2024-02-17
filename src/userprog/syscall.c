@@ -11,6 +11,7 @@ static void syscall_handler (struct intr_frame *);
 void
 syscall_init (void) 
 {
+  lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -33,31 +34,31 @@ syscall_handler(struct intr_frame *f UNUSED)
     case SYS_EXEC:
     case SYS_WAIT:
     case SYS_CREATE:
-      get_args(f, &args, 2);
+      parse_arguments(f, &args, 2);
   	  f->eax = (uint32_t) create(args[0], args[1]);
     case SYS_REMOVE:
-      get_args(f, &args, 1);
+      parse_arguments(f, &args, 1);
       f->eax = (uint32_t) remove(args[0]);
     case SYS_OPEN:
-      get_args(f, &args, 1);
+      parse_arguments(f, &args, 1);
       f->eax = (uint32_t) open(args[0]);
     case SYS_FILESIZE:
-      get_args(f, &args, 1);
+      parse_arguments(f, &args, 1);
       f->eax = (uint32_t) filesize(args[0]);
     case SYS_READ:
-      get_args(f, &args, 3);
+      parse_arguments(f, &args, 3);
       f->eax = (uint32_t) read(args[0], args[1], args[2]);
     case SYS_WRITE:
-      get_args(f, &args, 3);
+      parse_arguments(f, &args, 3);
       f->eax = (uint32_t) write(args[0], args[1], args[2]);
     case SYS_SEEK:
-      get_args(f, &args, 2);
+      parse_arguments(f, &args, 2);
       seek(args[0], args[1]);
     case SYS_TELL:
-      get_args(f, &args, 1);
+      parse_arguments(f, &args, 1);
       f->eax = (uint32_t) tell(args[0]);
     case SYS_CLOSE:
-      get_args(f, &args, 1);
+      parse_arguments(f, &args, 1);
       close(args[0]);
     default: 
       printf("system call!\n");
@@ -301,18 +302,18 @@ int findFdForFile(){
 
 /*
 this checks the address of a given pointer to validate it*/
-void* validate_pointer(const void *vaddr)
+void* validate_pointer(const void * givenPointer)
 { 
     //is not a user virtual address
-    if (!is_user_vaddr(vaddr)) //from threads/vaddr.h
+    if (!is_user_vaddr(givenPointer)) //from threads/vaddr.h
     {
         return 0;
     }
     //from userprog/pagedir.c
     //vaddr < USER_VADDR_BOTTOM?
-    void *point = pagedir_get_page(thread_current()->pagedir, vaddr);
+    void *point = pagedir_get_page(thread_current()->pagedir, givenPointer);
     //is it a null when dereferenced
-    if (!point)
+    if (point == NULL)
     {
         return 0;
     }
@@ -321,13 +322,13 @@ void* validate_pointer(const void *vaddr)
 }
 /* get arguments off of the stack */
 void
-get_args (struct intr_frame *f, int *args, int numArgs)
+parse_arguments (struct intr_frame *f, int *args, int numArgs)
 {
-  int *tempPointer;
+  int *tempPointer = f->esp + 1; //area of first actual argument
   for (int i = 0; i < numArgs; i++)
   {
     //get arg, check its pointer, then set to an argument
-    tempPointer = (int *) f->esp + i + 1;
+    tempPointer = (int *) tempPointer + i;
     validate_pointer((const void *) tempPointer);
     args[i] = *tempPointer;
   }
