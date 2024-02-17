@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
@@ -35,16 +36,9 @@ tid_t process_execute(const char *file_name)
   fn_copy = palloc_get_page(0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy(fn_copy, file_name, PGSIZE);
-
-  // char *token, *save_ptr;
-  // for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-  // {
-  //   printf("TEST %s\n", token);
-  // }
-
-  /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create(file_name, NICE_DEFAULT, start_process, fn_copy);
+  strlcpy (fn_copy, file_name, PGSIZE);
+  
+  tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
   return tid;
@@ -217,6 +211,24 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  
+  char* fn_copy;
+  char** argv;
+  int argc = 0;
+
+  fn_copy = malloc(strlen(file_name) + 1);//malloc(strlen(file_name) + 1);
+  if ( fn_copy == NULL ) return false;
+  
+  argv = malloc(4096);
+  if ( argv == NULL ) {
+    free(fn_copy);
+    return false;
+  }
+
+  strlcpy(fn_copy, file_name, PGSIZE);
+
+  char *token, *save_ptr;
+  token = strtok_r(fn_copy, " ", &save_ptr);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create();
@@ -225,19 +237,25 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   process_activate();
 
   /* Open executable file. */
-  file = filesys_open(file_name);
-  if (file == NULL)
-  {
-    printf("load: %s: open failed\n", file_name);
-    goto done;
-  }
+  file = filesys_open (token);
+  if (file == NULL) 
+    {
+      printf ("load: %s: open failed\n", token);
+      goto done; 
+    }
 
   /* Read and verify executable header. */
-  if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 3 || ehdr.e_version != 1 || ehdr.e_phentsize != sizeof(struct Elf32_Phdr) || ehdr.e_phnum > 1024)
-  {
-    printf("load: %s: error loading executable\n", file_name);
-    goto done;
-  }
+  if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
+      || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
+      || ehdr.e_type != 2
+      || ehdr.e_machine != 3
+      || ehdr.e_version != 1
+      || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
+      || ehdr.e_phnum > 1024) 
+    {
+      printf ("load: %s: error loading executable\n", token);
+      goto done; 
+    }
 
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
@@ -300,6 +318,32 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   /* Set up stack. */
   if (!setup_stack(esp, file_name))
     goto done;
+  
+  for ( ; token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
+    *esp -= strlen(token) + 1;
+    
+    memcpy(*esp, token, strlen(token) + 1);
+    argv[argc] = *esp;
+    argc++;
+  }
+
+  *esp = (void *) ((int32_t) *esp & (~3));
+  *esp -= sizeof(char *);
+
+  for ( int i = argc - 1; i >= 0; i-- ) {
+    *esp -= sizeof(char *);
+    memcpy(*esp, argv + i, sizeof(char *));
+  }
+  
+  *esp -= sizeof(char *);
+  memcpy(*esp, *esp + sizeof(char *), sizeof(char *));
+  
+  *esp -= sizeof(char *);
+  memcpy(*esp, &argc, sizeof(int));
+
+  *esp -= sizeof(char *);
+
+  //hex_dump((uintptr_t) *esp - 32, *esp - 32, 128, 1);
 
   /* Start address. */
   *eip = (void (*)(void))ehdr.e_entry;
@@ -308,7 +352,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
 done:
   /* We arrive here whether the load is successful or not. */
-  file_close(file);
+  free(fn_copy);
+  free(argv);
+  file_close (file);
   return success;
 }
 
@@ -428,85 +474,15 @@ setup_stack(void **esp, char* file_name)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
-  {
-    success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-    if (success)
-      *esp = PHYS_BASE - 12;
-    else
-      palloc_free_page(kpage);
-  }
-
-  //start of arg handling
-  char *currentArg;
-  char *save_ptr;
-  int argc = 0;
-
-  //copy file name just in case
-  char *file_name_copy = malloc(strlen(file_name) + 1);
-  strlcpy(file_name_copy, file_name, strlen(file_name) + 1);
-
-  //count the args so we can get argc
-  for (currentArg = strtok_r(file_name_copy, " ", &save_ptr); currentArg != NULL;
-       currentArg = strtok_r(NULL, " ", &save_ptr))
-    argc++;
-
-  //allocate the argv based on argc (using calloc to add terminator to end)
-  int *argv = calloc(argc, sizeof(int));
-
-  //start putting tokens in argv (so we can get addresses later)
-  //put them on stack 
-  int index = 0;
-  for (currentArg = strtok_r(file_name_copy, " ", &save_ptr); currentArg != NULL; currentArg = strtok_r(NULL, " ", &save_ptr))
-  {
-    //copy the arg to stack
-    *esp -= strlen(currentArg) + 1;
-    memcpy(*esp, currentArg, strlen(currentArg) + 1);
-    //put it in array
-    argv[index] = *esp;
-    index++;
-  }
-
-  //make sure the pointers are alligned
-  while ((int)*esp % 4 != 0)
-  {
-    *esp -= sizeof(char);
-    char filler = 0;
-    memcpy(*esp, &filler, sizeof(char));
-  }
-
-  int zero = 0;
-
-  //add a terminator to array of addresses
-  *esp -= sizeof(int);
-  memcpy(*esp, &zero, sizeof(int));
-
-  //add each address from argv to stack 
-  //argc - 1 bc we are working backwards (i.e argc is 4 but we want indexes 3 2 1 0)
-  for (int index = argc - 1; index >= 0; index--)
-  {
-    *esp -= sizeof(int);
-    memcpy(*esp, &argv[index], sizeof(int));
-  }
-
-  //push argv
-  int ptr = *esp;
-  *esp -= sizeof(int);
-  memcpy(*esp, &ptr, sizeof(int));
-
-  //push argc on stack
-  *esp -= sizeof(int);
-  memcpy(*esp, &argc, sizeof(int));
-
-  //fake return address
-  *esp -= sizeof(int);
-  memcpy(*esp, &zero, sizeof(int));
-
-  //cleanup
-  free(file_name_copy);
-  free(argv);
-
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL) 
+    {
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success)
+        *esp = PHYS_BASE;
+      else
+        palloc_free_page (kpage);
+    }
   return success;
 }
 
