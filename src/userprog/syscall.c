@@ -14,12 +14,58 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler(struct intr_frame *f UNUSED)
 {
-  //f->esp == 
-  printf ("system call!\n");
-  thread_exit ();
+  //get pointer (int bc we want sys call number)
+  int* p = f->esp;
+  //check if its a good pointer
+  validate_pointer(p);
+  int syscall_num = *p;
+  int args[3];
+  //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
+  switch (syscall_num){
+    case SYS_HALT:
+      halt();
+    case SYS_EXIT:
+      //get arg for exit then exit
+    case SYS_EXEC:
+    case SYS_WAIT:
+    case SYS_CREATE:
+      get_args(f, &args, 2);
+  	  f->eax = (uint32_t) create(args[0], args[1]);
+    case SYS_REMOVE:
+      get_args(f, &args, 1);
+      f->eax = (uint32_t) remove(args[0]);
+    case SYS_OPEN:
+      get_args(f, &args, 1);
+      f->eax = (uint32_t) open(args[0]);
+    case SYS_FILESIZE:
+      get_args(f, &args, 1);
+      f->eax = (uint32_t) filesize(args[0]);
+    case SYS_READ:
+      get_args(f, &args, 3);
+      f->eax = (uint32_t) read(args[0], args[1], args[2]);
+    case SYS_WRITE:
+      get_args(f, &args, 3);
+      f->eax = (uint32_t) write(args[0], args[1], args[2]);
+    case SYS_SEEK:
+      get_args(f, &args, 2);
+      seek(args[0], args[1]);
+    case SYS_TELL:
+      get_args(f, &args, 1);
+      f->eax = (uint32_t) tell(args[0]);
+    case SYS_CLOSE:
+      get_args(f, &args, 1);
+      close(args[0]);
+    default: 
+      printf("system call!\n");
+
+  }
+  
+  //thread_exit();
+
 }
 
 //whats difference from user/lib/syscall.c
@@ -250,4 +296,39 @@ int findFdForFile(){
     }
   }
   return -1;
+}
+
+
+/*
+this checks the address of a given pointer to validate it*/
+void* validate_pointer(const void *vaddr)
+{ 
+    //is not a user virtual address
+    if (!is_user_vaddr(vaddr)) //from threads/vaddr.h
+    {
+        return 0;
+    }
+    //from userprog/pagedir.c
+    //vaddr < USER_VADDR_BOTTOM?
+    void *point = pagedir_get_page(thread_current()->pagedir, vaddr);
+    //is it a null when dereferenced
+    if (!point)
+    {
+        return 0;
+    }
+    //return the valid pointer
+    return point;
+}
+/* get arguments off of the stack */
+void
+get_args (struct intr_frame *f, int *args, int numArgs)
+{
+  int *tempPointer;
+  for (int i = 0; i < numArgs; i++)
+  {
+    //get arg, check its pointer, then set to an argument
+    tempPointer = (int *) f->esp + i + 1;
+    validate_pointer((const void *) tempPointer);
+    args[i] = *tempPointer;
+  }
 }
