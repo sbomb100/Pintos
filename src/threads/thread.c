@@ -81,6 +81,8 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
   sched_init (&bcpu->rq);
   spinlock_init (&bcpu->rq.lock);
+  /* SET UP FILE DESCRIPTOR ARRAY*/
+  
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_boot_thread (initial_thread, bcpu);

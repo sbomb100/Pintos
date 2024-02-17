@@ -111,6 +111,9 @@ struct thread
   int64_t vruntime; 
   int64_t vruntime_0;
   int64_t actual_runtime;
+  /*added in P2 for File Descriptors*/
+  struct file* fdToFile[1024];
+
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
