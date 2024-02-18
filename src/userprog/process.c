@@ -15,15 +15,12 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
-
-// 4096 byte string array for process_execute. Self-imposed limit on command line argument
-// length. saved in the bss.
-char argv[32][128];
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -39,53 +36,9 @@ tid_t process_execute(const char *file_name)
   fn_copy = palloc_get_page(0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy(fn_copy, file_name, PGSIZE);
-
-  void *sp = PHYS_BASE;
-
-  char *token, *save_ptr;
-
-  int32_t argc = 0;
-  for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-  {
-    strlcpy(argv[argc], token, strlen(token) + 1);
-    printf("%d, %s %d\n", argc, argv[argc], strlen(argv[argc]));
-    argc++;
-  }
-
-  for (int32_t n = argc - 1; n >= 0; n--)
-  {
-    printf("%p %p\n", sp, argv[n]);
-    for (int32_t i = strlen(argv[n]) + 1; i >= 0; i--)
-    {
-      sp--;
-      sp = &argv[n][i];
-      // printf("%p\n", sp);
-    }
-    // strlcpy((char *) sp, argv[n], strlen(argv[n]) + 1);
-    // memcpy(sp, argv[n], strlen(argv[n]) + 1);
-    printf("%p\n", sp);
-  }
-
-  sp = (void *)((int32_t)sp & (~3)); // round down to multiple of 4.
-  sp -= sizeof(char *);
-
-  for (int32_t n = argc - 1; n >= 0; n--)
-  {
-    printf("%p %s\n", sp, argv[n]);
-    // sp = argv[n];
-    sp -= sizeof(char *);
-  }
-
-  sp = argv;
-  sp -= sizeof(char **);
-  sp = (void *)argc;
-  sp -= sizeof(int);
-  sp = NULL;
-
-  hex_dump((uintptr_t)PHYS_BASE - 128, PHYS_BASE, 128, 1);
-  /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create(file_name, NICE_DEFAULT, start_process, fn_copy);
+  strlcpy (fn_copy, file_name, PGSIZE);
+  
+  tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
   return tid;
@@ -258,6 +211,24 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  
+  char* fn_copy;
+  char** argv;
+  int argc = 0;
+
+  fn_copy = malloc(strlen(file_name) + 1);//malloc(strlen(file_name) + 1);
+  if ( fn_copy == NULL ) return false;
+  
+  argv = malloc(4096);
+  if ( argv == NULL ) {
+    free(fn_copy);
+    return false;
+  }
+
+  strlcpy(fn_copy, file_name, PGSIZE);
+
+  char *token, *save_ptr;
+  token = strtok_r(fn_copy, " ", &save_ptr);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create();
@@ -266,19 +237,25 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   process_activate();
 
   /* Open executable file. */
-  file = filesys_open(file_name);
-  if (file == NULL)
-  {
-    printf("load: %s: open failed\n", file_name);
-    goto done;
-  }
+  file = filesys_open (token);
+  if (file == NULL) 
+    {
+      printf ("load: %s: open failed\n", token);
+      goto done; 
+    }
 
   /* Read and verify executable header. */
-  if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 3 || ehdr.e_version != 1 || ehdr.e_phentsize != sizeof(struct Elf32_Phdr) || ehdr.e_phnum > 1024)
-  {
-    printf("load: %s: error loading executable\n", file_name);
-    goto done;
-  }
+  if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
+      || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
+      || ehdr.e_type != 2
+      || ehdr.e_machine != 3
+      || ehdr.e_version != 1
+      || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
+      || ehdr.e_phnum > 1024) 
+    {
+      printf ("load: %s: error loading executable\n", token);
+      goto done; 
+    }
 
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
@@ -341,6 +318,32 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   /* Set up stack. */
   if (!setup_stack(esp))
     goto done;
+  
+  for ( ; token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
+    *esp -= strlen(token) + 1;
+    
+    memcpy(*esp, token, strlen(token) + 1);
+    argv[argc] = *esp;
+    argc++;
+  }
+
+  *esp = (void *) ((int32_t) *esp & (~3));
+  *esp -= sizeof(char *);
+
+  for ( int i = argc - 1; i >= 0; i-- ) {
+    *esp -= sizeof(char *);
+    memcpy(*esp, argv + i, sizeof(char *));
+  }
+  
+  *esp -= sizeof(char *);
+  memcpy(*esp, *esp + sizeof(char *), sizeof(char *));
+  
+  *esp -= sizeof(char *);
+  memcpy(*esp, &argc, sizeof(int));
+
+  *esp -= sizeof(char *);
+
+  //hex_dump((uintptr_t) *esp - 32, *esp - 32, 128, 1);
 
   /* Start address. */
   *eip = (void (*)(void))ehdr.e_entry;
@@ -349,7 +352,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
 done:
   /* We arrive here whether the load is successful or not. */
-  file_close(file);
+  free(fn_copy);
+  free(argv);
+  file_close (file);
   return success;
 }
 
@@ -469,15 +474,15 @@ setup_stack(void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
-  {
-    success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-    if (success)
-      *esp = PHYS_BASE - 12;
-    else
-      palloc_free_page(kpage);
-  }
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL) 
+    {
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success)
+        *esp = PHYS_BASE;
+      else
+        palloc_free_page (kpage);
+    }
   return success;
 }
 
