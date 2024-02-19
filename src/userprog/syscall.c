@@ -1,12 +1,8 @@
 #include "userprog/syscall.h"
-#include <stdio.h>
-#include <syscall-nr.h>
-#include "threads/interrupt.h"
-#include "threads/thread.h"
 
-#include "filesys/filesys.h"
 //#include <sys/types.h>
 static void syscall_handler (struct intr_frame *);
+struct lock file_lock;
 
 void
 syscall_init (void) 
@@ -14,7 +10,18 @@ syscall_init (void)
   lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
-
+/* get arguments off of the stack */ 
+void parse_arguments (struct intr_frame *f, int *args[3], int numArgs)
+{
+  int *tempPointer = f->esp + 1; //area of first actual argument
+  for (int i = 0; i < numArgs; i++)
+  {
+    //get arg, check its pointer, then set to an argument
+    tempPointer = (int *) tempPointer + i;
+    validate_pointer((const void *) tempPointer);
+    args[i] = *tempPointer;
+  }
+}
 
 static void
 syscall_handler(struct intr_frame *f UNUSED)
@@ -29,37 +36,50 @@ syscall_handler(struct intr_frame *f UNUSED)
   switch (syscall_num){
     case SYS_HALT:
       halt();
+      break;
     case SYS_EXIT:
       //get arg for exit then exit
+      break;
     case SYS_EXEC:
+      break;
     case SYS_WAIT:
+      break;
     case SYS_CREATE:
       parse_arguments(f, &args, 2);
   	  f->eax = (uint32_t) create(args[0], args[1]);
+      break;
     case SYS_REMOVE:
       parse_arguments(f, &args, 1);
       f->eax = (uint32_t) remove(args[0]);
+      break;
     case SYS_OPEN:
       parse_arguments(f, &args, 1);
       f->eax = (uint32_t) open(args[0]);
+      break;
     case SYS_FILESIZE:
       parse_arguments(f, &args, 1);
       f->eax = (uint32_t) filesize(args[0]);
+      break;
     case SYS_READ:
       parse_arguments(f, &args, 3);
       f->eax = (uint32_t) read(args[0], args[1], args[2]);
+      break;
     case SYS_WRITE:
       parse_arguments(f, &args, 3);
       f->eax = (uint32_t) write(args[0], args[1], args[2]);
+      break;
     case SYS_SEEK:
       parse_arguments(f, &args, 2);
       seek(args[0], args[1]);
+      break;
     case SYS_TELL:
       parse_arguments(f, &args, 1);
       f->eax = (uint32_t) tell(args[0]);
+      break;
     case SYS_CLOSE:
       parse_arguments(f, &args, 1);
       close(args[0]);
+      break;
     default: 
       printf("system call!\n");
 
@@ -185,7 +205,7 @@ int filesize(int fd)
 int read(int fd, void *buffer, unsigned size)
 {
   // Fd 0 reads from the keyboard using input_getc().
-  int bytesRead = 0;
+  unsigned bytesRead = 0;
   
   // If fd == 0, reads from keyboard using input_getc()
   if (fd == 0)
@@ -244,9 +264,9 @@ int write(int fd, const void *buffer, unsigned size)
 */
 void seek(int fd, unsigned position)
 {
-  struct file_desc * fd_elem = get_file(fd);
+  struct file* fileDes = thread_current()->fdToFile[fd - 2];
 
-  if (fd_elem == NULL)
+  if (fileDes == NULL)
     return;
   
   lock_acquire(&file_lock);
@@ -277,7 +297,7 @@ void close(int fd)
   
   struct file* fileDes = thread_current()->fdToFile[fd - 2];
   if (fileDes == NULL)
-    return -1;
+    return;
   
   
   lock_acquire(&file_lock);
@@ -311,7 +331,7 @@ void* validate_pointer(const void * givenPointer)
     }
     //from userprog/pagedir.c
     //vaddr < USER_VADDR_BOTTOM?
-    void *point = pagedir_get_page(thread_current()->pagedir, givenPointer);
+    void *point = (void *)pagedir_get_page(thread_current()->pagedir, givenPointer);
     //is it a null when dereferenced
     if (point == NULL)
     {
@@ -319,17 +339,4 @@ void* validate_pointer(const void * givenPointer)
     }
     //return the valid pointer
     return point;
-}
-/* get arguments off of the stack */
-void
-parse_arguments (struct intr_frame *f, int *args, int numArgs)
-{
-  int *tempPointer = f->esp + 1; //area of first actual argument
-  for (int i = 0; i < numArgs; i++)
-  {
-    //get arg, check its pointer, then set to an argument
-    tempPointer = (int *) tempPointer + i;
-    validate_pointer((const void *) tempPointer);
-    args[i] = *tempPointer;
-  }
 }

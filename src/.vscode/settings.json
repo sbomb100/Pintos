@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "stdbool.h": "c",
+        "filesys.h": "c",
+        "syscall.h": "c",
+        "interrupt.h": "c"
+    }
+}
