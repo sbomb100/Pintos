@@ -19,9 +19,9 @@ void parse_arguments (struct intr_frame *f, int *args[3], int numArgs)
     //get arg, check its pointer, then set to an argument
     tempPointer = (int *) tempPointer + i;
     validate_pointer((const void *) tempPointer);
-    args[i] = *tempPointer;
+    *args[i] = *tempPointer;
   }
-}
+} 
 
 static void
 syscall_handler(struct intr_frame *f UNUSED)
@@ -31,7 +31,7 @@ syscall_handler(struct intr_frame *f UNUSED)
   //check if its a good pointer
   validate_pointer(p);
   int syscall_num = *p;
-  int args[3];
+  int args[3] = {0, 0, 0};
   //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
   switch (syscall_num){
     case SYS_HALT:
@@ -46,15 +46,15 @@ syscall_handler(struct intr_frame *f UNUSED)
       break;
     case SYS_CREATE:
       parse_arguments(f, &args, 2);
-  	  f->eax = (uint32_t) create(args[0], args[1]);
+  	  f->eax = (uint32_t) create((const char *)args[0], (unsigned int)args[1]);
       break;
     case SYS_REMOVE:
       parse_arguments(f, &args, 1);
-      f->eax = (uint32_t) remove(args[0]);
+      f->eax = (uint32_t) remove((const char *)args[0]);
       break;
     case SYS_OPEN:
       parse_arguments(f, &args, 1);
-      f->eax = (uint32_t) open(args[0]);
+      f->eax = (uint32_t) open((const char *)args[0]);
       break;
     case SYS_FILESIZE:
       parse_arguments(f, &args, 1);
@@ -62,15 +62,15 @@ syscall_handler(struct intr_frame *f UNUSED)
       break;
     case SYS_READ:
       parse_arguments(f, &args, 3);
-      f->eax = (uint32_t) read(args[0], args[1], args[2]);
+      f->eax = (uint32_t) read(args[0], (void *)args[1], (unsigned int) args[2]);
       break;
     case SYS_WRITE:
       parse_arguments(f, &args, 3);
-      f->eax = (uint32_t) write(args[0], args[1], args[2]);
+      f->eax = (uint32_t) write(args[0], (void *)args[1], (unsigned int)args[2]);
       break;
     case SYS_SEEK:
       parse_arguments(f, &args, 2);
-      seek(args[0], args[1]);
+      seek(args[0], (unsigned int) args[1]);
       break;
     case SYS_TELL:
       parse_arguments(f, &args, 1);
@@ -222,7 +222,7 @@ int read(int fd, void *buffer, unsigned size)
   struct file * filePtr = thread_current()->fdToFile[fd - 2];
   if (filePtr == NULL)
     return -1;
-  
+   
   lock_acquire(&file_lock);
   // Read from the file using filesys function
   bytesRead = file_read(filePtr,buffer,size);
