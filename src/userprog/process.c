@@ -64,15 +64,6 @@ start_process(void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page(file_name);
-  struct child *cur_child = find_child(thread_current()->parent->children, thread_current()->tid);
-  if (!success) {
-    cur_child->has_loaded = false;
-    sema_up(&cur_child->wait_sema);
-    thread_exit(-1);
-  } else {
-    cur_child->has_loaded = true;
-    sema_up(&cur_child->wait_sema);
-  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
