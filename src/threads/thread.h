@@ -112,7 +112,7 @@ struct thread
   int64_t vruntime_0;
   int64_t actual_runtime;
   /*added in P2 for File Descriptors*/
-  struct file* fdToFile[100];
+  struct file** fdToFile;
 
   /* Parent-Child Relationship */
   struct thread *parent;
