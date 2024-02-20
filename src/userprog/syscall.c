@@ -51,12 +51,9 @@ syscall_handler(struct intr_frame *f UNUSED)
       halt();
       break;
     case SYS_EXIT:
-      printf("SYS_EXIT\n");
+      // printf("SYS_EXIT\n");
       if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
-      struct thread *cur = thread_current();
-      // int arg = *(int *) (p + 4);
-      printf ("%s\n", cur->name);
       thread_exit(*(int *) (p + 4));
       break;
     case SYS_EXEC:
@@ -110,7 +107,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       f->eax = (uint32_t) read(args[0], (void *) args[1], (unsigned int) args[2]);
       break;
     case SYS_WRITE:
-      printf("SYS_WRITE\n");
+      // printf("SYS_WRITE\n");
       if (!parse_arguments(f, &args[0], 3)) {
         thread_exit(-1);
         return;
@@ -146,7 +143,7 @@ syscall_handler(struct intr_frame *f UNUSED)
 
   }
   
-  thread_exit(0);
+  // thread_exit(0);
 
 }
 
@@ -284,7 +281,7 @@ int read(int fd, void *buffer, unsigned size)
 int write(int fd, const void *buffer, unsigned size)
 {
   // Fd 1 writes to the console.
-printf ("fd: %d\n", fd);
+// printf ("fd: %d\n", fd);
   // Your code to write to the console should write all of buffer in one call to putbuf(),
   // at least as long as size is not bigger than a few hundred bytes.
   // if fd == 1, write to standard output

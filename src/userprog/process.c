@@ -373,15 +373,16 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     memcpy(*esp, argv + i, sizeof(char *));
   }
   
-  *esp -= sizeof(char *);
-  memcpy(*esp, *esp + sizeof(char *), sizeof(char *));
+  char *temp = *esp;
+  *esp -= sizeof(char **);
+  memcpy(*esp, &temp, sizeof(char **));
   
   *esp -= sizeof(char *);
   memcpy(*esp, &argc, sizeof(int));
 
   *esp -= sizeof(char *);
 
-  //hex_dump((uintptr_t) *esp - 32, *esp - 32, 128, 1);
+  // hex_dump((uintptr_t) *esp - 32, *esp - 32, 128, 1);
 
   /* Start address. */
   *eip = (void (*)(void))ehdr.e_entry;
