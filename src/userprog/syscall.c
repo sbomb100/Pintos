@@ -12,26 +12,27 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 /* get arguments off of the stack */ 
-// void parse_arguments (struct intr_frame *f, int args[], int numArgs)
-// {
-//   int *tempPointer = f->esp + 1; //area of first actual argument
-//   for (int i = 0; i < numArgs; i++)
-//   {
-//     //get arg, check its pointer, then set to an argument
-//     tempPointer = (int *) tempPointer + i;
-//     validate_pointer((const void *) tempPointer);
-//     *args[i] = *tempPointer;
-//   }
-// } 
+ bool parse_arguments (struct intr_frame *f, int* args, int numArgs)
+ {
+   int i;
+    int *ptr;
+    for (i = 0; i < numArgs; i++)
+    {
+        ptr = (int *) f->esp + i + 1;
+        validate_pointer((const void *) ptr);
+        args[i] = *ptr;
+    }
+    return true;
+ } 
 
-bool parse_arguments (void *ptr, int args)
-{
-  for (int i = 0; i < 4*args; i++) {
-    if (!validate_pointer((int *) ptr+i))
-      return false;
-  }
-  return true;
-} 
+// bool parse_arguments (void *ptr, int args)
+// {
+//   for (int i = 0; i < 4*args; i++) {
+//     if (!validate_pointer((int *) ptr+i))
+//       return false;
+//   }
+//   return true;
+// } 
 
 static void
 syscall_handler(struct intr_frame *f UNUSED)
@@ -41,7 +42,7 @@ syscall_handler(struct intr_frame *f UNUSED)
   //check if its a good pointer
   validate_pointer(p);
   int syscall_num = *p;
-  // int args[3] = {0, 0, 0};
+  int args[3];
   //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
   switch (syscall_num){
     case SYS_HALT:
@@ -49,12 +50,12 @@ syscall_handler(struct intr_frame *f UNUSED)
       break;
     case SYS_EXIT:
       printf("SYS_EXIT\n");
-      if (!parse_arguments(p+1, 1))
+      if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
       // thread_current()->exit_status = *(int *) (p + 4); // TODO: exit_status should be in child struct
-      // struct thread *cur = thread_current();
+      struct thread *cur = thread_current();
       // int arg = *(int *) (p + 4);
-      // printf ("%s: exit(%d)\n", cur->name, arg);
+      printf ("%s\n", cur->name);
       thread_exit(*(int *) (p + 4));
       break;
     case SYS_EXEC:
@@ -62,14 +63,14 @@ syscall_handler(struct intr_frame *f UNUSED)
       break;
     case SYS_WAIT:
       printf("SYS_WAIT\n");
-      if (!parse_arguments(p+1, 1))
+      if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
       int arg = *(int *) (p + 4);
       f->eax = process_wait(arg);
       break;
     case SYS_CREATE:
       printf("SYS_CREATE\n");
-      if (!parse_arguments(p+4, 2)) {
+      if (!parse_arguments(f, &args[0], 2)){
         thread_exit(-1);
         return;
       }
@@ -77,67 +78,67 @@ syscall_handler(struct intr_frame *f UNUSED)
       break;
     case SYS_REMOVE:
       printf("SYS_REMOVE\n");
-      if (!parse_arguments(p+4, 1)) {
+      if (!parse_arguments(f, &args[0], 1)){
         thread_exit(-1);
         return;
       }
-      f->eax = (uint32_t) remove((const char *) (p + 4));
+      f->eax = (uint32_t) remove((const char *) args[0]);
       break;
     case SYS_OPEN:
       printf("SYS_OPEN\n");
-      if (!parse_arguments(p+4, 1)) {
+      if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
       }
-      f->eax = (uint32_t) open((const char *) (p + 4));
+      f->eax = (uint32_t) open((const char *)  args[0]);
       break;
     case SYS_FILESIZE:
       printf("SYS_FILESIZE\n");
-      if (!parse_arguments(p+4, 1)) {
+      if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
       }
-      f->eax = (uint32_t) filesize((int) p + 4);
+      f->eax = (uint32_t) filesize(args[0]);
       break;
     case SYS_READ:
       printf("SYS_READ\n");
-      if (!parse_arguments(p+4, 3)) {
+      if (!parse_arguments(f, &args[0], 3)) {
         thread_exit(-1);
         return;
       }
-      f->eax = (uint32_t) read(*((int*) p + 4), (void *) (p + 8), (unsigned int) (p + 12));
+      f->eax = (uint32_t) read(args[0], (void *) args[1], (unsigned int) args[2]);
       break;
     case SYS_WRITE:
       printf("SYS_WRITE\n");
-      if (!parse_arguments(p+4, 3)) {
+      if (!parse_arguments(f, &args[0], 3)) {
         thread_exit(-1);
         return;
       }
-      f->eax = (uint32_t) write(*((int*) p + 4), (void *)(p + 8), (unsigned int) (p + 12));
+      f->eax = (uint32_t) write(args[0], (const void *) args[1], (unsigned int) args[2]);
       break;
     case SYS_SEEK:
       printf("SYS_SEEK\n");
-      if (!parse_arguments(p+4, 2)) {
+      if (!parse_arguments(f, &args[0], 2)) {
         thread_exit(-1);
         return;
       }
-      seek(*((int*) p + 4), (unsigned int) (p + 8));
+      seek(args[0], (unsigned int) args[1]);
       break;
     case SYS_TELL:
       printf("SYS_TELL\n");
-      if (!parse_arguments(p+4, 1)) {
+      if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
       }
-      f->eax = (uint32_t) tell(*((int*) p + 4));
+      f->eax = (uint32_t) tell(args[0]);
       break;
     case SYS_CLOSE:
       printf("SYS_CLOSE\n");
-      if (!parse_arguments(p+4, 1)) {
+      if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
       }
-      close(*((int*) p + 4));
+      close(args[0]);
       break;
     default: 
       printf("system call!\n");
@@ -282,7 +283,7 @@ int read(int fd, void *buffer, unsigned size)
 int write(int fd, const void *buffer, unsigned size)
 {
   // Fd 1 writes to the console.
-
+printf ("fd: %d\n", fd);
   // Your code to write to the console should write all of buffer in one call to putbuf(),
   // at least as long as size is not bigger than a few hundred bytes.
   // if fd == 1, write to standard output

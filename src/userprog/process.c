@@ -126,7 +126,7 @@ void process_exit(int status)
 
   /* Process Termination Message */
   printf ("%s: exit(%d)\n", cur->name, status);
-
+  
   /* Find the child */
   ASSERT(cur->parent != NULL);
   ASSERT(!list_empty(&cur->parent->children));

@@ -12,7 +12,7 @@
 #include "devices/input.h"
 #include "devices/shutdown.h"
 void syscall_init (void);
-bool parse_arguments (void *ptr, int args);
+bool parse_arguments (struct intr_frame *f, int* args, int numArgs);
 bool validate_pointer(const void * pointer);
 void halt(void);
 void exit(int status);
