@@ -170,7 +170,7 @@ main (void)
   run_actions (argv);
   /* Finish up. */
   shutdown ();
-  thread_exit ();
+  thread_exit (0);
   NOT_REACHED ();
 }
 

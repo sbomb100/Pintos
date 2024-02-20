@@ -28,6 +28,7 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name)
 {
+  // printf("PROCESS_EXEC\n");
   char *fn_copy;
   tid_t tid;
 
@@ -63,7 +64,7 @@ start_process(void *file_name_)
   /* If load failed, quit. */
   palloc_free_page(file_name);
   if (!success)
-    thread_exit();
+    thread_exit(-1);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -86,16 +87,61 @@ start_process(void *file_name_)
    does nothing. */
 int process_wait(tid_t child_tid UNUSED)
 {
+  /* Finds the child */
+  struct thread *cur = thread_current();
+  struct child *cur_child = NULL;
+  struct list_elem *e;
+
+  for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e)){
+    struct child *temp = list_entry(e, struct child, elem);
+    if (temp->tid == child_tid) {
+      cur_child = temp;
+      break;
+    }
+  }
+
+  /* exits if no child was found */
+  if (cur_child == NULL) {
+    return -1;
+  }
+
+  if (!cur_child->has_exited) {
+    sema_down(&cur_child->wait_sema);
+  }
+
+  list_remove(e);
+  return cur_child->exit_status;
+
   for (;;)
     ;
   return -1;
 }
 
 /* Free the current process's resources. */
-void process_exit(void)
+void process_exit(int status)
 {
+  // printf("PROCESS_EXIT\n");
   struct thread *cur = thread_current();
   uint32_t *pd;
+
+  /* Process Termination Message */
+  printf ("%s: exit(%d)\n", cur->name, status);
+
+  /* Find the child */
+  ASSERT(cur->parent != NULL);
+  ASSERT(!list_empty(&cur->parent->children));
+  struct child *cur_child = NULL;
+  struct list_elem *e;
+  for (e = list_begin(&cur->parent->children); e != list_end(&cur->parent->children); e = list_next(e)){
+    struct child *temp = list_entry(e, struct child, elem);
+    if (temp->tid == cur->tid) {
+      cur_child = temp;
+      break;
+    }
+  }
+
+  cur_child->exit_status = status;
+  sema_up(&cur_child->wait_sema);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

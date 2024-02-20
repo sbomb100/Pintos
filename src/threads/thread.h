@@ -114,12 +114,26 @@ struct thread
   /*added in P2 for File Descriptors*/
   struct file* fdToFile[100];
 
+  /* Parent-Child Relationship */
+  struct thread *parent;
+  struct list children;
+
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
 #endif
   /* Owned by thread.c. */
   unsigned magic; /* Detects stack overflow. */
+};
+
+struct child
+{
+   tid_t tid;
+   int exit_status;
+   bool has_exited;
+   struct semaphore wait_sema;
+   struct list_elem elem;
+
 };
 
 void thread_init (void);
@@ -138,7 +152,7 @@ struct thread * thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
-void thread_exit (void) NO_RETURN;
+void thread_exit (int status) NO_RETURN;
 void thread_yield (void);
 void thread_exit_ap (void) NO_RETURN;
 /* Performs some operation on thread t, given auxiliary data AUX. */

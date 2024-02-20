@@ -1,4 +1,5 @@
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 
 //#include <sys/types.h>
 static void syscall_handler (struct intr_frame *);
@@ -47,74 +48,90 @@ syscall_handler(struct intr_frame *f UNUSED)
       halt();
       break;
     case SYS_EXIT:
+      printf("SYS_EXIT\n");
       if (!parse_arguments(p+1, 1))
-        thread_exit();
+        thread_exit(-1);
       // thread_current()->exit_status = *(int *) (p + 4); // TODO: exit_status should be in child struct
-      thread_exit();
+      thread_exit(-1);
       break;
     case SYS_EXEC:
+      printf("SYS_EXEC\n");
       break;
     case SYS_WAIT:
+      printf("SYS_WAIT\n");
+      if (!parse_arguments(p+1, 1))
+        thread_exit(-1);
+      int arg = *(int *) (p + 4);
+      f->eax = process_wait(arg);
       break;
     case SYS_CREATE:
+      printf("SYS_CREATE\n");
       if (!parse_arguments(p+4, 2)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
   	  f->eax = (uint32_t) create((const char *) (p + 4), (unsigned int) (p + 8));
       break;
     case SYS_REMOVE:
+      printf("SYS_REMOVE\n");
       if (!parse_arguments(p+4, 1)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       f->eax = (uint32_t) remove((const char *) (p + 4));
       break;
     case SYS_OPEN:
+      printf("SYS_OPEN\n");
       if (!parse_arguments(p+4, 1)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       f->eax = (uint32_t) open((const char *) (p + 4));
       break;
     case SYS_FILESIZE:
+      printf("SYS_FILESIZE\n");
       if (!parse_arguments(p+4, 1)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       f->eax = (uint32_t) filesize((int) p + 4);
       break;
     case SYS_READ:
+      printf("SYS_READ\n");
       if (!parse_arguments(p+4, 3)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       f->eax = (uint32_t) read(*((int*) p + 4), (void *) (p + 8), (unsigned int) (p + 12));
       break;
     case SYS_WRITE:
+      printf("SYS_WRITE\n");
       if (!parse_arguments(p+4, 3)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       f->eax = (uint32_t) write(*((int*) p + 4), (void *)(p + 8), (unsigned int) (p + 12));
       break;
     case SYS_SEEK:
+      printf("SYS_SEEK\n");
       if (!parse_arguments(p+4, 2)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       seek(*((int*) p + 4), (unsigned int) (p + 8));
       break;
     case SYS_TELL:
+      printf("SYS_TELL\n");
       if (!parse_arguments(p+4, 1)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       f->eax = (uint32_t) tell(*((int*) p + 4));
       break;
     case SYS_CLOSE:
+      printf("SYS_CLOSE\n");
       if (!parse_arguments(p+4, 1)) {
-        thread_exit();
+        thread_exit(-1);
         return;
       }
       close(*((int*) p + 4));
@@ -124,7 +141,7 @@ syscall_handler(struct intr_frame *f UNUSED)
 
   }
   
-  thread_exit();
+  thread_exit(0);
 
 }
 

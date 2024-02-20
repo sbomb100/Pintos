@@ -209,6 +209,15 @@ do_thread_create (const char *name, int nice, thread_func *function, void *aux)
     init_thread (t, name, nice);
     t->tid = allocate_tid ();
 
+    /* Parent-child structure setup */
+    struct child *cur_child = malloc(sizeof(struct child));
+    cur_child->tid = t->tid;
+    cur_child->exit_status = -1;
+    cur_child->has_exited = false;
+    sema_init(&cur_child->wait_sema, 0);
+    list_push_back(&thread_current()->children, &cur_child->elem);
+    
+
     /* Stack frame for kernel_thread(). */
     kf = alloc_frame (t, sizeof *kf);
     kf->eip = NULL;
@@ -401,12 +410,12 @@ do_thread_exit (void)
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
 void
-thread_exit (void)
+thread_exit (int status UNUSED)  //TODO: this shouldn't be unused?????
 {
   ASSERT(!intr_context ());
 
 #ifdef USERPROG
-  process_exit ();
+  process_exit (status);
 #endif
 
   do_thread_exit ();
@@ -524,7 +533,7 @@ kernel_thread_entry (thread_func *function, void *aux)
   unlock_own_ready_queue ();
   ASSERT (intr_get_level () == INTR_ON);
   function (aux); /* Execute the thread function. */
-  thread_exit (); /* If function() returns, kill the thread. */
+  thread_exit (0); /* If function() returns, kill the thread. */
 }
 
 /* Returns the running thread. */
@@ -583,6 +592,8 @@ init_thread (struct thread *t, const char *name, int nice)
   t->stack = (uint8_t *) t + PGSIZE;
   t->nice = nice;
   t->magic = THREAD_MAGIC;
+  list_init(&t->children);
+  t->parent = running_thread();
   if (cpu_can_acquire_spinlock)
     spinlock_acquire (&all_lock);
   list_push_back (&all_list, &t->allelem);
