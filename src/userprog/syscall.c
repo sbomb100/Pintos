@@ -14,12 +14,13 @@ syscall_init (void)
 /* get arguments off of the stack */ 
  bool parse_arguments (struct intr_frame *f, int* args, int numArgs)
  {
-   int i;
+    int i;
     int *ptr;
     for (i = 0; i < numArgs; i++)
     {
         ptr = (int *) f->esp + i + 1;
-        validate_pointer((const void *) ptr);
+        if (!validate_pointer((const void *) ptr))
+          return false;
         args[i] = *ptr;
     }
     return true;
@@ -52,7 +53,6 @@ syscall_handler(struct intr_frame *f UNUSED)
       printf("SYS_EXIT\n");
       if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
-      // thread_current()->exit_status = *(int *) (p + 4); // TODO: exit_status should be in child struct
       struct thread *cur = thread_current();
       // int arg = *(int *) (p + 4);
       printf ("%s\n", cur->name);

@@ -21,6 +21,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
+struct child *find_child(struct list child_list, tid_t child_tid);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -28,7 +29,7 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name)
 {
-  // printf("PROCESS_EXEC\n");
+  printf("PROCESS_EXEC\n");
   char *fn_copy;
   tid_t tid;
 
@@ -63,8 +64,15 @@ start_process(void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page(file_name);
-  if (!success)
+  struct child *cur_child = find_child(thread_current()->parent->children, thread_current()->tid);
+  if (!success) {
+    cur_child->has_loaded = false;
+    sema_up(&cur_child->wait_sema);
     thread_exit(-1);
+  } else {
+    cur_child->has_loaded = true;
+    sema_up(&cur_child->wait_sema);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -112,9 +120,9 @@ int process_wait(tid_t child_tid UNUSED)
   list_remove(e);
   return cur_child->exit_status;
 
-  for (;;)
-    ;
-  return -1;
+  // for (;;)
+  //   ;
+  // return -1;
 }
 
 /* Free the current process's resources. */
@@ -130,16 +138,7 @@ void process_exit(int status)
   /* Find the child */
   ASSERT(cur->parent != NULL);
   ASSERT(!list_empty(&cur->parent->children));
-  struct child *cur_child = NULL;
-  struct list_elem *e;
-  for (e = list_begin(&cur->parent->children); e != list_end(&cur->parent->children); e = list_next(e)){
-    struct child *temp = list_entry(e, struct child, elem);
-    if (temp->tid == cur->tid) {
-      cur_child = temp;
-      break;
-    }
-  }
-
+  struct child *cur_child = find_child(cur->parent->children, cur->tid);
   cur_child->exit_status = status;
   sema_up(&cur_child->wait_sema);
 
@@ -530,6 +529,23 @@ setup_stack(void **esp)
         palloc_free_page (kpage);
     }
   return success;
+}
+
+/* Helper function for finding the relevant child */
+struct child *find_child(struct list child_list, tid_t child_tid)
+{
+  struct child *cur_child = NULL;
+  struct list_elem *e;
+
+  for (e = list_begin(&child_list); e != list_end(&child_list); e = list_next(e)){
+    struct child *temp = list_entry(e, struct child, elem);
+    if (temp->tid == child_tid) {
+      cur_child = temp;
+      break;
+    }
+  }
+
+  return cur_child;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
