@@ -391,7 +391,7 @@ static void
 do_thread_exit (void)
 {
   struct thread * cur = thread_current ();
-
+  free(cur->fdToFile);
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
@@ -403,6 +403,7 @@ do_thread_exit (void)
 
   lock_own_ready_queue ();
   cur->status = THREAD_DYING;
+  
   schedule ();
   NOT_REACHED ();
 }
