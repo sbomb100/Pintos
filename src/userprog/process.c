@@ -125,7 +125,7 @@ void process_exit(int status)
   uint32_t *pd;
 
   /* Process Termination Message */
-  printf ("%s: exit(%d)\n", cur->name, status);
+  
 
   /* Find the child */
   ASSERT(cur->parent != NULL);
