@@ -23,6 +23,7 @@ static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
 struct child *find_child(struct list child_list, tid_t child_tid);
 
+static struct thread* new_thread;
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -43,7 +44,28 @@ tid_t process_execute(const char *file_name)
   tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
+
+  else{ //put child struct in children list
+    //do I have to malloc the my_child? not sure
+    struct child my_child;
+    my_child.tid = tid;
+    //my_child->exit_status = 
+    my_child.has_exited = false;
+    sema_init(&my_child.wait_sema, 0);
+
+    list_push_back(&thread_current()->children, &my_child->elem);
+
+  }
   return tid;
+}
+
+/*this func can be used to find threa with a particular tid. */
+static void find_tid(struct thread *t, void *aux){
+  // struct thread **new_thread_ptr = aux;
+  int new_thread_tid = *((int *)aux);
+  if (t->tid == new_thread_tid) {
+    new_thread = t;
+  }
 }
 
 /* A thread function that loads a user process and starts it
@@ -65,7 +87,28 @@ start_process(void *file_name_)
   /* If load failed, quit. */
   palloc_free_page(file_name);
   if (!success)
-    thread_exit(-1);
+    thread_exit(-1); //does not return to caller -> process_execute does not complete, so this child does not make an entry in the children list. i.e loaded = true if child  entry exists
+  // else{
+  //   //record loaded = true in child struct
+  //  // struct list* sibling_list = &(thread_current()->parent)->children;
+
+  // struct thread *parent = thread_current()->parent;
+  // struct child *child_me = NULL;
+  // struct list_elem *e;
+
+  // for (e = list_begin(&parent->children); e != list_end(&parent->children); e = list_next(e)){
+  //   struct child *temp = list_entry(e, struct child, elem);
+  //   if (temp->tid == thread_current()->tid) {
+  //     child_me = temp;
+  //     break;
+  //   }
+  // }
+
+  // if(child_me == NULL){
+  //   printf("parent thread has no record of this thread")
+  // }
+
+  // }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
