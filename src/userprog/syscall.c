@@ -52,7 +52,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       if (!parse_arguments(p+1, 1))
         thread_exit(-1);
       // thread_current()->exit_status = *(int *) (p + 4); // TODO: exit_status should be in child struct
-      thread_exit(-1);
+      thread_exit(*(int *) (p + 4));
       break;
     case SYS_EXEC:
       printf("SYS_EXEC\n");
