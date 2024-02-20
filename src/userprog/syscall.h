@@ -12,8 +12,8 @@
 #include "devices/input.h"
 #include "devices/shutdown.h"
 void syscall_init (void);
-void parse_arguments (struct intr_frame *f, int *args[3], int numArgs);
-void* validate_pointer(const void * pointer);
+bool parse_arguments (void *ptr, int args);
+bool validate_pointer(const void * pointer);
 void halt(void);
 void exit(int status);
 bool create(const char *file, unsigned initial_size);

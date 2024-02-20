@@ -11,74 +11,113 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 /* get arguments off of the stack */ 
-void parse_arguments (struct intr_frame *f, int *args[3], int numArgs)
+// void parse_arguments (struct intr_frame *f, int args[], int numArgs)
+// {
+//   int *tempPointer = f->esp + 1; //area of first actual argument
+//   for (int i = 0; i < numArgs; i++)
+//   {
+//     //get arg, check its pointer, then set to an argument
+//     tempPointer = (int *) tempPointer + i;
+//     validate_pointer((const void *) tempPointer);
+//     *args[i] = *tempPointer;
+//   }
+// } 
+
+bool parse_arguments (void *ptr, int args)
 {
-  int *tempPointer = f->esp + 1; //area of first actual argument
-  for (int i = 0; i < numArgs; i++)
-  {
-    //get arg, check its pointer, then set to an argument
-    tempPointer = (int *) tempPointer + i;
-    validate_pointer((const void *) tempPointer);
-    *args[i] = *tempPointer;
+  for (int i = 0; i < 4*args; i++) {
+    if (!validate_pointer((int *) ptr+i))
+      return false;
   }
+  return true;
 } 
 
 static void
 syscall_handler(struct intr_frame *f UNUSED)
 {
   //get pointer (int bc we want sys call number)
-  int* p = f->esp;
+  int* p = f->esp; //esp
   //check if its a good pointer
   validate_pointer(p);
   int syscall_num = *p;
-  int args[3] = {0, 0, 0};
+  // int args[3] = {0, 0, 0};
   //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
   switch (syscall_num){
     case SYS_HALT:
       halt();
       break;
     case SYS_EXIT:
-      //get arg for exit then exit
+      if (!parse_arguments(p+1, 1))
+        thread_exit();
+      // thread_current()->exit_status = *(int *) (p + 4); // TODO: exit_status should be in child struct
+      thread_exit();
       break;
     case SYS_EXEC:
       break;
     case SYS_WAIT:
       break;
     case SYS_CREATE:
-      parse_arguments(f, &args, 2);
-  	  f->eax = (uint32_t) create((const char *)args[0], (unsigned int)args[1]);
+      if (!parse_arguments(p+4, 2)) {
+        thread_exit();
+        return;
+      }
+  	  f->eax = (uint32_t) create((const char *) (p + 4), (unsigned int) (p + 8));
       break;
     case SYS_REMOVE:
-      parse_arguments(f, &args, 1);
-      f->eax = (uint32_t) remove((const char *)args[0]);
+      if (!parse_arguments(p+4, 1)) {
+        thread_exit();
+        return;
+      }
+      f->eax = (uint32_t) remove((const char *) (p + 4));
       break;
     case SYS_OPEN:
-      parse_arguments(f, &args, 1);
-      f->eax = (uint32_t) open((const char *)args[0]);
+      if (!parse_arguments(p+4, 1)) {
+        thread_exit();
+        return;
+      }
+      f->eax = (uint32_t) open((const char *) (p + 4));
       break;
     case SYS_FILESIZE:
-      parse_arguments(f, &args, 1);
-      f->eax = (uint32_t) filesize(args[0]);
+      if (!parse_arguments(p+4, 1)) {
+        thread_exit();
+        return;
+      }
+      f->eax = (uint32_t) filesize((int) p + 4);
       break;
     case SYS_READ:
-      parse_arguments(f, &args, 3);
-      f->eax = (uint32_t) read(args[0], (void *)args[1], (unsigned int) args[2]);
+      if (!parse_arguments(p+4, 3)) {
+        thread_exit();
+        return;
+      }
+      f->eax = (uint32_t) read(*((int*) p + 4), (void *) (p + 8), (unsigned int) (p + 12));
       break;
     case SYS_WRITE:
-      parse_arguments(f, &args, 3);
-      f->eax = (uint32_t) write(args[0], (void *)args[1], (unsigned int)args[2]);
+      if (!parse_arguments(p+4, 3)) {
+        thread_exit();
+        return;
+      }
+      f->eax = (uint32_t) write(*((int*) p + 4), (void *)(p + 8), (unsigned int) (p + 12));
       break;
     case SYS_SEEK:
-      parse_arguments(f, &args, 2);
-      seek(args[0], (unsigned int) args[1]);
+      if (!parse_arguments(p+4, 2)) {
+        thread_exit();
+        return;
+      }
+      seek(*((int*) p + 4), (unsigned int) (p + 8));
       break;
     case SYS_TELL:
-      parse_arguments(f, &args, 1);
-      f->eax = (uint32_t) tell(args[0]);
+      if (!parse_arguments(p+4, 1)) {
+        thread_exit();
+        return;
+      }
+      f->eax = (uint32_t) tell(*((int*) p + 4));
       break;
     case SYS_CLOSE:
-      parse_arguments(f, &args, 1);
-      close(args[0]);
+      if (!parse_arguments(p+4, 1)) {
+        thread_exit();
+        return;
+      }
+      close(*((int*) p + 4));
       break;
     default: 
       printf("system call!\n");
@@ -99,19 +138,6 @@ void halt(void)
   //free palloc pages?
   //close fds?
   shutdown_power_off();
-}
-/*
-  process_exit() and free pallocs, printf?
-
-  terminates current user program.
-  returning status to kernel
-*/
-void exit(int status)
-{
-  //Exiting or terminating a process implicitly closes all its open file descriptors, 
-  //as if by calling close() for each one
-
-  //process_exit()
 }
 /*
   Runs the executable whose name is given in cmd_line, passing any given arguments.
@@ -322,12 +348,13 @@ int findFdForFile(){
 
 /*
 this checks the address of a given pointer to validate it*/
-void* validate_pointer(const void * givenPointer)
+// returns 0 if it's not valid
+bool validate_pointer(const void * givenPointer)
 { 
     //is not a user virtual address
     if (!is_user_vaddr(givenPointer)) //from threads/vaddr.h
     {
-        return 0;
+        return false;
     }
     //from userprog/pagedir.c
     //vaddr < USER_VADDR_BOTTOM?
@@ -335,8 +362,8 @@ void* validate_pointer(const void * givenPointer)
     //is it a null when dereferenced
     if (point == NULL)
     {
-        return 0;
+        return false;
     }
     //return the valid pointer
-    return point;
+    return true;
 }
