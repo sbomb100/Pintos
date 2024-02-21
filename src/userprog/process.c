@@ -42,20 +42,17 @@ tid_t process_execute(const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
   
   tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page(fn_copy);
-
-  else{ //put child struct in children list
-    //do I have to malloc the my_child? not sure
-    struct child my_child;
-    my_child.tid = tid;
-    //my_child->exit_status = 
-    my_child.has_exited = false;
-    sema_init(&my_child.wait_sema, 0);
-
-    list_push_back(&thread_current()->children, &my_child.elem);
-
   }
+  else {
+    struct child * child_process = find_child(thread_current()->children, tid);
+    sema_down(&child_process->wait_sema);
+    if ( child_process->exit_status == -1 ) {
+        return TID_ERROR;
+    }
+  }  
+  
   return tid;
 }
 
@@ -178,7 +175,6 @@ void process_exit(int status)
   struct child *cur_child = find_child(cur->parent->children, cur->tid);
   cur_child->exit_status = status;
   sema_up(&cur_child->wait_sema);
-
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

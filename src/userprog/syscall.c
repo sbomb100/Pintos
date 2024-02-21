@@ -158,7 +158,7 @@ syscall_handler(struct intr_frame *f UNUSED)
 */
 tid_t exec(const char *cmd_line)
 {
-  if (cmd_line == NULL)
+  if (cmd_line == NULL || !validate_pointer(cmd_line))
     return -1;
   //struct thread* parent_thread = thread_current();
   lock_acquire(&file_lock);
