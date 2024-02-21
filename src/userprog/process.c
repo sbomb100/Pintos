@@ -53,7 +53,7 @@ tid_t process_execute(const char *file_name)
     my_child.has_exited = false;
     sema_init(&my_child.wait_sema, 0);
 
-    list_push_back(&thread_current()->children, &my_child->elem);
+    list_push_back(&thread_current()->children, &my_child.elem);
 
   }
   return tid;

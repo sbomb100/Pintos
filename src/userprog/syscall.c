@@ -1,8 +1,8 @@
 #include "userprog/syscall.h"
 #include "userprog/process.h"
-
 //#include <sys/types.h>
 static void syscall_handler (struct intr_frame *);
+pid_t exec(const char *cmd_line);
 struct lock file_lock;
 
 void
@@ -170,7 +170,7 @@ pid_t exec(const char *cmd_line)
 {
   if (cmd_line == NULL)
     return -1;
-  struct thread* parent_thread = thread_current();
+  //struct thread* parent_thread = thread_current();
   lock_acquire(&file_lock);
   pid_t child_tid = process_execute(cmd_line);
 
