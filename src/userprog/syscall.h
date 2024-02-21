@@ -14,8 +14,7 @@
 void syscall_init (void);
 bool parse_arguments (struct intr_frame *f, int* args, int numArgs);
 bool validate_pointer(const void * pointer);
-void halt(void);
-void exit(int status);
+tid_t exec(const char *cmd_line);
 bool create(const char *file, unsigned initial_size);
 bool remove(const char *file);
 int open(const char *file);

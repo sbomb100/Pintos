@@ -2,9 +2,8 @@
 #include "userprog/process.h"
 //#include <sys/types.h>
 static void syscall_handler (struct intr_frame *);
-tid_t exec(const char *cmd_line);
-struct lock file_lock;
 
+struct lock file_lock;
 void
 syscall_init (void) 
 {
@@ -51,7 +50,7 @@ syscall_handler(struct intr_frame *f UNUSED)
   //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
   switch (syscall_num){ //bad system call causes panic
     case SYS_HALT:
-      halt();
+      shutdown_power_off();
       break;
     case SYS_EXIT:
       // printf("SYS_EXIT\n");
@@ -63,7 +62,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       //printf("SYS_EXEC\n");
       if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
-      int argu = *(int *) (p + 4);
+      //int argu = *(int *) (p + 4);
       f->eax = exec((const char *)  args[0]);
       break;
     case SYS_WAIT:
@@ -152,15 +151,6 @@ syscall_handler(struct intr_frame *f UNUSED)
   
   // thread_exit(0);
 
-}
-
-//whats difference from user/lib/syscall.c
-/*
-  tells OS to STOP process
-*/
-void halt(void)
-{
-  shutdown_power_off();
 }
 /*
   Runs the executable whose name is given in cmd_line, passing any given arguments.
