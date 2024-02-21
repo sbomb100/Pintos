@@ -594,6 +594,7 @@ init_thread (struct thread *t, const char *name, int nice)
   t->nice = nice;
   t->magic = THREAD_MAGIC;
   list_init(&t->children);
+  sema_init(&t->load_sema, 0);
   t->parent = running_thread();
   if (cpu_can_acquire_spinlock)
     spinlock_acquire (&all_lock);

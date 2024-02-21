@@ -118,6 +118,9 @@ struct thread
   struct thread *parent;
   struct list children;
 
+  /*loading child*/
+  struct semaphore load_sema;
+  bool child_successful;
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
