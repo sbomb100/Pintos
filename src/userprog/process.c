@@ -29,7 +29,7 @@ struct child *find_child(struct list child_list, tid_t child_tid);
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name)
 {
-  printf("PROCESS_EXEC\n");
+  //printf("PROCESS_EXEC\n");
   char *fn_copy;
   tid_t tid;
 
@@ -126,7 +126,8 @@ void process_exit(int status)
   uint32_t *pd;
 
   /* Process Termination Message */
-  printf ("%s: exit(%d)\n", cur->name, status);
+  char* tmp;
+  printf ("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
   
   /* Find the child */
   ASSERT(cur->parent != NULL);
