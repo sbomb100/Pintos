@@ -42,11 +42,14 @@ syscall_handler(struct intr_frame *f UNUSED)
   //get pointer (int bc we want sys call number)
   int* p = f->esp; //esp
   //check if its a good pointer
-  validate_pointer(p);
+  if (!validate_pointer(p)) {
+    thread_exit(-1);
+    return;
+  }
   int syscall_num = *p;
   int args[3];
   //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
-  switch (syscall_num){
+  switch (syscall_num){ //bad system call causes panic
     case SYS_HALT:
       halt();
       break;
@@ -54,32 +57,32 @@ syscall_handler(struct intr_frame *f UNUSED)
       // printf("SYS_EXIT\n");
       if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
-      thread_exit(*(int *) (p + 4));
+      thread_exit(*(int *) (p + 1));
       break;
     case SYS_EXEC:
-      printf("SYS_EXEC\n");
+      //printf("SYS_EXEC\n");
       if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
       int arg = *(int *) (p + 4);
       f->eax = exec((const char *)  args[0]);
       break;
     case SYS_WAIT:
-      printf("SYS_WAIT\n");
+      //printf("SYS_WAIT\n");
       if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
       int arg = *(int *) (p + 4);
       f->eax = process_wait(arg);
       break;
     case SYS_CREATE:
-      printf("SYS_CREATE\n");
+      //printf("SYS_CREATE\n");
       if (!parse_arguments(f, &args[0], 2)){
         thread_exit(-1);
         return;
       }
-  	  f->eax = (uint32_t) create((const char *) (p + 4), (unsigned int) (p + 8));
+  	  f->eax = (uint32_t) create((const char *) (args[0]), (unsigned int) (args[1]));
       break;
     case SYS_REMOVE:
-      printf("SYS_REMOVE\n");
+      //printf("SYS_REMOVE\n");
       if (!parse_arguments(f, &args[0], 1)){
         thread_exit(-1);
         return;
@@ -87,7 +90,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       f->eax = (uint32_t) remove((const char *) args[0]);
       break;
     case SYS_OPEN:
-      printf("SYS_OPEN\n");
+      //printf("SYS_OPEN\n");
       if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
@@ -95,7 +98,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       f->eax = (uint32_t) open((const char *)  args[0]);
       break;
     case SYS_FILESIZE:
-      printf("SYS_FILESIZE\n");
+      //printf("SYS_FILESIZE\n");
       if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
@@ -103,7 +106,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       f->eax = (uint32_t) filesize(args[0]);
       break;
     case SYS_READ:
-      printf("SYS_READ\n");
+      //printf("SYS_READ\n");
       if (!parse_arguments(f, &args[0], 3)) {
         thread_exit(-1);
         return;
@@ -119,7 +122,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       f->eax = (uint32_t) write(args[0], (const void *) args[1], (unsigned int) args[2]);
       break;
     case SYS_SEEK:
-      printf("SYS_SEEK\n");
+      //printf("SYS_SEEK\n");
       if (!parse_arguments(f, &args[0], 2)) {
         thread_exit(-1);
         return;
@@ -127,7 +130,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       seek(args[0], (unsigned int) args[1]);
       break;
     case SYS_TELL:
-      printf("SYS_TELL\n");
+      //printf("SYS_TELL\n");
       if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
@@ -135,7 +138,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       f->eax = (uint32_t) tell(args[0]);
       break;
     case SYS_CLOSE:
-      printf("SYS_CLOSE\n");
+      //printf("SYS_CLOSE\n");
       if (!parse_arguments(f, &args[0], 1)) {
         thread_exit(-1);
         return;
@@ -143,7 +146,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       close(args[0]);
       break;
     default: 
-      printf("system call!\n");
+      thread_exit(-1);
 
   }
   
@@ -157,9 +160,6 @@ syscall_handler(struct intr_frame *f UNUSED)
 */
 void halt(void)
 {
-  //does it need more?
-  //free palloc pages?
-  //close fds?
   shutdown_power_off();
 }
 /*
@@ -213,12 +213,13 @@ pid_t exec(const char *cmd_line)
 */
 bool create(const char *file, unsigned initial_size)
 {
-  if (file == NULL)
-    return -1;
-
+ 
+  if (file == NULL ||  !validate_pointer(file))
+    thread_exit(-1);
+  
   lock_acquire(&file_lock);
-  int ret = filesys_create(file, initial_size);
-  lock_release(&file_lock);
+  int ret = filesys_create(file, initial_size); //kernel panic (assertion `length >= 0' failed)
+  lock_release(&file_lock); 
 
   return ret;
 }
@@ -228,8 +229,9 @@ bool create(const char *file, unsigned initial_size)
 */
 bool remove(const char *file)
 {
-  if (file == NULL)
-    return -1;
+  if (file == NULL ||  !validate_pointer(file))
+    thread_exit(-1);
+
   lock_acquire(&file_lock);
   bool flag = filesys_remove(file);
   lock_release(&file_lock);
@@ -244,17 +246,19 @@ int open(const char *file)
 {
   // Each process has an independent set of file descriptors. File descriptors are not inherited by child processes
   // openning same file makes new fds (act as if different files)
+  if (file == NULL ||  !validate_pointer(file))
+    thread_exit(0);
 
   lock_acquire(&file_lock);
-  struct file * fp = filesys_open (file);
+  struct file * fp = filesys_open (file); //`name != NULL' / check pointer (could be bad pointer)
   lock_release(&file_lock);
   
   if (fp == NULL) 
-    return -1;
+    thread_exit(0);
   
   int fd = findFdForFile(); //does index + 2 to avoid 0 or 1
   if (fd == -1) //need to expand array
-    return -1;
+    thread_exit(-1);
   //lock around it? i dont think so
   thread_current()->fdToFile[fd - 2] = fp;
   
@@ -278,6 +282,10 @@ int filesize(int fd)
 */
 int read(int fd, void *buffer, unsigned size)
 {
+  //check pointers / fd
+  if (buffer == NULL ||  !validate_pointer(buffer) || fd < 0 || fd == 1 || thread_current()->fdToFile[fd - 2] == NULL)
+    thread_exit(-1);
+  
   // Fd 0 reads from the keyboard using input_getc().
   unsigned bytesRead = 0;
   
@@ -309,6 +317,9 @@ int read(int fd, void *buffer, unsigned size)
 */
 int write(int fd, const void *buffer, unsigned size)
 {
+  //length >= 0 (fails from create)
+  //check pointers and bad fd
+
   // Fd 1 writes to the console.
 // printf ("fd: %d\n", fd);
   // Your code to write to the console should write all of buffer in one call to putbuf(),
@@ -366,6 +377,8 @@ unsigned tell(int fd)
 */
 void close(int fd)
 {
+  //`inode->deny_write_cnt <= inode->open_cnt    close twice not good
+  //check if fd is good
   if (fd == 0 || fd == 1)
     return;
   
@@ -377,6 +390,7 @@ void close(int fd)
   lock_acquire(&file_lock);
   // Closing file using file sys function
   file_close(fileDes);
+  thread_current()->fdToFile[fd - 2] = NULL;
   lock_release(&file_lock);
 }
 
