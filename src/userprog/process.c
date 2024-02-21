@@ -42,28 +42,12 @@ tid_t process_execute(const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
   
   tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR) {
+  if (tid == TID_ERROR) 
     palloc_free_page(fn_copy);
-  else{
-    //thread_foreach
-    //sema_down(&thread->load_sema);
-    
-  }
   sema_down(&thread_current()->load_sema);
   if(!thread_current()->child_successful)
     tid = -1;
 
-  // else{ //put child struct in children list
-  //   //do I have to malloc the my_child? not sure
-  //   struct child my_child;
-  //   my_child.tid = tid;
-  //   //my_child->exit_status = 
-  //   my_child.has_exited = false;
-  //   sema_init(&my_child.wait_sema, 0);
-
-  //   list_push_back(&thread_current()->children, &my_child.elem);
-
-  // }
   return tid;
 }
 
@@ -102,27 +86,7 @@ start_process(void *file_name_)
   }
   thread_current()->parent->child_successful = true;
   sema_up(&thread_current()->parent->load_sema);
-  // else{
-  //   //record loaded = true in child struct
-  //  // struct list* sibling_list = &(thread_current()->parent)->children;
 
-  // struct thread *parent = thread_current()->parent;
-  // struct child *child_me = NULL;
-  // struct list_elem *e;
-
-  // for (e = list_begin(&parent->children); e != list_end(&parent->children); e = list_next(e)){
-  //   struct child *temp = list_entry(e, struct child, elem);
-  //   if (temp->tid == thread_current()->tid) {
-  //     child_me = temp;
-  //     break;
-  //   }
-  // }
-
-  // if(child_me == NULL){
-  //   printf("parent thread has no record of this thread")
-  // }
-
-  // }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
