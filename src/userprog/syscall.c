@@ -285,7 +285,9 @@ int filesize(int fd)
 int read(int fd, void *buffer, unsigned size)
 {
   //check pointers / fd
-  if (buffer == NULL ||  !validate_pointer(buffer) || fd < 0 || fd == 1 || thread_current()->fdToFile[fd - 2] == NULL)
+  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
+    return -1;
+  if (buffer == NULL ||  !validate_pointer(buffer))
     thread_exit(-1);
   
   // Fd 0 reads from the keyboard using input_getc().
@@ -321,7 +323,10 @@ int write(int fd, const void *buffer, unsigned size)
 {
   //length >= 0 (fails from create)
   //check pointers and bad fd
-
+  if (buffer == NULL ||  !validate_pointer(buffer))
+    thread_exit(-1);
+  if (fd < 1 || fd > 1025)
+    return -1;
   // Fd 1 writes to the console.
 // printf ("fd: %d\n", fd);
   // Your code to write to the console should write all of buffer in one call to putbuf(),
@@ -381,7 +386,7 @@ void close(int fd)
 {
   //`inode->deny_write_cnt <= inode->open_cnt    close twice not good
   //check if fd is good
-  if (fd == 0 || fd == 1)
+  if (fd < 2 || fd > 1025)
     return;
   
   struct file* fileDes = thread_current()->fdToFile[fd - 2];
