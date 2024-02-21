@@ -2,7 +2,7 @@
 #include "userprog/process.h"
 //#include <sys/types.h>
 static void syscall_handler (struct intr_frame *);
-pid_t exec(const char *cmd_line);
+tid_t exec(const char *cmd_line);
 struct lock file_lock;
 
 void
@@ -63,7 +63,7 @@ syscall_handler(struct intr_frame *f UNUSED)
       //printf("SYS_EXEC\n");
       if (!parse_arguments(f, &args[0], 1))
         thread_exit(-1);
-      int arg = *(int *) (p + 4);
+      int argu = *(int *) (p + 4);
       f->eax = exec((const char *)  args[0]);
       break;
     case SYS_WAIT:
@@ -166,13 +166,13 @@ void halt(void)
   Runs the executable whose name is given in cmd_line, passing any given arguments.
   returns: the new process's program id (pid) or -1 on failure
 */
-pid_t exec(const char *cmd_line)
+tid_t exec(const char *cmd_line)
 {
   if (cmd_line == NULL)
     return -1;
   //struct thread* parent_thread = thread_current();
   lock_acquire(&file_lock);
-  pid_t child_tid = process_execute(cmd_line);
+  tid_t child_tid = process_execute(cmd_line);
 
   //double-check that the new process has loaded and that everything went 
   //smoothly by checking that the child struct is in the parent's children list
