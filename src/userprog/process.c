@@ -44,18 +44,26 @@ tid_t process_execute(const char *file_name)
   tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
-
-  else{ //put child struct in children list
-    //do I have to malloc the my_child? not sure
-    struct child my_child;
-    my_child.tid = tid;
-    //my_child->exit_status = 
-    my_child.has_exited = false;
-    sema_init(&my_child.wait_sema, 0);
-
-    list_push_back(&thread_current()->children, &my_child.elem);
-
+  else{
+    //thread_foreach
+    //sema_down(&thread->load_sema);
+    
   }
+  sema_down(&thread_current()->load_sema);
+  if(!thread_current()->child_successful)
+    tid = -1;
+
+  // else{ //put child struct in children list
+  //   //do I have to malloc the my_child? not sure
+  //   struct child my_child;
+  //   my_child.tid = tid;
+  //   //my_child->exit_status = 
+  //   my_child.has_exited = false;
+  //   sema_init(&my_child.wait_sema, 0);
+
+  //   list_push_back(&thread_current()->children, &my_child.elem);
+
+  // }
   return tid;
 }
 
@@ -86,8 +94,14 @@ start_process(void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page(file_name);
-  if (!success)
+  if (!success){
+    thread_current()->parent->child_successful = false;
+    sema_up(&thread_current()->parent->load_sema);
     thread_exit(-1); //does not return to caller -> process_execute does not complete, so this child does not make an entry in the children list. i.e loaded = true if child  entry exists
+    
+  }
+  thread_current()->parent->child_successful = true;
+  sema_up(&thread_current()->parent->load_sema);
   // else{
   //   //record loaded = true in child struct
   //  // struct list* sibling_list = &(thread_current()->parent)->children;
