@@ -42,7 +42,7 @@ tid_t process_execute(const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
   
   tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page(fn_copy);
   else{
     //thread_foreach
@@ -192,7 +192,6 @@ void process_exit(int status)
   struct child *cur_child = find_child(cur->parent->children, cur->tid);
   cur_child->exit_status = status;
   sema_up(&cur_child->wait_sema);
-
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
