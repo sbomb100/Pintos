@@ -42,7 +42,10 @@ syscall_handler(struct intr_frame *f UNUSED)
   //get pointer (int bc we want sys call number)
   int* p = f->esp; //esp
   //check if its a good pointer
-  validate_pointer(p);
+  if (!validate_pointer(p)) {
+    thread_exit(-1);
+    return;
+  }
   int syscall_num = *p;
   int args[3];
   //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
