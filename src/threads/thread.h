@@ -113,6 +113,8 @@ struct thread
   int64_t actual_runtime;
   /*added in P2 for File Descriptors*/
   struct file** fdToFile;
+   /*this thread's exe file*/
+  struct file *exec_file;
 
   /* Parent-Child Relationship */
   struct thread *parent;

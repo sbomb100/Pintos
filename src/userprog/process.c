@@ -158,6 +158,11 @@ void process_exit(int status)
   sema_up(&cur_child->wait_sema);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
+  if(cur->exec_file != NULL){
+    file_allow_write(cur->exec_file); 
+  }
+  file_close(cur->exec_file);
+
   pd = cur->pagedir;
   if (pd != NULL)
   {
@@ -410,11 +415,19 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
   success = true;
 
+  if(success){
+    file_deny_write(file);
+    thread_current() -> exec_file = file;
+  }
+  else{
+    file_close(file);
+  }
+
 done:
   /* We arrive here whether the load is successful or not. */
   free(fn_copy);
   free(argv);
-  file_close (file);
+  //file_close (file);
   return success;
 }
 
