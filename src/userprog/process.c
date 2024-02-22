@@ -18,6 +18,7 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
@@ -158,11 +159,12 @@ void process_exit(int status)
   sema_up(&cur_child->wait_sema);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
+  lock_file();
   if(cur->exec_file != NULL){
     file_allow_write(cur->exec_file); 
   }
   file_close(cur->exec_file);
-
+  unlock_file();
   pd = cur->pagedir;
   if (pd != NULL)
   {
@@ -300,6 +302,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     goto done;
   process_activate();
 
+  lock_file();
   /* Open executable file. */
   file = filesys_open (token);
   if (file == NULL) 
@@ -427,6 +430,7 @@ done:
   /* We arrive here whether the load is successful or not. */
   free(fn_copy);
   free(argv);
+  unlock_file();
   //file_close (file);
   return success;
 }

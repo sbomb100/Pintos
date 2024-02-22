@@ -4,6 +4,12 @@
 static void syscall_handler (struct intr_frame *);
 
 struct lock file_lock;
+void lock_file() {
+  lock_acquire(&file_lock);
+}
+void unlock_file() {
+  lock_release(&file_lock);
+}
 void
 syscall_init (void) 
 {
@@ -161,7 +167,6 @@ tid_t exec(const char *cmd_line)
   if (cmd_line == NULL || !validate_pointer(cmd_line))
     return -1;
   //struct thread* parent_thread = thread_current();
-  lock_acquire(&file_lock);
   tid_t child_tid = process_execute(cmd_line);
 
   //double-check that the new process has loaded and that everything went 
@@ -182,7 +187,6 @@ tid_t exec(const char *cmd_line)
   if(cur_child == NULL){
     child_tid = -1;
   }
-  lock_release(&file_lock);
   return child_tid;
 }
 /*
@@ -207,9 +211,9 @@ bool create(const char *file, unsigned initial_size)
   if (file == NULL ||  !validate_pointer(file))
     thread_exit(-1);
   
-  lock_acquire(&file_lock);
+  lock_file();
   int ret = filesys_create(file, initial_size); //kernel panic (assertion `length >= 0' failed)
-  lock_release(&file_lock); 
+  unlock_file();
 
   return ret;
 }
@@ -222,9 +226,9 @@ bool remove(const char *file)
   if (file == NULL ||  !validate_pointer(file))
     thread_exit(-1);
 
-  lock_acquire(&file_lock);
+  lock_file();
   bool flag = filesys_remove(file);
-  lock_release(&file_lock);
+  unlock_file();
 
   return flag;
 }
@@ -239,11 +243,13 @@ int open(const char *file)
   if (file == NULL ||  !validate_pointer(file))
     thread_exit(-1);
 
-  lock_acquire(&file_lock);
+  lock_file();
   struct file * fp = filesys_open (file); //`name != NULL' / check pointer (could be bad pointer)
-  if (fp == NULL)
+  if (fp == NULL) {
+    unlock_file();
     return -1;
-  lock_release(&file_lock);
+  }
+  unlock_file();
   
   if (fp == NULL) 
     thread_exit(0);
@@ -262,9 +268,9 @@ int open(const char *file)
 int filesize(int fd)
 {
   struct file * filePtr = thread_current()->fdToFile[fd - 2];
-  lock_acquire(&file_lock);
+  lock_file();
   int length = file_length(filePtr); 
-  lock_release(&file_lock);
+  unlock_file();
   return length;
 }
 /*
@@ -299,10 +305,10 @@ int read(int fd, void *buffer, unsigned size)
   if (filePtr == NULL)
     return -1;
    
-  lock_acquire(&file_lock);
+  lock_file();
   // Read from the file using filesys function
   bytesRead = file_read(filePtr,buffer,size);
-  lock_release(&file_lock);
+  unlock_file();
   return bytesRead;
 }
 /*
@@ -332,10 +338,10 @@ int write(int fd, const void *buffer, unsigned size)
   if (fileDes == NULL)
     return -1;
   
-  lock_acquire(&file_lock);
+  lock_file();
   // write to the file using filesys function
   int ret = file_write(fileDes,buffer,size);
-  lock_release(&file_lock);
+  unlock_file();
   return ret;
 }
 
@@ -351,9 +357,9 @@ void seek(int fd, unsigned position)
   if (fileDes == NULL)
     return;
   
-  lock_acquire(&file_lock);
+  lock_file();
   file_seek(thread_current()->fdToFile[fd - 2], position);
-  lock_release(&file_lock);
+  unlock_file();
 }
 /*
   Returns: the position of the next byte to be read or written in open file fd
@@ -364,9 +370,9 @@ unsigned tell(int fd)
   if (fileDes == NULL)
     return -1;
 
-  lock_acquire(&file_lock);
+  lock_file();
   unsigned pos = file_tell (fileDes);
-  lock_release(&file_lock);
+  unlock_file();
   return pos;
 }
 /*
@@ -384,11 +390,11 @@ void close(int fd)
     return;
   
   
-  lock_acquire(&file_lock);
+  lock_file();
   // Closing file using file sys function
   file_close(fileDes);
   thread_current()->fdToFile[fd - 2] = NULL;
-  lock_release(&file_lock);
+  unlock_file();
 }
 
 //index of zero is fd of 2

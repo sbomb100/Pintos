@@ -25,4 +25,6 @@ void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
 int findFdForFile(void);
+void lock_file(void);
+void unlock_file(void);
 #endif /* userprog/syscall.h */
