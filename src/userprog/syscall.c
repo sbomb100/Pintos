@@ -255,10 +255,11 @@ int filesize(int fd)
 int read(int fd, void *buffer, unsigned size)
 {
   //check pointers / fd
-  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
-    return -1;
   if (buffer == NULL ||  !validate_pointer(buffer))
     thread_exit(-1);
+  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
+    return -1;
+  
   
   // Fd 0 reads from the keyboard using input_getc().
   unsigned bytesRead = 0;
@@ -302,17 +303,21 @@ int write(int fd, const void *buffer, unsigned size)
   // Your code to write to the console should write all of buffer in one call to putbuf(),
   // at least as long as size is not bigger than a few hundred bytes.
   // if fd == 1, write to standard output
+  lock_file();
   if (fd == 1)
   {
     putbuf(buffer,size);
+    unlock_file();
     return size;
   }
   
  struct file* fileDes = thread_current()->fdToFile[fd - 2];
-  if (fileDes == NULL)
+  if (fileDes == NULL) {
+    unlock_file();
     return -1;
+  }
   
-  lock_file();
+  
   // write to the file using filesys function
   int ret = file_write(fileDes,buffer,size);
   unlock_file();
