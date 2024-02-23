@@ -68,6 +68,9 @@ start_process(void *file_name_)
   struct intr_frame if_;
   bool success;
   thread_current()->fdToFile = malloc(1024 * sizeof(struct file *));
+  for ( int i = 0; i < 1024; i++ ) {
+    thread_current()->fdToFile[i] = NULL;
+  }
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
