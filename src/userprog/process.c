@@ -31,7 +31,6 @@ static struct thread* new_thread;
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char *file_name)
 {
-  //printf("PROCESS_EXEC\n");
   char *fn_copy;
   tid_t tid;
 
@@ -54,7 +53,6 @@ tid_t process_execute(const char *file_name)
 
 /*this func can be used to find threa with a particular tid. */
 static void find_tid(struct thread *t, void *aux){
-  // struct thread **new_thread_ptr = aux;
   int new_thread_tid = *((int *)aux);
   if (t->tid == new_thread_tid) {
     new_thread = t;
@@ -82,7 +80,7 @@ start_process(void *file_name_)
   if (!success){
     thread_current()->parent->child_successful = false;
     sema_up(&thread_current()->parent->load_sema);
-    thread_exit(-1); //does not return to caller -> process_execute does not complete, so this child does not make an entry in the children list. i.e loaded = true if child  entry exists
+    thread_exit(-1); 
     
   }
   thread_current()->parent->child_successful = true;
@@ -135,15 +133,11 @@ int process_wait(tid_t child_tid UNUSED)
   list_remove(e);
   return cur_child->exit_status;
 
-  // for (;;)
-  //   ;
-  // return -1;
 }
 
 /* Free the current process's resources. */
 void process_exit(int status)
 {
-  // printf("PROCESS_EXIT\n");
   struct thread *cur = thread_current();
   uint32_t *pd;
 
@@ -282,7 +276,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   char** argv;
   int argc = 0;
 
-  fn_copy = malloc(strlen(file_name) + 1);//malloc(strlen(file_name) + 1);
+  fn_copy = malloc(strlen(file_name) + 1);
   if ( fn_copy == NULL ) return false;
   
   argv = malloc(4096);
@@ -411,8 +405,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
   *esp -= sizeof(char *);
 
-  // hex_dump((uintptr_t) *esp - 32, *esp - 32, 128, 1);
-
   /* Start address. */
   *eip = (void (*)(void))ehdr.e_entry;
 
@@ -431,7 +423,6 @@ done:
   free(fn_copy);
   free(argv);
   unlock_file();
-  //file_close (file);
   return success;
 }
 
