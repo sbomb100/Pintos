@@ -380,7 +380,7 @@ void close(int fd)
 int findFdForFile(){
   struct file** fdArray = thread_current()->fdToFile;
 
-  for (int i = 0; i < 1024; i++){
+  for (int i = 0; i < 128; i++){
     if (fdArray[i] == NULL){
       return i + 2;
     }

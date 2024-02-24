@@ -67,8 +67,9 @@ start_process(void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  thread_current()->fdToFile = malloc(1024 * sizeof(struct file *));
-  for ( int i = 0; i < 1024; i++ ) {
+  thread_current()->fdToFile = malloc(128 * sizeof(struct file *));
+  
+  for ( int i = 0; i < 128; i++ ) {
     thread_current()->fdToFile[i] = NULL;
   }
   /* Initialize interrupt frame and load executable. */
@@ -84,7 +85,6 @@ start_process(void *file_name_)
     thread_current()->parent->child_successful = false;
     sema_up(&thread_current()->parent->load_sema);
     thread_exit(-1); 
-    
   }
   thread_current()->parent->child_successful = true;
   sema_up(&thread_current()->parent->load_sema);
