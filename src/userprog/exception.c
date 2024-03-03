@@ -120,12 +120,15 @@ kill (struct intr_frame *f)
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
-page_fault (struct intr_frame *f) 
+page_fault (struct intr_frame *f) //TODO: fix to work with SPT
 {
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
+
+   //get current thread?-------------------- make sure its not holding a lock?
+
 
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
@@ -143,10 +146,32 @@ page_fault (struct intr_frame *f)
   /* Count page faults. */
   page_fault_cnt++;
 
+   //--------------------------------------------------check if its bad pointer access, else look in SPT
+   //if page isnt in SPT, make new page for it, *(stack page!) 
+   // install the page with 
+   /**
+      if ( !(pagedir_get_page (t->pagedir, nsp->addr) == NULL
+            && pagedir_set_page (t->pagedir, nsp->addr, stack_frame->kpage, nsp->writable)))
+        PANIC ("Error growing stack page!");
+    }
+
+    and maybe hold file sys lock?
+   **/
+
+  // if page status is in file:
+  //read file, change read_bytes, put page into frame
+
+   //if in swap table:
+   //load page from swap table into a frame
+
+
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+   //if (!not_present && write)
+   // thread_exit (-1); //not sure on what status to do
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
