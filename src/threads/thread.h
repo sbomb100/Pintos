@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include "filesys/file.h"
 #include "threads/synch.h"
-
+#include "lib/kernel/hash.h"
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -123,6 +123,11 @@ struct thread
   /*loading child*/
   struct semaphore load_sema;
   bool child_successful;
+
+
+  //VM STUFF
+  struct hash spt;
+  size_t num_pages;
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */
