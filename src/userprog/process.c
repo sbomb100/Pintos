@@ -19,6 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
@@ -37,8 +38,10 @@ tid_t process_execute(const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page(0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL){
+    palloc_free_page(fn_copy);
     return TID_ERROR;
+  }
   strlcpy (fn_copy, file_name, PGSIZE);
   
   tid = thread_create (file_name, NICE_DEFAULT, start_process, fn_copy);
@@ -69,12 +72,12 @@ start_process(void *file_name_)
   bool success;
   thread_current()->fdToFile = malloc(128 * sizeof(struct file *));
   
-  
-  //TODO INITIALIZE SPT HERE
-
   for ( int i = 0; i < 128; i++ ) {
     thread_current()->fdToFile[i] = NULL;
-  }
+  } 
+  //VM make the spt hash table since its setup for thread
+  hash_init (&thread_current()->spt, page_hash, is_page_before, NULL);
+
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -147,6 +150,8 @@ void process_exit(int status)
 {
   struct thread *cur = thread_current();
   uint32_t *pd;
+  //VM delete hash and pass a function to kill its elems
+  hash_destroy (&cur->spt, destory_page);
 
   /* Process Termination Message */
   char* tmp;
@@ -167,6 +172,7 @@ void process_exit(int status)
   file_close(cur->exec_file);
   unlock_file();
   pd = cur->pagedir;
+  //TODO free page for oom??
   if (pd != NULL)
   {
     /* Correct ordering here is crucial.  We must set
@@ -325,7 +331,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
       goto done; 
     }
 
-
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++)
@@ -366,7 +371,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
              Read initial part from disk and zero the rest. */
           read_bytes = page_offset + phdr.p_filesz;
           zero_bytes = (ROUND_UP(page_offset + phdr.p_memsz, PGSIZE) - read_bytes);
-        } 
+        }
         else
         {
           /* Entirely zero.
@@ -505,7 +510,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT(pg_ofs(upage) == 0);
   ASSERT(ofs % PGSIZE == 0);
 
-  file_seek(file, ofs); 
+  file_seek(file, ofs);
   while (read_bytes > 0 || zero_bytes > 0)
   {
     /* Calculate how to fill this page.
@@ -513,11 +518,9 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
        and zero the final PAGE_ZERO_BYTES bytes. */
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
-    
-    //TODO: make a page table entry here!, check to see if you actually malloc it aswell
+  //TODO: make a page table entry here!, check to see if you actually malloc it aswell
     //then fill as many values as you can
     //add a lock and the table to the owner thread
-
     /* Get a page of memory. */
     uint8_t *kpage = palloc_get_page(PAL_USER);
     if (kpage == NULL)

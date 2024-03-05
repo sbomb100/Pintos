@@ -10,16 +10,14 @@
 /* hash function, address comparator */
 /* Returns a hash value for spt_page_entry p. */
 unsigned
-page_hash (const struct hash_elem *p_, void *aux UNUSED)
+page_hash (const struct hash_elem *elem1)
 {
-  const struct spt_page_entry *page = hash_entry (p_, struct spt_page_entry, elem);
+  const struct spt_page_entry *page = hash_entry (elem1, struct spt_page_entry, elem);
   return hash_bytes (&page->vaddr, sizeof page->vaddr);
 }
 
-/* Returns true if spt_page_entry a precedes spt_page_entry b. */
-bool
-is_page_before (const struct hash_elem *elem1, const struct hash_elem *elem2,
-           void *aux UNUSED)
+// true if spt_page_entry 1 is before 2
+bool is_page_before (const struct hash_elem *elem1, const struct hash_elem *elem2)
 {
   const struct spt_page_entry *page_one = hash_entry (elem1, struct spt_page_entry, elem);
   const struct spt_page_entry *page_two = hash_entry (elem2, struct spt_page_entry, elem);
@@ -28,10 +26,9 @@ is_page_before (const struct hash_elem *elem1, const struct hash_elem *elem2,
 }
 
 //destroy the page. clear any references as well
-void
-destory_page (struct hash_elem *e, void *aux UNUSED)
+void destory_page (struct hash_elem *elem1)
 {
-  struct spt_page_entry *page = hash_entry (e, struct spt_page_entry, elem);
+  struct spt_page_entry *page = hash_entry (elem1, struct spt_page_entry, elem);
   if (page->frame != NULL) { //if it has a frame, free the frame
     struct frame_entry *f = page->frame;
     page->frame = NULL;
@@ -45,14 +42,13 @@ destory_page (struct hash_elem *e, void *aux UNUSED)
 }
 
 //search the hash table for a page, returns null if no such
-struct spt_page_entry *
-get_page_from_hash (void *address)
+struct spt_page_entry * get_page_from_hash (void *given_address)
 {
   struct thread *t = thread_current ();
   struct spt_page_entry page;
   struct hash_elem *elem_in_hash;
 
-  page.vaddr = (void *) (pg_no(address) << PGBITS);
+  page.vaddr = (void *) (pg_no(given_address) << PGBITS);
   elem_in_hash = hash_find (&t->spt, &page.elem);
   return elem_in_hash != NULL ? hash_entry (elem_in_hash, struct spt_page_entry, elem) : NULL; //????
 }

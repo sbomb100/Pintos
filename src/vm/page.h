@@ -45,8 +45,14 @@ struct spt_page_entry
     size_t swap_index; //to know where is in swap fastest
 };
 
-//need cuntions for
-//getting spt entry from hash
-//putting in hash
-//removing from hash
-//initialization
+//need funcitons for
+//getting spt entry from hash : DONE
+//putting in hash : DONE
+//removing from hash : DONE
+//initialization: initialized in process.c
+
+//functions might need an aux that will be unused since the hash functions have it?
+unsigned page_hash (const struct hash_elem *);
+bool is_page_before (const struct hash_elem *, const struct hash_elem *);
+void destory_page (struct hash_elem *);
+struct spt_page_entry * get_page_from_hash (void *);
