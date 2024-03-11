@@ -10,7 +10,7 @@
 #include "threads/thread.h"
 
 
-struct frame_table_entry {
+struct frame {
 	struct spt_page_entry * page;
 	struct list_elem elem; //since we are using linked list
 	int unused_count;
