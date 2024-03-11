@@ -1,6 +1,6 @@
 //The header file for a supplemental page table entry
 
-#include "vm/frame.h"
+
 
 #include <debug.h>
 #include <inttypes.h>
@@ -42,7 +42,7 @@ struct spt_page_entry
 	struct thread * t; 
 
     //maybe?
-    size_t swap_index; //to know where is in swap fastest
+    int swap_index; //to know where is in swap fastest
 };
 
 //need funcitons for
@@ -51,8 +51,8 @@ struct spt_page_entry
 //removing from hash : DONE
 //initialization: initialized in process.c
 
-//functions might need an aux that will be unused since the hash functions have it?
-unsigned page_hash (const struct hash_elem *);
-bool is_page_before (const struct hash_elem *, const struct hash_elem *);
-void destory_page (struct hash_elem *);
+// Moved to process.c
+// unsigned page_hash (const struct hash_elem *, void *);
+// bool is_page_before (const struct hash_elem *, const struct hash_elem *, void *);
+// void destroy_page (struct hash_elem *, void *);
 struct spt_page_entry * get_page_from_hash (void *);

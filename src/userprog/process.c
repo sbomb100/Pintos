@@ -20,12 +20,53 @@
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
 #include "vm/page.h"
+#include "vm/frame.h"
+#include "lib/kernel/hash.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
 struct child *find_child(struct list child_list, tid_t child_tid);
+unsigned page_hash (const struct hash_elem *elem1, void *aux UNUSED);
+bool is_page_before (const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED);
+void destroy_page (struct hash_elem *elem1, void *aux UNUSED);
 
 static struct thread* new_thread;
+
+/* hash function, address comparator */
+/* Returns a hash value for spt_page_entry p. */
+unsigned
+page_hash (const struct hash_elem *elem1, void *aux UNUSED)
+{
+  const struct spt_page_entry *page = hash_entry (elem1, struct spt_page_entry, elem);
+  return hash_bytes (&page->vaddr, sizeof page->vaddr);
+}
+
+// true if spt_page_entry 1 is before 2
+bool is_page_before (const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED)
+{
+  const struct spt_page_entry *page_one = hash_entry (elem1, struct spt_page_entry, elem);
+  const struct spt_page_entry *page_two = hash_entry (elem2, struct spt_page_entry, elem);
+
+  return  pg_no(page_one->vaddr) < pg_no(page_two->vaddr); //where does pg_no come from
+}
+
+//destroy the page. clear any references as well
+void destroy_page (struct hash_elem *elem1, void *aux UNUSED)
+{
+  struct spt_page_entry *page = hash_entry (elem1, struct spt_page_entry, elem);
+  if (page->frame != NULL) { //if it has a frame, free the frame
+    struct frame *f = page->frame;
+    page->frame = NULL;
+    free(f); //and other things
+  }
+  if (page->swap_index != -1){
+    //remove page from swap, make reference -1
+  }
+    //this means its in the swap table, so free it from swap table
+  free (page);
+}
+
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -54,7 +95,7 @@ tid_t process_execute(const char *file_name)
   return tid;
 }
 
-/*this func can be used to find threa with a particular tid. */
+/*this func can be used to find thread with a particular tid. */
 static void find_tid(struct thread *t, void *aux){
   int new_thread_tid = *((int *)aux);
   if (t->tid == new_thread_tid) {
@@ -77,7 +118,6 @@ start_process(void *file_name_)
   } 
   //VM make the spt hash table since its setup for thread
   hash_init (&thread_current()->spt, page_hash, is_page_before, NULL);
-
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -151,7 +191,7 @@ void process_exit(int status)
   struct thread *cur = thread_current();
   uint32_t *pd;
   //VM delete hash and pass a function to kill its elems
-  hash_destroy (&cur->spt, destory_page);
+  hash_destroy (&cur->spt, destroy_page);
 
   /* Process Termination Message */
   char* tmp;
