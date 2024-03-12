@@ -55,11 +55,8 @@ void frame_allocate_page(struct spt_page_entry* page){
     lock_acquire(&frame_table_lock);
     struct frame* f = find_frame();
     f->page = page;
-    bool sucessful = false;
-    if(pagedir_set_page(thread_current()->pagedir, page->vaddr)){
-
-    }
-    //TODO: should the parameter be spt_page_entry or vaddr? is it correct to use the pagedir_set_page here?
+    page->frame = f;
+    lock_release(&frame_table_lock);
 }
 
 
