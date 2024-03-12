@@ -15,11 +15,12 @@ struct frame {
 	struct list_elem elem; //since we are using linked list
 	int unused_count;
     bool pinned; //may need to be swapped into page
+	void* paddr; //physocal address
 };
 
 //methods
-
-//frame table init
+void frame_init(); //frame table init
 //allocate page into table
+void frame_allocate_page(struct spt_page_entry* page);
 //evict page from table
 //chose someone to evict
