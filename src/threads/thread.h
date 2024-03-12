@@ -127,7 +127,7 @@ struct thread
 
   //VM STUFF
   struct hash spt;
-  size_t num_pages;
+  size_t num_stack_pages;
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir; /* Page directory. */

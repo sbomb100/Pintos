@@ -31,12 +31,12 @@ struct spt_page_entry
     void *vaddr;       
     struct frame *frame;
     int page_status; //0: all 0 1: in swap 2: in file 3: in frame
-
+    uint32_t *pagedir; //holder for owner page directory, used instead of holding owner thread
 	// if we mmap file
 	struct file * file;
     size_t bytes_read;
 	off_t offset;
-	
+	bool is_stack;
 	bool writable;
     struct spinlock lock; //syncro lock
 	struct thread * t; 
