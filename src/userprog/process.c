@@ -179,8 +179,10 @@ int process_wait(tid_t child_tid UNUSED)
     sema_down(&cur_child->wait_sema);
   }
 
+  int exit_status = cur_child->exit_status;
   list_remove(e);
-  return cur_child->exit_status;
+  free(cur_child);
+  return exit_status;
 
 }
 
