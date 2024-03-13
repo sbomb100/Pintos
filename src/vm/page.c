@@ -8,7 +8,7 @@
 #include "lib/kernel/hash.h"
 
 // Moved to process.c
-
+struct spt_page_entry * get_page_from_hash (void *);
 // /* hash function, address comparator */
 // /* Returns a hash value for spt_page_entry p. */
 // unsigned

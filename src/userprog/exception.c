@@ -5,7 +5,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "vm/page.h"
-
+#include "userprog/syscall.h"
+#include "userprog/process.h"
+#include "threads/malloc.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -154,53 +156,118 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    // pointer is good so get the page with it
    struct spt_page_entry *page = get_page_from_hash(fault_addr);
 
-   if (page == NULL) //page not found
+   if (page == NULL) // page not found
    {
+      char *esp = f->esp;
+      // if its not in stack range
+      if ((fault_addr > PHYS_BASE) || (fault_addr < PHYS_BASE - 0x800000) ||
+          (fault_addr > (void *)(esp + 32)) || (fault_addr < (void *)(esp - 32)))
+      {
+         thread_exit(-1);
+      }
       // page isnt in table, therefore make new page.
       // if addr is outside stack range then exit
+      char *current_stack = PHYS_BASE - (t->num_stack_pages * PGSIZE);
+      char *new_page_addr = (char *)(pg_no(fault_addr) << PGBITS);
+      for (; new_page_addr < current_stack; new_page_addr += PGSIZE)
+      {
+         struct spt_page_entry *nsp = (struct spt_page_entry *)malloc(sizeof(struct spt_page_entry));
+         if (nsp == NULL)
+         { // check to see it malloced
+            thread_exit(-1);
+         }
+         nsp->is_stack = true;
+         nsp->vaddr = new_page_addr;
+         nsp->page_status = 3;
+         nsp->writable = true;
+         nsp->file = NULL;
+         nsp->offset = 0;
+         nsp->bytes_read = 0;
+         nsp->pagedir = t->pagedir;
+         hash_insert(&t->spt, &nsp->elem);
+         t->num_stack_pages++;
+         if (t->num_stack_pages > 2048) // hard limit
+         {
+            thread_exit(-1);
+         }
+         // get frame and put it in page
+         /* Install */
+      }
 
+      return;
       // make new additional stack page and put it in a frame
    }
    if (page->page_status == 2) // filesys
    {
-      //get frame and its page
-      //hold file lock
-      //make sure all data is there witha file_read_at
-      //release lock
+      // get frame and its page
+      // hold file lock
+      /*
+      struct frame_entry *frame = get_frame();
+      uint8_t *kpage = frame->kpage;
+      frame->page_occupant = p;
 
-      //mem set the kpage + bytes read
+      // make sure all data is there witha file_read_at
+      // release lock
 
-      //install into a frame
+      lock_acquire(&file_lock);
+      if (file_read_at (p->file, kpage, p->read_bytes, p->offset) != (int) p->read_bytes) {
+        lock_release (&file_lock);
+        thread_exit (-1);
+      }
+      lock_release (&file_lock);
+
+      // mem set the kpage + bytes read
+      size_t zb = PGSIZE - p->read_bytes;
+      memset (kpage + p->read_bytes, 0, zb); //make sure page has memory correct range
+
+      // install into a frame
+
+      if ( !(pagedir_get_page (t->pagedir, p->addr) == NULL
+          && pagedir_set_page (t->pagedir, p->addr, kpage, p->writable)))
+        thread_exit ();
+      p->status = IN_FRAME_TABLE;
+      p->frame = frame;
+      return;
+      */
    }
    if (page->page_status == 1) // in swap table
    {
-      //get frame and its page 
-      //load_page from swap table (function in swap.c to be made)
-      //install page
+      // get frame and its page
+      /*
+      struct frame_entry *frame = get_frame();
+      uint8_t *kpage = frame->kpage;
+      frame->page_occupant = p;
+      p->frame = frame;
+      */
+      // load_page from swap table (function in swap.c to be made)
+      /*
+      swap_get (p); //TO IMPLEMENT, GET PAGE FROM SWAP
+
+      //install frame
+      if ( !(pagedir_get_page (t->pagedir, p->addr) == NULL
+          && pagedir_set_page (t->pagedir, p->addr, kpage, p->writable)))
+        thread_exit ();
+      p->status = IN_FRAME_TABLE;
+
+      */
+      // install page
    }
-   // install the page with
-   /**
-      if ( !(pagedir_get_page (t->pagedir, nsp->addr) == NULL
-            && pagedir_set_page (t->pagedir, nsp->addr, stack_frame->kpage, nsp->writable)))
-        PANIC ("Error growing stack page!");
-    }
 
-    and maybe hold file sys lock?
-   **/
-
-   // if page status is in file:
-   // read file, change read_bytes, put page into frame
-
-   // if in swap table:
-   // load page from swap table into a frame
-
+   // if page doesnt exist
+   if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
+   {
+      thread_exit(-1);
+   }
    /* Determine cause. */
    not_present = (f->error_code & PF_P) == 0;
    write = (f->error_code & PF_W) != 0;
    user = (f->error_code & PF_U) != 0;
 
-   // if (!not_present && write)
-   //  thread_exit (-1); //not sure on what status to do
+   // ADDED VM
+   if (!not_present && write)
+   {
+      thread_exit(-1);
+   }
 
    /* To implement virtual memory, delete the rest of the function
       body, and replace it with code that brings in the page to
