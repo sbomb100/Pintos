@@ -1,6 +1,7 @@
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include <string.h>
 #include "threads/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -9,8 +10,9 @@
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
-//#include "vm/page.h"
+#include "vm/page.h"
 #include "vm/swap.h"
+
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -157,7 +159,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       thread_exit(-1); // FIX? CHECK IF CORRECT STATUS CODE
    }
    // pointer is good so get the page with it
-   struct spt_page_entry *page = get_page_from_hash(fault_addr);
+   struct spt_entry *page = get_page_from_hash(fault_addr);
 
    if (page == NULL) // page not found
    {
@@ -174,7 +176,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       char *new_page_addr = (char *)(pg_no(fault_addr) << PGBITS);
       for (; new_page_addr < current_stack; new_page_addr += PGSIZE)
       {
-         struct spt_page_entry *new_page = (struct spt_page_entry *)malloc(sizeof(struct spt_page_entry));
+         struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
          if (new_page == NULL)
          { // check to see it malloced
             thread_exit(-1);

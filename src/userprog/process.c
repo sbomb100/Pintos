@@ -28,22 +28,22 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
 struct child *find_child(struct list child_list, tid_t child_tid);
 
 
-static struct thread *new_thread;
+// static struct thread *new_thread;
 
 /* hash function, address comparator */
-/* Returns a hash value for spt_page_entry p. */
+/* Returns a hash value for spt_entry p. */
 unsigned
 page_hash(const struct hash_elem *elem1, void *aux UNUSED)
 {
-  const struct spt_page_entry *page = hash_entry(elem1, struct spt_page_entry, elem);
+  const struct spt_entry *page = hash_entry(elem1, struct spt_entry, elem);
   return hash_bytes(&page->vaddr, sizeof page->vaddr);
 }
 
-// true if spt_page_entry 1 is before 2
+// true if spt_entry 1 is before 2
 bool is_page_before(const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED)
 {
-  const struct spt_page_entry *page_one = hash_entry(elem1, struct spt_page_entry, elem);
-  const struct spt_page_entry *page_two = hash_entry(elem2, struct spt_page_entry, elem);
+  const struct spt_entry *page_one = hash_entry(elem1, struct spt_entry, elem);
+  const struct spt_entry *page_two = hash_entry(elem2, struct spt_entry, elem);
 
   return pg_no(page_one->vaddr) < pg_no(page_two->vaddr); // where does pg_no come from
 }
@@ -51,7 +51,7 @@ bool is_page_before(const struct hash_elem *elem1, const struct hash_elem *elem2
 // destroy the page. clear any references as well
 void destroy_page(struct hash_elem *elem1, void *aux UNUSED)
 {
-  struct spt_page_entry *page = hash_entry(elem1, struct spt_page_entry, elem);
+  struct spt_entry *page = hash_entry(elem1, struct spt_entry, elem);
   if (page->frame != NULL)
   { // if it has a frame, free the frame
     struct frame *f = page->frame;
@@ -561,7 +561,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     // add a lock and the table to the owner thread
     /* Get a page of memory. */
     // VM making a page
-    struct spt_page_entry *page = (struct spt_page_entry *)malloc(sizeof(struct spt_page_entry));
+    struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
     if (page == NULL) { //did it malloc?
       free(page);
       return false;
@@ -616,7 +616,7 @@ setup_stack(void **esp)
   bool success = false;
   // TODO: make the stack a SPT page instead which should get instantly put into a frame.
   /* create a page, put it in a frame, then set stack */
-  struct spt_page_entry *page = (struct spt_page_entry *)malloc(sizeof(struct spt_page_entry));
+  struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL) { //did it malloc?
       free(page);
       return false;

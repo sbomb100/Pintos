@@ -8,6 +8,7 @@
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
+#include "vm/page.h"
 
 static struct bitmap *used_blocks;
 struct block *block_swap;
@@ -22,7 +23,7 @@ void swap_init(void)
     block_swap = block_get_role(BLOCK_SWAP);
 }
 
-void swap_insert(struct spt_page_entry *p)
+void swap_insert(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
     char *c = (char *)p->frame->paddr;
@@ -37,7 +38,7 @@ void swap_insert(struct spt_page_entry *p)
 }
 
 /* Read from swap into the page */
-void swap_get(struct spt_page_entry *p)
+void swap_get(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
     char *c = (char *)p->frame->paddr;
@@ -52,7 +53,7 @@ void swap_get(struct spt_page_entry *p)
     lock_release(&block_lock);
 }
 
-void swap_free(struct spt_page_entry *p)
+void swap_free(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
     bitmap_reset(used_blocks, p->swap_block);

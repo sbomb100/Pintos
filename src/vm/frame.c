@@ -54,7 +54,7 @@ struct frame* find_frame(){
 /**
  * 
 */
-void frame_allocate_page(struct spt_page_entry* page){
+void frame_allocate_page(struct spt_entry* page){
     lock_acquire(&frame_table_lock);
     struct frame* f = find_frame();
     f->page = page;
