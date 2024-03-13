@@ -5,7 +5,6 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "vm/swap.h"
-#include "lib/kernel/hash.h"
 
 // Moved to process.c
 struct spt_page_entry * get_page_from_hash (void *);

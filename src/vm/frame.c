@@ -1,13 +1,15 @@
-#include <stdint.h>
-#include <stdbool.h>
+#include "vm/frame.h"
+#include <stdio.h>
+#include <bitmap.h>
+#include <round.h>
 #include "vm/page.h"
-#include <list.h>
-#include "devices/timer.h"
-#include "threads/init.h"
+#include "vm/swap.h"
+#include "userprog/pagedir.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
-#include "vm/frame.h"
 
 static struct list frame_list; //frame list
 static struct lock frame_table_lock; //lock for the frame table
@@ -44,6 +46,7 @@ struct frame* find_frame(){
         }
     }
     //no empty frame found
+    //could this just become LRU by grabbing the first frame, then once grabbed push it to the back instead?
     struct frame* f = evict();
     return f;
 }

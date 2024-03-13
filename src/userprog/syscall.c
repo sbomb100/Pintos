@@ -2,7 +2,7 @@
 #include "userprog/process.h"
 static void syscall_handler (struct intr_frame *);
 
-struct lock file_lock;
+
 void lock_file() {
   lock_acquire(&file_lock);
 }

@@ -4,10 +4,13 @@
 #include "threads/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "vm/page.h"
-#include "userprog/syscall.h"
-#include "userprog/process.h"
+#include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "userprog/pagedir.h"
+#include "userprog/syscall.h"
+#include "vm/frame.h"
+//#include "vm/page.h"
+#include "vm/swap.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -171,27 +174,38 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       char *new_page_addr = (char *)(pg_no(fault_addr) << PGBITS);
       for (; new_page_addr < current_stack; new_page_addr += PGSIZE)
       {
-         struct spt_page_entry *nsp = (struct spt_page_entry *)malloc(sizeof(struct spt_page_entry));
-         if (nsp == NULL)
+         struct spt_page_entry *new_page = (struct spt_page_entry *)malloc(sizeof(struct spt_page_entry));
+         if (new_page == NULL)
          { // check to see it malloced
             thread_exit(-1);
          }
-         nsp->is_stack = true;
-         nsp->vaddr = new_page_addr;
-         nsp->page_status = 3;
-         nsp->writable = true;
-         nsp->file = NULL;
-         nsp->offset = 0;
-         nsp->bytes_read = 0;
-         nsp->pagedir = t->pagedir;
-         hash_insert(&t->spt, &nsp->elem);
+         //new page
+         new_page->is_stack = true;
+         new_page->vaddr = new_page_addr;
+         new_page->page_status = 3;
+         new_page->writable = true;
+         new_page->file = NULL;
+         new_page->offset = 0;
+         new_page->bytes_read = 0;
+         new_page->pagedir = t->pagedir;
+         page->swap_block = -1;
+         hash_insert(&t->spt, &new_page->elem);
+
          t->num_stack_pages++;
          if (t->num_stack_pages > 2048) // hard limit
          {
             thread_exit(-1);
          }
          // get frame and put it in page
+         struct frame *new_frame = find_frame();
+         new_frame->page = new_page;
          /* Install */
+         if (!(pagedir_get_page(t->pagedir, new_page->vaddr) == NULL && pagedir_set_page(t->pagedir, new_page->vaddr, new_frame->paddr, new_page->writable)))
+         {
+            PANIC("Error growing stack page!");
+         }
+
+         return;
       }
 
       return;
@@ -200,57 +214,51 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    if (page->page_status == 2) // filesys
    {
       // get frame and its page
-      // hold file lock
-      /*
-      struct frame_entry *frame = get_frame();
-      uint8_t *kpage = frame->kpage;
-      frame->page_occupant = p;
-
-      // make sure all data is there witha file_read_at
-      // release lock
+      struct frame *new_frame = find_frame();
+      uint8_t *kpage = new_frame->paddr;
+      new_frame->page = page;
 
       lock_acquire(&file_lock);
-      if (file_read_at (p->file, kpage, p->read_bytes, p->offset) != (int) p->read_bytes) {
-        lock_release (&file_lock);
-        thread_exit (-1);
+      if (file_read_at(page->file, kpage, page->bytes_read, page->offset) != (int)page->bytes_read)
+      {
+         lock_release(&file_lock);
+         thread_exit(-1);
       }
-      lock_release (&file_lock);
+      lock_release(&file_lock);
 
       // mem set the kpage + bytes read
-      size_t zb = PGSIZE - p->read_bytes;
-      memset (kpage + p->read_bytes, 0, zb); //make sure page has memory correct range
+      size_t nBytes = PGSIZE - page->bytes_read;
+      memset(kpage + page->bytes_read, 0, nBytes); // make sure page has memory correct range
 
       // install into a frame
 
-      if ( !(pagedir_get_page (t->pagedir, p->addr) == NULL
-          && pagedir_set_page (t->pagedir, p->addr, kpage, p->writable)))
-        thread_exit ();
-      p->status = IN_FRAME_TABLE;
-      p->frame = frame;
+      if (!(pagedir_get_page(t->pagedir, page->vaddr) == NULL && pagedir_set_page(t->pagedir, page->vaddr, kpage, page->writable)))
+      {
+         thread_exit(-1);
+      }
+      page->page_status = 3; // in frame table
+      page->frame = new_frame;
       return;
-      */
    }
    if (page->page_status == 1) // in swap table
    {
       // get frame and its page
-      /*
-      struct frame_entry *frame = get_frame();
-      uint8_t *kpage = frame->kpage;
-      frame->page_occupant = p;
-      p->frame = frame;
-      */
-      // load_page from swap table (function in swap.c to be made)
-      /*
-      swap_get (p); //TO IMPLEMENT, GET PAGE FROM SWAP
 
-      //install frame
-      if ( !(pagedir_get_page (t->pagedir, p->addr) == NULL
-          && pagedir_set_page (t->pagedir, p->addr, kpage, p->writable)))
-        thread_exit ();
-      p->status = IN_FRAME_TABLE;
+      struct frame *new_frame = find_frame();
+      uint8_t *kpage = new_frame->paddr;
+      new_frame->page = page;
+      page->frame = new_frame;
 
-      */
-      // install page
+
+      swap_get(page); // GET PAGE FROM SWAP
+
+      // install frame
+      if (!(pagedir_get_page(t->pagedir, page->vaddr) == NULL && pagedir_set_page(t->pagedir, page->vaddr, kpage, page->writable)))
+      {
+         thread_exit(-1);
+      }
+      page->page_status = 3; // in frame table
+
    }
 
    // if page doesnt exist

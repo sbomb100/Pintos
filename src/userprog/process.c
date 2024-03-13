@@ -26,9 +26,7 @@
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
 struct child *find_child(struct list child_list, tid_t child_tid);
-unsigned page_hash(const struct hash_elem *elem1, void *aux UNUSED);
-bool is_page_before(const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED);
-void destroy_page(struct hash_elem *elem1, void *aux UNUSED);
+
 
 static struct thread *new_thread;
 
@@ -95,16 +93,6 @@ tid_t process_execute(const char *file_name)
     tid = -1;
 
   return tid;
-}
-
-/*this func can be used to find thread with a particular tid. */
-static void find_tid(struct thread *t, void *aux)
-{
-  int new_thread_tid = *((int *)aux);
-  if (t->tid == new_thread_tid)
-  {
-    new_thread = t;
-  }
 }
 
 /* A thread function that loads a user process and starts it
@@ -587,7 +575,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->writable = writable;
     page->bytes_read = page_read_bytes;
     page->pagedir = t->pagedir;
-
+    page->swap_block = -1;
     hash_insert(&t->spt, &page->elem);
 
     /*old code from user prog
@@ -641,6 +629,7 @@ setup_stack(void **esp)
   page->offset = 0;
   page->bytes_read = 0;
   page->pagedir = thread_current()->pagedir;
+  page->swap_block = -1;
   hash_insert(&thread_current()->spt, &page->elem);
   thread_current()->num_stack_pages++;
   // FRAME TODO: now grab frame from frame list and put the page on it, set page's frame to the captured frame too (its a 2 way street)

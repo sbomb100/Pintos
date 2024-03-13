@@ -27,4 +27,5 @@ void close(int fd);
 int findFdForFile(void);
 void lock_file(void);
 void unlock_file(void);
+struct lock file_lock;
 #endif /* userprog/syscall.h */

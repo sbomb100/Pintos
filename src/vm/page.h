@@ -1,27 +1,12 @@
 //The header file for a supplemental page table entry
 
 
-
-#include <debug.h>
-#include <inttypes.h>
-#include <round.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "userprog/pagedir.h"
-#include "userprog/syscall.h"
-#include "userprog/process.h"
-#include "filesys/directory.h"
-#include "filesys/file.h"
-#include "filesys/filesys.h"
-#include "threads/flags.h"
-#include "threads/init.h"
-#include "threads/interrupt.h"
+#include <stdint.h>
+#include <hash.h>
 #include "threads/palloc.h"
-#include "threads/thread.h"
-#include "threads/vaddr.h"
+#include "filesys/file.h"
+#include "vm/frame.h"
 #include "threads/synch.h"
-#include "lib/kernel/hash.h"
 
 struct spt_page_entry
 {
@@ -40,7 +25,7 @@ struct spt_page_entry
 	bool writable;
     struct spinlock lock; //syncro lock
 	struct thread * t; 
-
+    int swap_block; // FOR SWAP TABLE
     //maybe?
     int swap_index; //to know where is in swap fastest
 };
