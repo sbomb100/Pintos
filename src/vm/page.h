@@ -1,3 +1,6 @@
+#ifndef VM_PAGE_H
+#define VM_PAGE_H
+
 //The header file for a supplemental page table entry
 
 
@@ -40,5 +43,7 @@ struct spt_entry
 // unsigned page_hash (const struct hash_elem *, void *);
 // bool is_page_before (const struct hash_elem *, const struct hash_elem *, void *);
 // void destroy_page (struct hash_elem *, void *);
-extern struct spt_entry * get_page_from_hash (void *);
+struct spt_entry * get_page_from_hash (void *);
 
+
+#endif

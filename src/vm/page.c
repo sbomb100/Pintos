@@ -5,7 +5,6 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "vm/swap.h"
-struct spt_entry * get_page_from_hash (void *given_address);
 // Moved to process.c
 
 // /* hash function, address comparator */

@@ -1,4 +1,7 @@
 #include "userprog/exception.h"
+#include "vm/page.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,9 +12,7 @@
 #include "threads/malloc.h"
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
-#include "vm/frame.h"
-#include "vm/page.h"
-#include "vm/swap.h"
+
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
