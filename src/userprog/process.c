@@ -104,6 +104,9 @@ start_process(void *file_name_)
   struct intr_frame if_;
   bool success;
   thread_current()->fdToFile = malloc(128 * sizeof(struct file *));
+  if (thread_current()->fdToFile == NULL){
+    thread_exit(-1);
+  }
 
   for (int i = 0; i < 128; i++)
   {
@@ -154,7 +157,7 @@ int process_wait(tid_t child_tid UNUSED)
   struct thread *cur = thread_current();
   struct child *cur_child = NULL;
   struct list_elem *e;
-
+  
   for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e))
   {
     struct child *temp = list_entry(e, struct child, elem);

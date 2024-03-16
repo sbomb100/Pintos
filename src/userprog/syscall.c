@@ -1,138 +1,146 @@
 #include "userprog/syscall.h"
 #include "userprog/process.h"
-static void syscall_handler (struct intr_frame *);
+static void syscall_handler(struct intr_frame *);
 
-
-void lock_file() {
+void lock_file()
+{
   lock_acquire(&file_lock);
 }
-void unlock_file() {
+void unlock_file()
+{
   lock_release(&file_lock);
 }
-void
-syscall_init (void) 
+void syscall_init(void)
 {
   lock_init(&file_lock);
-  
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-}
-/* get arguments off of the stack */ 
- bool parse_arguments (struct intr_frame *f, int* args, int numArgs)
- {
-    int i;
-    int *ptr;
-    for (i = 0; i < numArgs; i++)
-    {
-        ptr = (int *) f->esp + i + 1;
-        if (!validate_pointer((const void *) ptr))
-          return false;
-        args[i] = *ptr;
-    }
-    return true;
- } 
 
+  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
+}
+/* get arguments off of the stack */
+bool parse_arguments(struct intr_frame *f, int *args, int numArgs)
+{
+  int i;
+  int *ptr;
+  for (i = 0; i < numArgs; i++)
+  {
+    ptr = (int *)f->esp + i + 1;
+    if (!validate_pointer((const void *)ptr))
+      return false;
+    args[i] = *ptr;
+  }
+  return true;
+}
 
 static void
 syscall_handler(struct intr_frame *f)
 {
-  //get pointer (int bc we want sys call number)
-  int* p = f->esp; //esp
-  //check if its a good pointer
-  if (!validate_pointer(p)) {
+  // get pointer (int bc we want sys call number)
+  int *p = f->esp; // esp
+  // check if its a good pointer
+  if (!validate_pointer(p))
+  {
     thread_exit(-1);
     return;
   }
   int syscall_num = *p;
   int args[3];
-  //PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
-  switch (syscall_num){ //bad system call causes panic
-    case SYS_HALT:
-      shutdown_power_off();
-      break;
-    case SYS_EXIT:
-      if (!parse_arguments(f, &args[0], 1))
-        thread_exit(-1);
-      thread_exit(*(int *) (p + 1));
-      break;
-    case SYS_EXEC:
-      if (!parse_arguments(f, &args[0], 1))
-        thread_exit(-1);
-      f->eax = exec((const char *)  args[0]);
-      break;
-    case SYS_WAIT:
-      if (!parse_arguments(f, &args[0], 1))
-        thread_exit(-1);
-      int arg = *(int *) (p + 4);
-      f->eax = process_wait(arg);
-      break;
-    case SYS_CREATE:
-      if (!parse_arguments(f, &args[0], 2)){
-        thread_exit(-1);
-        return;
-      }
-  	  f->eax = (uint32_t) create((const char *) (args[0]), (unsigned int) (args[1]));
-      break;
-    case SYS_REMOVE:
-      if (!parse_arguments(f, &args[0], 1)){
-        thread_exit(-1);
-        return;
-      }
-      f->eax = (uint32_t) remove((const char *) args[0]);
-      break;
-    case SYS_OPEN:
-      if (!parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
-      }
-      f->eax = (uint32_t) open((const char *)  args[0]);
-      break;
-    case SYS_FILESIZE:
-      if (!parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
-      }
-      f->eax = (uint32_t) filesize(args[0]);
-      break;
-    case SYS_READ:
-      if (!parse_arguments(f, &args[0], 3)) {
-        thread_exit(-1);
-        return;
-      }
-      f->eax = (uint32_t) read(args[0], (void *) args[1], (unsigned int) args[2]);
-      break;
-    case SYS_WRITE:
-      if (!parse_arguments(f, &args[0], 3)) {
-        thread_exit(-1);
-        return;
-      }
-      f->eax = (uint32_t) write(args[0], (const void *) args[1], (unsigned int) args[2]);
-      break;
-    case SYS_SEEK:
-      if (!parse_arguments(f, &args[0], 2)) {
-        thread_exit(-1);
-        return;
-      }
-      seek(args[0], (unsigned int) args[1]);
-      break;
-    case SYS_TELL:
-      if (!parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
-      }
-      f->eax = (uint32_t) tell(args[0]);
-      break;
-    case SYS_CLOSE:
-      if (!parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
-      }
-      close(args[0]);
-      break;
-    default: 
+  // PUT RETURNS IN EAX REGISTER ON FRAME, converted to same type as EAX for consistency
+  switch (syscall_num)
+  { // bad system call causes panic
+  case SYS_HALT:
+    shutdown_power_off();
+    break;
+  case SYS_EXIT:
+    if (!parse_arguments(f, &args[0], 1))
       thread_exit(-1);
-
+    thread_exit(*(int *)(p + 1));
+    break;
+  case SYS_EXEC:
+    if (!parse_arguments(f, &args[0], 1))
+      thread_exit(-1);
+    f->eax = exec((const char *)args[0]);
+    break;
+  case SYS_WAIT:
+    if (!parse_arguments(f, &args[0], 1))
+      thread_exit(-1);
+    int arg = *(int *)(p + 4);
+    f->eax = process_wait(arg);
+    break;
+  case SYS_CREATE:
+    if (!parse_arguments(f, &args[0], 2))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)create((const char *)(args[0]), (unsigned int)(args[1]));
+    break;
+  case SYS_REMOVE:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)remove((const char *)args[0]);
+    break;
+  case SYS_OPEN:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)open((const char *)args[0]);
+    break;
+  case SYS_FILESIZE:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)filesize(args[0]);
+    break;
+  case SYS_READ:
+    if (!parse_arguments(f, &args[0], 3))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)read(args[0], (void *)args[1], (unsigned int)args[2]);
+    break;
+  case SYS_WRITE:
+    if (!parse_arguments(f, &args[0], 3))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)write(args[0], (const void *)args[1], (unsigned int)args[2]);
+    break;
+  case SYS_SEEK:
+    if (!parse_arguments(f, &args[0], 2))
+    {
+      thread_exit(-1);
+      return;
+    }
+    seek(args[0], (unsigned int)args[1]);
+    break;
+  case SYS_TELL:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)tell(args[0]);
+    break;
+  case SYS_CLOSE:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    close(args[0]);
+    break;
+  default:
+    thread_exit(-1);
   }
-
 }
 /*
   Runs the executable whose name is given in cmd_line, passing any given arguments.
@@ -144,48 +152,40 @@ tid_t exec(const char *cmd_line)
     return -1;
   tid_t child_tid = process_execute(cmd_line);
 
-  //double-check that the new process has loaded and that everything went 
-  //smoothly by checking that the child struct is in the parent's children list
-  //not 100% sure that it is necessary
+  // double-check that the new process has loaded and that everything went
+  // smoothly by checking that the child struct is in the parent's children list
+
   struct thread *cur = thread_current();
   struct child *cur_child = NULL;
   struct list_elem *e;
 
-  for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e)){
+  for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e))
+  {
     struct child *temp = list_entry(e, struct child, elem);
-    if (temp->tid == child_tid) {
+    if (temp->tid == child_tid)
+    {
       cur_child = temp;
       break;
     }
   }
 
-  if(cur_child == NULL){
+  if (cur_child == NULL)
+  {
     child_tid = -1;
   }
   return child_tid;
 }
-/*
-  if pid alive, wait until terminate
-  returns: 0 on success, non 0 on failure.
 
-*/
-//int wait(pid_t pid)
-//{
-  // We suggest that you implement process_wait() according to the comment at the top of the function
-  // then implement the wait system call in terms of process_wait().
-
-  //process_wait()
-//}
 /*
   creates a file, however does not open the file
   returns: true on success, false otherwise
 */
 bool create(const char *file, unsigned initial_size)
 {
- 
-  if (file == NULL ||  !validate_pointer(file))
+
+  if (file == NULL || !validate_pointer(file))
     thread_exit(-1);
-  
+
   lock_file();
   int ret = filesys_create(file, initial_size);
   unlock_file();
@@ -198,7 +198,7 @@ bool create(const char *file, unsigned initial_size)
 */
 bool remove(const char *file)
 {
-  if (file == NULL ||  !validate_pointer(file))
+  if (file == NULL || !validate_pointer(file))
     thread_exit(-1);
 
   lock_file();
@@ -215,25 +215,31 @@ int open(const char *file)
 {
   // Each process has an independent set of file descriptors. File descriptors are not inherited by child processes
   // openning same file makes new fds (act as if different files)
-  if (file == NULL ||  !validate_pointer(file))
+  if (file == NULL || !validate_pointer(file))
     thread_exit(-1);
 
   lock_file();
-  struct file * fp = filesys_open (file); 
-  if (fp == NULL) {
+  struct file *fp = filesys_open(file);
+  if (fp == NULL)
+  {
     unlock_file();
     return -1;
   }
   unlock_file();
-  
-  if (fp == NULL) 
+
+  if (fp == NULL)
     thread_exit(0);
-  
-  int fd = findFdForFile(); //does index + 2 to avoid 0 or 1
+
+  int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
   if (fd == -1)
+  {
+    //FIX? maybe fixed oom
+    
+    file_close(fp);
     thread_exit(-1);
+  }
   thread_current()->fdToFile[fd - 2] = fp;
-  
+
   return fd;
 }
 /*
@@ -241,9 +247,9 @@ int open(const char *file)
 */
 int filesize(int fd)
 {
-  struct file * filePtr = thread_current()->fdToFile[fd - 2];
+  struct file *filePtr = thread_current()->fdToFile[fd - 2];
   lock_file();
-  int length = file_length(filePtr); 
+  int length = file_length(filePtr);
   unlock_file();
   return length;
 }
@@ -254,35 +260,34 @@ int filesize(int fd)
 */
 int read(int fd, void *buffer, unsigned size)
 {
-  //check pointers / fd
-  if (buffer == NULL ||  !validate_pointer(buffer))
+  // check pointers / fd
+  if (buffer == NULL || !validate_pointer(buffer))
     thread_exit(-1);
   if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
     return -1;
-  
-  
+
   // Fd 0 reads from the keyboard using input_getc().
   unsigned bytesRead = 0;
-  
+
   // If fd == 0, reads from keyboard using input_getc()
   if (fd == 0)
-  { 
+  {
     while (bytesRead < size)
     {
-      *((char *)buffer+bytesRead) = input_getc();
+      *((char *)buffer + bytesRead) = input_getc();
       bytesRead++;
     }
     return bytesRead;
   }
 
   // fd is not 0, so read it
-  struct file * filePtr = thread_current()->fdToFile[fd - 2];
+  struct file *filePtr = thread_current()->fdToFile[fd - 2];
   if (filePtr == NULL)
     return -1;
-   
+
   lock_file();
   // Read from the file using filesys function
-  bytesRead = file_read(filePtr,buffer,size);
+  bytesRead = file_read(filePtr, buffer, size);
   unlock_file();
   return bytesRead;
 }
@@ -292,9 +297,9 @@ int read(int fd, void *buffer, unsigned size)
 */
 int write(int fd, const void *buffer, unsigned size)
 {
-  //length >= 0 (fails from create)
-  //check pointers and bad fd
-  if (buffer == NULL ||  !validate_pointer(buffer))
+  // length >= 0 (fails from create)
+  // check pointers and bad fd
+  if (buffer == NULL || !validate_pointer(buffer))
     thread_exit(-1);
   if (fd < 1 || fd > 1025)
     return -1;
@@ -306,20 +311,20 @@ int write(int fd, const void *buffer, unsigned size)
   lock_file();
   if (fd == 1)
   {
-    putbuf(buffer,size);
+    putbuf(buffer, size);
     unlock_file();
     return size;
   }
-  
- struct file* fileDes = thread_current()->fdToFile[fd - 2];
-  if (fileDes == NULL) {
+
+  struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  if (fileDes == NULL)
+  {
     unlock_file();
     return -1;
   }
-  
-  
+
   // write to the file using filesys function
-  int ret = file_write(fileDes,buffer,size);
+  int ret = file_write(fileDes, buffer, size);
   unlock_file();
   return ret;
 }
@@ -331,11 +336,11 @@ int write(int fd, const void *buffer, unsigned size)
 */
 void seek(int fd, unsigned position)
 {
-  struct file* fileDes = thread_current()->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->fdToFile[fd - 2];
 
   if (fileDes == NULL)
     return;
-  
+
   lock_file();
   file_seek(thread_current()->fdToFile[fd - 2], position);
   unlock_file();
@@ -345,12 +350,12 @@ void seek(int fd, unsigned position)
 */
 unsigned tell(int fd)
 {
-  struct file* fileDes = thread_current()->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->fdToFile[fd - 2];
   if (fileDes == NULL)
     return -1;
 
   lock_file();
-  unsigned pos = file_tell (fileDes);
+  unsigned pos = file_tell(fileDes);
   unlock_file();
   return pos;
 }
@@ -360,15 +365,14 @@ unsigned tell(int fd)
 void close(int fd)
 {
   //`inode->deny_write_cnt <= inode->open_cnt    close twice not good
-  //check if fd is good
+  // check if fd is good
   if (fd < 2 || fd > 1025)
     return;
-  
-  struct file* fileDes = thread_current()->fdToFile[fd - 2];
+
+  struct file *fileDes = thread_current()->fdToFile[fd - 2];
   if (fileDes == NULL)
     return;
-  
-  
+
   lock_file();
   // Closing file using file sys function
   file_close(fileDes);
@@ -376,36 +380,38 @@ void close(int fd)
   unlock_file();
 }
 
-//index of zero is fd of 2
-int findFdForFile(){
-  struct file** fdArray = thread_current()->fdToFile;
+// index of zero is fd of 2
+int findFdForFile()
+{
+  struct file **fdArray = thread_current()->fdToFile;
 
-  for (int i = 0; i < 128; i++){
-    if (fdArray[i] == NULL){
+  for (int i = 0; i < 128; i++)
+  {
+    if (fdArray[i] == NULL)
+    {
       return i + 2;
     }
   }
   return -1;
 }
 
-
 /*
 this checks the address of a given pointer to validate it*/
 // returns 0 if it's not valid
-bool validate_pointer(const void * givenPointer)
-{ 
-    //is not a user virtual address
-    if (!is_user_vaddr(givenPointer)) //from threads/vaddr.h
-    {
-        return false;
-    }
-    //from userprog/pagedir.c
-    //vaddr < USER_VADDR_BOTTOM?
-    void *point = (void *)pagedir_get_page(thread_current()->pagedir, givenPointer);
-    if (point == NULL)
-    {
-        return false;
-    }
-    //return the valid pointer
-    return true;
+bool validate_pointer(const void *givenPointer)
+{
+  // is not a user virtual address
+  if (!is_user_vaddr(givenPointer)) // from threads/vaddr.h
+  {
+    return false;
+  }
+  // from userprog/pagedir.c
+  // vaddr < USER_VADDR_BOTTOM?
+  void *point = (void *)pagedir_get_page(thread_current()->pagedir, givenPointer);
+  if (point == NULL)
+  {
+    return false;
+  }
+  // return the valid pointer
+  return true;
 }
