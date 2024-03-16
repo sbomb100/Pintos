@@ -3,6 +3,9 @@
 
 //The header file for a frame table entry
 #include <stdint.h>
+#include <stdbool.h>
+#include "vm/page.h"
+
 struct frame {
 	struct spt_entry * page;
 	struct list_elem elem; //since we are using linked list
