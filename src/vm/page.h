@@ -43,7 +43,7 @@ struct spt_entry
 // unsigned page_hash (const struct hash_elem *, void *);
 // bool is_page_before (const struct hash_elem *, const struct hash_elem *, void *);
 // void destroy_page (struct hash_elem *, void *);
-struct spt_entry * get_page_from_hash (void *);
+extern struct spt_entry * get_page_from_hash (void *);
 
 
 #endif

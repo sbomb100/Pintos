@@ -1,5 +1,7 @@
 #include "userprog/syscall.h"
 #include "userprog/process.h"
+struct lock file_lock;
+
 static void syscall_handler(struct intr_frame *);
 
 void lock_file()
@@ -234,7 +236,7 @@ int open(const char *file)
   if (fd == -1)
   {
     //FIX? maybe fixed oom
-    
+
     file_close(fp);
     thread_exit(-1);
   }
