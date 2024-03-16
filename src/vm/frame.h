@@ -1,6 +1,3 @@
-#ifndef VM_FRAME_H
-#define VM_FRAME_H
-
 //The header file for a frame table entry
 #include <stdint.h>
 struct frame {
@@ -19,5 +16,3 @@ struct frame* find_frame(void);
 //evict page from table
 //chose someone to evict
 
-
-#endif

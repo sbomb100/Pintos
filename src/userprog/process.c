@@ -54,7 +54,7 @@ void destroy_page(struct hash_elem *elem1, void *aux UNUSED)
   struct spt_entry *page = hash_entry(elem1, struct spt_entry, elem);
   if (page->frame != NULL)
   { // if it has a frame, free the frame
-    struct frame *f = page->frame;
+    struct frame_table_entry *f = page->frame;
     page->frame = NULL;
     free(f); // and other things
   }

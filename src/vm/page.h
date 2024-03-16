@@ -1,6 +1,3 @@
-#ifndef VM_PAGE_H
-#define VM_PAGE_H
-
 //The header file for a supplemental page table entry
 
 
@@ -45,5 +42,3 @@ struct spt_entry
 // void destroy_page (struct hash_elem *, void *);
 extern struct spt_entry * get_page_from_hash (void *);
 
-
-#endif
