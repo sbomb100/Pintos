@@ -1,8 +1,8 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
+#include <stdbool.h>
+#include <list.h>
 
-//The header file for a frame table entry
-#include <stdint.h>
 struct frame {
 	struct spt_entry * page;
 	struct list_elem elem; //since we are using linked list
@@ -18,6 +18,8 @@ void frame_allocate_page(struct spt_entry* page);
 struct frame* find_frame(void);
 //evict page from table
 //chose someone to evict
+
+void free_frame(struct frame *);
 
 
 #endif

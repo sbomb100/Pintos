@@ -63,5 +63,11 @@ void frame_allocate_page(struct spt_entry* page){
 }
 
 
-
-
+/**
+ * frees frame
+*/
+void free_frame(struct frame *f){
+    lock_acquire(&frame_table_lock);
+    f->page = NULL;
+    lock_release(&frame_table_lock);
+}
