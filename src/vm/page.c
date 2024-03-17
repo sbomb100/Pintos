@@ -10,7 +10,7 @@
 /* hash function, address comparator */
 /* Returns a hash value for spt_entry p. */
 unsigned
-page_hash (const struct hash_elem *elem1, void *aux)
+page_hash (const struct hash_elem *elem1, void *aux UNUSED)
 {
   const struct spt_entry *page = hash_entry (elem1, struct spt_entry, elem);
   return hash_bytes (&page->vaddr, sizeof page->vaddr);
