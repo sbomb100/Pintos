@@ -598,7 +598,9 @@ setup_stack(void **esp)
   page->bytes_read = 0;
   page->pagedir = thread_current()->pagedir;
   page->swap_block = -1;
+  lock_acquire(&thread_current()->spt_lock);
   hash_insert(&thread_current()->spt, &page->elem);
+  lock_release(&thread_current()->spt_lock);
   thread_current()->num_stack_pages++;
   // FRAME TODO: now grab frame from frame list and put the page on it, set page's frame to the captured frame too (its a 2 way street)
   // kpage = find_frame()
