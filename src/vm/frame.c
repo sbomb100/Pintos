@@ -46,7 +46,9 @@ struct frame* find_frame(){
         struct frame * f = list_entry(e, struct frame, elem);
         if ( f->pinned ) continue;
 
-        swap_insert(f->page);
+        if ( f->page != NULL ) {
+            swap_insert(f->page);
+        }
         list_remove(e);
         list_push_back(&frame_list, e);
         lock_release(&frame_table_lock);
