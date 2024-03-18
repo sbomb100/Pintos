@@ -38,7 +38,7 @@ void frame_init(){
 */
 struct frame* find_frame(){
     struct list_elem *e;
-    //lock_acquire(&frame_table_lock);
+    lock_acquire(&frame_table_lock);
     for (e = list_begin(&frame_list); e != list_end (&frame_list); e = list_next (e)) {
         struct frame *f = list_entry (e, struct frame, elem);
         if(f->page == NULL){
@@ -46,7 +46,7 @@ struct frame* find_frame(){
             return f;
         }
     }
-    //lock_release(&frame_table_lock);
+    lock_release(&frame_table_lock);
     //no empty frame found
     //could this just become LRU by grabbing the first frame, then once grabbed push it to the back instead?
     //struct frame* f = evict();
@@ -57,11 +57,11 @@ struct frame* find_frame(){
  * 
 */
 void frame_allocate_page(struct spt_entry* page){
-    lock_acquire(&frame_table_lock);
+    //lock_acquire(&frame_table_lock);
     struct frame* f = find_frame();
     f->page = page;
     page->frame = f;
-    lock_release(&frame_table_lock);
+    //lock_release(&frame_table_lock);
 }
 
 
