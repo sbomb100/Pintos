@@ -266,8 +266,8 @@ thread_create (const char *name, int nice, thread_func *function, void *aux)
   tid_t tid = t->tid;
 
   // VM make the spt hash table since its setup for thread
-  hash_init(&thread_current()->spt, page_hash, is_page_before, NULL);
-  lock_init(&thread_current()->spt_lock);
+  hash_init(&t->spt, page_hash, is_page_before, NULL);
+  lock_init(&t->spt_lock);
   //init mmap
   list_init (&t->mmap_list);
   t->num_mapped = 0;
