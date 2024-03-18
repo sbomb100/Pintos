@@ -157,6 +157,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    struct thread *t = thread_current();
    if (fault_addr == NULL || is_kernel_vaddr(fault_addr))
    {                   // doesnt exit or is kernel pointer
+      printf("fail 160 exception.c\n");
       thread_exit(-1); // FIX? CHECK IF CORRECT STATUS CODE
    }
    // pointer is good so get the page with it
@@ -165,10 +166,12 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    if (page == NULL) // page not found
    {
       char *esp = f->esp;
+      printf(esp);
       // if its not in stack range
       if ((fault_addr > PHYS_BASE) || (fault_addr < PHYS_BASE - 0x800000) ||
           (fault_addr > (void *)(esp + 32)) || (fault_addr < (void *)(esp - 32)))
       {
+         printf("fail 173 exception.c\n");
          thread_exit(-1);
       }
       // page isnt in table, therefore make new page.
@@ -180,6 +183,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
          struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
          if (new_page == NULL)
          { // check to see it malloced
+         printf("fail 185 exception.c\n");
             thread_exit(-1);
          }
          //new page
@@ -197,6 +201,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
          t->num_stack_pages++;
          if (t->num_stack_pages > 2048) // hard limit
          {
+            printf("fail 202 exception.c\n");
             thread_exit(-1);
          }
          // get frame and put it in page
@@ -225,6 +230,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       if (file_read_at(page->file, kpage, page->bytes_read, page->offset) != (int)page->bytes_read)
       {
          lock_release(&file_lock);
+         printf("fail 232 exception.c\n");
          thread_exit(-1);
       }
       lock_release(&file_lock);
@@ -237,6 +243,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
 
       if (!(pagedir_get_page(t->pagedir, page->vaddr) == NULL && pagedir_set_page(t->pagedir, page->vaddr, kpage, page->writable)))
       {
+         printf("fail 245 exception.c\n");
          thread_exit(-1);
       }
       page->page_status = 3; // in frame table
@@ -258,6 +265,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       // install frame
       if (!(pagedir_get_page(t->pagedir, page->vaddr) == NULL && pagedir_set_page(t->pagedir, page->vaddr, kpage, page->writable)))
       {
+         printf("fail 267 exception.c\n");
          thread_exit(-1);
       }
       page->page_status = 3; // in frame table
@@ -267,6 +275,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    // if page doesnt exist
    if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
    {
+      printf("fail 277 exception.c\n");
       thread_exit(-1);
    }
    /* Determine cause. */
@@ -277,6 +286,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    // ADDED VM
    if (!not_present && write)
    {
+      printf("fail 288 exception.c\n");
       thread_exit(-1);
    }
 
