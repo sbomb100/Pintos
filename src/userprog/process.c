@@ -547,7 +547,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->bytes_read = page_read_bytes;
     page->bytes_zero = PGSIZE - page_read_bytes;
     page->pagedir = t->pagedir;
-    page->swap_block = -1;
+    page->swap_index = -1;
 
     lock_acquire(&t->spt_lock);
     hash_insert(&t->spt, &page->elem);
@@ -606,7 +606,7 @@ setup_stack(void **esp)
   page->offset = 0;
   page->bytes_read = 0;
   page->pagedir = thread_current()->pagedir;
-  page->swap_block = -1;
+  page->swap_index = -1;
   lock_acquire(&thread_current()->spt_lock);
   hash_insert(&thread_current()->spt, &page->elem);
   lock_release(&thread_current()->spt_lock);

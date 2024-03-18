@@ -30,7 +30,7 @@ struct spt_entry
 	bool writable;
     struct spinlock lock; //syncro lock
 	struct thread * t; 
-    int swap_block; // FOR SWAP TABLE
+    int swap_index; // FOR SWAP TABLE
     //maybe?
     int swap_index; //to know where is in swap fastest
 };

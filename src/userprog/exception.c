@@ -195,7 +195,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
          new_page->offset = 0;
          new_page->bytes_read = 0;
          new_page->pagedir = t->pagedir;
-         page->swap_block = -1;
+         page->swap_index = -1;
          hash_insert(&t->spt, &new_page->elem);
 
          t->num_stack_pages++;
