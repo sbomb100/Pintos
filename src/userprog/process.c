@@ -64,7 +64,9 @@ start_process(void *file_name_)
   struct intr_frame if_;
   bool success;
   thread_current()->fdToFile = malloc(128 * sizeof(struct file *));
-  if (thread_current()->fdToFile == NULL){
+  if (thread_current()->fdToFile == NULL)
+  {
+    printf("fail 69\n");
     thread_exit(-1);
   }
 
@@ -72,7 +74,7 @@ start_process(void *file_name_)
   {
     thread_current()->fdToFile[i] = NULL;
   }
-  
+
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -86,8 +88,10 @@ start_process(void *file_name_)
   {
     thread_current()->parent->child_successful = false;
     sema_up(&thread_current()->parent->load_sema);
+    printf("fail 91\n");
     thread_exit(-1);
   }
+  printf("loaded and stack are up\n");
   thread_current()->parent->child_successful = true;
   sema_up(&thread_current()->parent->load_sema);
 
@@ -116,7 +120,7 @@ int process_wait(tid_t child_tid UNUSED)
   struct thread *cur = thread_current();
   struct child *cur_child = NULL;
   struct list_elem *e;
-  
+
   for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e))
   {
     struct child *temp = list_entry(e, struct child, elem);
@@ -152,6 +156,7 @@ void process_exit(int status)
   uint32_t *pd;
   // VM delete hash and pass a function to kill its elems
   hash_destroy(&cur->spt, destroy_page);
+  // FIX BREAK LOCKS OFF AND CLEAR MMAP LIST
 
   /* Process Termination Message */
   char *tmp;
@@ -173,7 +178,7 @@ void process_exit(int status)
   file_close(cur->exec_file);
   unlock_file();
   pd = cur->pagedir;
-  // TODO free page for oom??
+  // FIX? free page for oom??
   if (pd != NULL)
   {
     /* Correct ordering here is crucial.  We must set
@@ -388,7 +393,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
   /* Set up stack. */
   if (!setup_stack(esp))
+  {
     goto done;
+  }
 
   for (; token != NULL; token = strtok_r(NULL, " ", &save_ptr))
   {
@@ -510,8 +517,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT(pg_ofs(upage) == 0);
   ASSERT(ofs % PGSIZE == 0);
-
-  struct thread* t = thread_current();
+  struct thread *t = thread_current();
   file_seek(file, ofs);
 
   while (read_bytes > 0 || zero_bytes > 0)
@@ -526,7 +532,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     /* Get a page of memory. */
     // VM making a page
     struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
-    if (page == NULL) { //did it malloc?
+    if (page == NULL)
+    { // did it malloc?
       free(page);
       return false;
     }
@@ -535,7 +542,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->frame = NULL;
     page->file = file;
     page->offset = ofs;
-    page->page_status = 2; //its a file page
+    page->page_status = 2; // its a file page
     page->writable = writable;
     page->bytes_read = page_read_bytes;
     page->bytes_zero = PGSIZE - page_read_bytes;
@@ -582,13 +589,15 @@ setup_stack(void **esp)
 {
   uint8_t *kpage;
   bool success = false;
-  // TODO: make the stack a SPT page instead which should get instantly put into a frame.
+  
   /* create a page, put it in a frame, then set stack */
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
-  if (page == NULL) { //did it malloc?
-      free(page);
-      return false;
-    }
+  if (page == NULL)
+  { // did it malloc?
+    printf("no page malloc\n");
+    free(page);
+    return false;
+  }
   page->is_stack = true;
   page->vaddr = PHYS_BASE - PGSIZE;
   page->page_status = 3; // in frame table bc we are adding it right after
@@ -601,20 +610,28 @@ setup_stack(void **esp)
   lock_acquire(&thread_current()->spt_lock);
   hash_insert(&thread_current()->spt, &page->elem);
   lock_release(&thread_current()->spt_lock);
+
   thread_current()->num_stack_pages++;
-  // FRAME TODO: now grab frame from frame list and put the page on it, set page's frame to the captured frame too (its a 2 way street)
-  // kpage = find_frame()
-  kpage = palloc_get_page(PAL_USER | PAL_ZERO); // replace this with comments above
+
+  struct frame * stack_frame = find_frame();
+  kpage = stack_frame->paddr;
+  stack_frame -> page = page;
+  page ->frame = stack_frame;
+  //kpage = palloc_get_page(PAL_USER | PAL_ZERO); // replace this with comments above
 
   if (kpage != NULL)
   {
+    
     // notice the install page uses kpage so by settting kpage to the frame the rest of stack setup is good
     success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-    if (success)
+    if (success) {
+      printf("set esp\n");
       *esp = PHYS_BASE;
+    }
     else
       palloc_free_page(kpage);
   }
+  printf("stack\n");
   return success;
 }
 

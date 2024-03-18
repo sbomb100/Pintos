@@ -40,6 +40,8 @@ syscall_handler(struct intr_frame *f)
   // get pointer (int bc we want sys call number)
   int *p = f->esp; // esp
   // check if its a good pointer
+  printf("syscall");
+
   if (!validate_pointer(p))
   {
     thread_exit(-1);
