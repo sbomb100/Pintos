@@ -76,9 +76,8 @@ void free_frame(struct frame *f){
     lock_acquire(&frame_table_lock);
     f->pinned = false;
     f->page = NULL;
-    f->paddr = addr;
     f->unused_count = 0;
-    list_remove(f->elem);
+    list_remove(&f->elem);
     list_push_back(&frame_list, &f->elem);
     lock_release(&frame_table_lock);
 }
