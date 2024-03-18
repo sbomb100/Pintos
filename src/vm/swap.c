@@ -29,6 +29,7 @@ void swap_insert(struct spt_entry *p)
     char *c = (char *)p->frame->paddr;
     size_t sector_num = bitmap_scan_and_flip(used_blocks, 0, 1, false);
     p->swap_block = sector_num;
+    p->page_status = 1;
     for (int i = 0; i < 8; i++)
     {
         block_write(block_swap, sector_num * 8 + i, c);
