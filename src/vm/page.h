@@ -18,7 +18,7 @@ struct spt_entry
     //virtual address
     void *vaddr;       
     struct frame *frame;
-    int page_status; //0: all 0 1: in swap 2: in file 3: in frame
+    int page_status; //0: mmaped 1: in swap 2: in file 3: in frame
     uint32_t *pagedir; //holder for owner page directory, used instead of holding owner thread
 	// if we mmap file
 	struct file * file;
