@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include "userprog/process.h"
+#include "threads/malloc.h"
 struct lock file_lock;
 
 static void syscall_handler(struct intr_frame *);
@@ -140,6 +141,30 @@ syscall_handler(struct intr_frame *f)
     }
     close(args[0]);
     break;
+  case SYS_MMAP: // 13
+  {
+    if (!parse_arguments(f, &args[0], 2))
+    {
+      thread_exit(-1);
+      return;
+    }
+    mapid_t return_val = mmap(args[0], (void *)args[1]);
+    f->eax = return_val;
+    break;
+  }
+  case SYS_MUNMAP: // 14
+  {
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    if(!munmap(args[0])){ //FIX? may not need to check return
+      thread_exit(-1);
+      return;
+    }
+    break;
+  }
   default:
     thread_exit(-1);
   }
@@ -235,7 +260,7 @@ int open(const char *file)
   int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
   if (fd == -1)
   {
-    //FIX? maybe fixed oom
+    // FIX? maybe fixed oom
 
     file_close(fp);
     thread_exit(-1);
@@ -415,5 +440,148 @@ bool validate_pointer(const void *givenPointer)
     return false;
   }
   // return the valid pointer
+  return true;
+}
+
+// VM MMAP
+mapid_t mmap(int fd, void *addr)
+{
+  // check args, does it exist, is it valid, is it pg alligned, is it a good fd
+  if (addr == NULL || is_user_vaddr(addr) != 0 || (int)addr % PGSIZE != 0 || fd <= 1)
+  {
+    return -1;
+  }
+  struct thread *curr = thread_current();
+  lock_acquire(&file_lock);
+
+  // Open file
+  struct file *file = curr->fdToFile[fd - 2];
+  if (file == NULL)
+  {
+    lock_release(&file_lock);
+    return -1;
+  }
+  off_t length_of_file = file_length(file);
+  if (length_of_file <= 0)
+  {
+    lock_release(&file_lock);
+    return -1;
+  }
+  lock_release(&file_lock);
+
+  // how many pages
+  int num_of_page = length_of_file / PGSIZE + 1;
+  // check if each page is already in hash
+  for (int i = 0; i < num_of_page; i++)
+  {
+    void *pg_addr = addr + (PGSIZE * i);
+    if (get_page_from_hash(pg_addr) != NULL)
+    {
+      return -1;
+    }
+  }
+
+  thread_current()->num_mapped++;
+  mapid_t id = thread_current()->num_mapped;
+  off_t offset = 0;
+  uint32_t read_bytes = length_of_file;
+
+  while (read_bytes > 0)
+  {
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    struct spt_entry *page = malloc(sizeof(struct spt_entry));
+    if (page == NULL)
+    {
+      return -1;
+    }
+
+    page->file = file;
+    page->offset = offset;
+    page->vaddr = addr;
+    page->bytes_read = page_read_bytes;
+    page->bytes_zero = PGSIZE - page_read_bytes;
+    page->writable = true;
+    page->page_status = 2; // in file
+    // page->is_in_memory = false;
+    page->pagedir = thread_current()->pagedir;
+
+    // add entry
+    lock_acquire(&thread_current()->spt_lock);
+    hash_insert(&thread_current()->spt, &page->elem);
+    lock_release(&thread_current()->spt_lock);
+
+    if (put_mmap_in_list(page) == false)
+    {
+      // unmap
+      munmap(id);
+      return -1;
+    }
+
+    // similar to what we see in load
+    read_bytes -= page_read_bytes;
+    addr += PGSIZE;
+    offset += PGSIZE;
+  }
+  return id;
+}
+bool munmap(mapid_t mapping)
+{
+  // does mapping make sense
+  if (mapping <= 0)
+  {
+    return false;
+  }
+  struct list * map_list = &(thread_current()->mmap_list);
+  struct list_elem * e = list_begin(map_list);
+   for(e = list_begin(map_list); e != list_end(map_list); e = e)
+  {
+    struct mapped_item * mmapped = list_entry(e, struct mapped_item, elem);
+
+    if(mmapped->id == mapping)
+    {
+      
+      struct spt_entry * page = mmapped->page;
+      file_seek(page->file, 0);
+
+      if ( pagedir_is_dirty(thread_current()->pagedir, page->vaddr)) 
+      {
+        //FIX? maybe check value
+        file_write_at(page->file, page->vaddr, page->bytes_read, page->offset);
+      }
+
+      //FIX? maybe move outside loop
+      lock_acquire(&thread_current()->spt_lock);
+      hash_delete(&thread_current()->spt, &page->elem);
+      lock_release(&thread_current()->spt_lock);
+
+      e = list_remove(&mmapped->elem);
+      free(mmapped);
+    }
+    else 
+    {
+      e = list_next(e);
+    }
+
+  }
+
+  thread_current()->num_mapped--;
+  return true;
+}
+
+// HELPER FOR MMAP
+// put page in mmap list
+bool put_mmap_in_list(struct spt_entry *page)
+{
+  struct mapped_item *mmapped = malloc(sizeof(struct mapped_item));
+  if (mmapped == NULL)
+  {
+    return false;
+  }
+
+  struct thread *t = thread_current();
+  mmapped->page = page;
+  mmapped->id = t->num_mapped;
+  list_push_back(&t->mmap_list, &mmapped->elem);
+
   return true;
 }

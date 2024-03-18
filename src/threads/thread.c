@@ -25,6 +25,7 @@
 #include "lib/kernel/bitmap.h"
 #include "threads/ipi.h"
 
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -263,6 +264,15 @@ thread_create (const char *name, int nice, thread_func *function, void *aux)
   /* Must save tid here - 't' could already be freed when we return 
      from wake_up_new_thread */ 
   tid_t tid = t->tid;
+
+  // VM make the spt hash table since its setup for thread
+  hash_init(&thread_current()->spt, page_hash, is_page_before, NULL);
+  lock_init(&thread_current()->spt_lock);
+  //init mmap
+  list_init (&t->mmap_list);
+  t->num_mapped = 0;
+
+
   /* Add to ready queue. */
   wake_up_new_thread (t);
   return tid;

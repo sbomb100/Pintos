@@ -11,6 +11,8 @@
 #include "userprog/pagedir.h"
 #include "devices/input.h"
 #include "devices/shutdown.h"
+#include "vm/page.h"
+extern struct lock file_lock;
 void syscall_init (void);
 bool parse_arguments (struct intr_frame *f, int* args, int numArgs);
 bool validate_pointer(const void * pointer);
@@ -27,5 +29,10 @@ void close(int fd);
 int findFdForFile(void);
 void lock_file(void);
 void unlock_file(void);
-extern struct lock file_lock;
+
+//MMAP FUNCTIONS FOR VM
+mapid_t mmap(int, void *);
+bool munmap(mapid_t);
+bool put_mmap_in_list(struct spt_entry *);
+
 #endif /* userprog/syscall.h */

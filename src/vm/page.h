@@ -23,7 +23,9 @@ struct spt_entry
 	// if we mmap file
 	struct file * file;
     size_t bytes_read;
+    size_t bytes_zero;
 	off_t offset;
+    //bool is_in_memory;
 	bool is_stack;
 	bool writable;
     struct spinlock lock; //syncro lock

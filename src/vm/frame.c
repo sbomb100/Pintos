@@ -21,13 +21,14 @@ void frame_init(){
 
     list_init(&frame_list);
     lock_init(&frame_table_lock);
-    void* addr;
-
-    while((addr) = palloc_get_page(PAL_USER) != NULL){ //creates a frame struct for every page created, and puts it into list
+    void* addr = palloc_get_page(PAL_USER | PAL_ZERO);
+    while(addr != NULL){ //creates a frame struct for every page created, and puts it into list
         struct frame* frame_entry = malloc(sizeof(struct frame));
         frame_entry->pinned = false;
+        frame_entry->page = NULL;
         frame_entry->paddr = addr;
         list_push_back(&frame_list, &frame_entry->elem);
+        addr = palloc_get_page(PAL_USER | PAL_ZERO);
 
     }
 }
@@ -37,18 +38,19 @@ void frame_init(){
 */
 struct frame* find_frame(){
     struct list_elem *e;
-
+    //lock_acquire(&frame_table_lock);
     for (e = list_begin(&frame_list); e != list_end (&frame_list); e = list_next (e)) {
         struct frame *f = list_entry (e, struct frame, elem);
         if(f->page == NULL){
-            
+            lock_release(&frame_table_lock);
             return f;
         }
     }
+    //lock_release(&frame_table_lock);
     //no empty frame found
     //could this just become LRU by grabbing the first frame, then once grabbed push it to the back instead?
-    struct frame* f = evict();
-    return f;
+    //struct frame* f = evict();
+    return NULL;
 }
 
 /**

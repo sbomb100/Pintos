@@ -7,24 +7,27 @@
 #include "filesys/file.h"
 #include "threads/synch.h"
 #include "lib/kernel/hash.h"
+#include "vm/page.h"
 /* States in a thread's life cycle. */
 enum thread_status
 {
-  THREAD_RUNNING,       /* Running thread. */
-  THREAD_READY,         /* Not running but ready to run. */
-  THREAD_BLOCKED,       /* Waiting for an event to trigger. */
-  THREAD_DYING          /* About to be destroyed. */
+   THREAD_RUNNING, /* Running thread. */
+   THREAD_READY,   /* Not running but ready to run. */
+   THREAD_BLOCKED, /* Waiting for an event to trigger. */
+   THREAD_DYING    /* About to be destroyed. */
 };
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
+
+typedef int mapid_t;
 typedef int tid_t;
-#define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
+#define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
 #define THREAD_NAME_MAX 16
 /* Thread priorities. */
-#define NICE_MIN -20                    /* Highest priority. */
-#define NICE_DEFAULT 0                  /* Default priority. */
-#define NICE_MAX 19                     /* Lowest priority. */
+#define NICE_MIN -20   /* Highest priority. */
+#define NICE_DEFAULT 0 /* Default priority. */
+#define NICE_MAX 19    /* Lowest priority. */
 
 /* A kernel thread or user process.
 
@@ -85,55 +88,61 @@ typedef int tid_t;
 
 struct thread
 {
-  /* Owned by thread.c. */
-  tid_t tid; /* Thread identifier. */
-  enum thread_status status; /* Thread state. */
-  char name[THREAD_NAME_MAX]; /* Name (for debugging purposes). */
-  uint8_t *stack; /* Saved stack pointer. */
+   /* Owned by thread.c. */
+   tid_t tid;                  /* Thread identifier. */
+   enum thread_status status;  /* Thread state. */
+   char name[THREAD_NAME_MAX]; /* Name (for debugging purposes). */
+   uint8_t *stack;             /* Saved stack pointer. */
 
-  /* Used in timer.c */
-  int64_t wake_tick; /* the tick when the thread should be unblocked */
-  struct list_elem blocked_elem;
+   /* Used in timer.c */
+   int64_t wake_tick; /* the tick when the thread should be unblocked */
+   struct list_elem blocked_elem;
 
-  int nice; /* Nice value. */
-  struct list_elem allelem; /* List element for all threads list. */
+   int nice;                 /* Nice value. */
+   struct list_elem allelem; /* List element for all threads list. */
 
-  struct cpu *cpu; /* Points to the CPU this thread is currently bound to.
-                      thread_unblock () will add a thread to the rq of
-                      this CPU.  A load balancer needs to update this
-                      field when migrating threads.
-                    */
+   struct cpu *cpu; /* Points to the CPU this thread is currently bound to.
+                       thread_unblock () will add a thread to the rq of
+                       this CPU.  A load balancer needs to update this
+                       field when migrating threads.
+                     */
 
-  /* Shared between thread.c and synch.c. */
-  struct list_elem elem; /* List element. */
+   /* Shared between thread.c and synch.c. */
+   struct list_elem elem; /* List element. */
 
-  /* Used for CFS algorithm. */
-  int64_t vruntime; 
-  int64_t vruntime_0;
-  int64_t actual_runtime;
-  /*added in P2 for File Descriptors*/
-  struct file** fdToFile;
+   /* Used for CFS algorithm. */
+   int64_t vruntime;
+   int64_t vruntime_0;
+   int64_t actual_runtime;
+   /*added in P2 for File Descriptors*/
+   struct file **fdToFile;
    /*this thread's exe file*/
-  struct file *exec_file;
+   struct file *exec_file;
 
-  /* Parent-Child Relationship */
-  struct thread *parent;
-  struct list children;
+   /* Parent-Child Relationship */
+   struct thread *parent;
+   struct list children;
 
-  /*loading child*/
-  struct semaphore load_sema;
-  bool child_successful;
+   /*loading child*/
+   struct semaphore load_sema;
+   bool child_successful;
 
-
-  //VM STUFF
-  struct hash spt;
-  size_t num_stack_pages;
 #ifdef USERPROG
-  /* Owned by userprog/process.c. */
-  uint32_t *pagedir; /* Page directory. */
+   /* Owned by userprog/process.c. */
+   uint32_t *pagedir; /* Page directory. */
 #endif
-  /* Owned by thread.c. */
-  unsigned magic; /* Detects stack overflow. */
+
+   // VM STUFF
+   //SPT
+   struct hash spt;
+   struct lock spt_lock;
+   size_t num_stack_pages;
+   //MMAP
+   struct list mmap_list;
+   size_t num_mapped;
+
+   /* Owned by thread.c. */
+   unsigned magic; /* Detects stack overflow. */
 };
 
 struct child
@@ -143,32 +152,39 @@ struct child
    bool has_exited;
    struct semaphore wait_sema;
    struct list_elem elem;
-
 };
 
-void thread_init (void);
-void thread_init_on_ap (void);
-void thread_start_idle_thread (void);
-void thread_tick (void);
-void thread_print_stats (void);
+// VM MMAP
+struct mapped_item
+{
+   mapid_t id;
+   struct spt_entry* page;
+   struct list_elem elem;
+};
 
-typedef void thread_func (void *aux);
-tid_t thread_create (const char *name, int priority, thread_func *, void *);
+void thread_init(void);
+void thread_init_on_ap(void);
+void thread_start_idle_thread(void);
+void thread_tick(void);
+void thread_print_stats(void);
 
-void thread_block (struct spinlock *);
-void thread_unblock (struct thread *);
-struct thread *running_thread (void);
-struct thread * thread_current (void);
-tid_t thread_tid (void);
-const char *thread_name (void);
+typedef void thread_func(void *aux);
+tid_t thread_create(const char *name, int priority, thread_func *, void *);
 
-void thread_exit (int status) NO_RETURN;
-void thread_yield (void);
-void thread_exit_ap (void) NO_RETURN;
+void thread_block(struct spinlock *);
+void thread_unblock(struct thread *);
+struct thread *running_thread(void);
+struct thread *thread_current(void);
+tid_t thread_tid(void);
+const char *thread_name(void);
+
+void thread_exit(int status) NO_RETURN;
+void thread_yield(void);
+void thread_exit_ap(void) NO_RETURN;
 /* Performs some operation on thread t, given auxiliary data AUX. */
-typedef void thread_action_func (struct thread *t, void *aux);
-void thread_foreach (thread_action_func *, void *);
-int thread_get_nice (void);
-void thread_set_nice (int);
+typedef void thread_action_func(struct thread *t, void *aux);
+void thread_foreach(thread_action_func *, void *);
+int thread_get_nice(void);
+void thread_set_nice(int);
 
 #endif /* threads/thread.h */

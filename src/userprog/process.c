@@ -72,8 +72,7 @@ start_process(void *file_name_)
   {
     thread_current()->fdToFile[i] = NULL;
   }
-  // VM make the spt hash table since its setup for thread
-  hash_init(&thread_current()->spt, page_hash, is_page_before, NULL);
+  
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -511,8 +510,10 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT(pg_ofs(upage) == 0);
   ASSERT(ofs % PGSIZE == 0);
+
   struct thread* t = thread_current();
   file_seek(file, ofs);
+
   while (read_bytes > 0 || zero_bytes > 0)
   {
     /* Calculate how to fill this page.
@@ -537,9 +538,13 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->page_status = 2; //its a file page
     page->writable = writable;
     page->bytes_read = page_read_bytes;
+    page->bytes_zero = PGSIZE - page_read_bytes;
     page->pagedir = t->pagedir;
     page->swap_block = -1;
+
+    lock_acquire(&t->spt_lock);
     hash_insert(&t->spt, &page->elem);
+    lock_release(&t->spt_lock);
 
     /*old code from user prog
     uint8_t *kpage = palloc_get_page(PAL_USER);
@@ -596,7 +601,7 @@ setup_stack(void **esp)
   hash_insert(&thread_current()->spt, &page->elem);
   thread_current()->num_stack_pages++;
   // FRAME TODO: now grab frame from frame list and put the page on it, set page's frame to the captured frame too (its a 2 way street)
-  // kpage = frame table entry of the page
+  // kpage = find_frame()
   kpage = palloc_get_page(PAL_USER | PAL_ZERO); // replace this with comments above
 
   if (kpage != NULL)
