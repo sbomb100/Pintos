@@ -464,7 +464,13 @@ mapid_t mmap(int fd, void *addr)
     lock_release(&file_lock);
     return -1;
   }
-  off_t length_of_file = file_length(file);
+  struct file *fileCopy = file_reopen(file);
+  if (fileCopy == NULL)
+  {
+    lock_release(&file_lock);
+    return -1;
+  }
+  off_t length_of_file = file_length(fileCopy);
   if (length_of_file <= 0)
   {
     lock_release(&file_lock);
@@ -498,7 +504,7 @@ mapid_t mmap(int fd, void *addr)
       return -1;
     }
 
-    page->file = file;
+    page->file = fileCopy;
     page->offset = offset;
     page->vaddr = addr;
     page->bytes_read = page_read_bytes;
