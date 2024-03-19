@@ -450,8 +450,11 @@ bool validate_pointer(const void *givenPointer)
 mapid_t mmap(int fd, void *addr)
 {
   // check args, does it exist, is it valid, is it pg alligned, is it a good fd
-  if (addr == NULL || is_user_vaddr(addr) != 0 || (int)addr % PGSIZE != 0 || fd <= 1)
+  if (addr == NULL || is_user_vaddr(addr) != true || fd <= 1)
   {
+    return -1;
+  }
+  if ((int)addr % PGSIZE != 0){
     return -1;
   }
   struct thread *curr = thread_current();
