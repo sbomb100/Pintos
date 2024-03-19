@@ -126,7 +126,7 @@ kill(struct intr_frame *f)
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
-page_fault(struct intr_frame *f) // TODO: fix to work with SPT
+page_fault(struct intr_frame *f)
 {
    bool not_present; /* True: not-present page, false: writing r/o page. */
    bool write;       /* True: access was write, false: access was read. */
@@ -170,7 +170,6 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       if ((fault_addr > PHYS_BASE) || (fault_addr < PHYS_BASE - 0x800000) ||
           (fault_addr > (void *)(esp + 32)) || (fault_addr < (void *)(esp - 32)))
       {
-         printf("fail 173 exception.c\n");
          thread_exit(-1);
       }
       // page isnt in table, therefore make new page.
@@ -325,7 +324,6 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    // ADDED VM
    if (!not_present && write)
    {
-      printf("fail 288 exception.c\n");
       thread_exit(-1);
    }
    
