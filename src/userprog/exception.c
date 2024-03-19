@@ -12,7 +12,7 @@
 #include "threads/malloc.h"
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
-
+#include "userprog/process.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -207,7 +207,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
          struct frame *new_frame = find_frame();
          new_frame->page = new_page;
          /* Install */
-         if (!(pagedir_get_page(t->pagedir, new_page->vaddr) == NULL && pagedir_set_page(t->pagedir, new_page->vaddr, new_frame->paddr, new_page->writable)))
+         if (!install_page(page->vaddr, new_frame->paddr, page->writable))
          {
             PANIC("Error growing stack page!");
          }
@@ -222,17 +222,24 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    {
       // get frame and its page
       struct frame *new_frame = find_frame();
+      if (new_frame == NULL)
+      {
+         printf("fail 227 exception.c\n");
+         thread_exit(-1);
+         return;
+      }
       uint8_t *kpage = new_frame->paddr;
       new_frame->page = page;
 
       lock_acquire(&file_lock);
       file_seek(page->file, page->offset);
-      if (file_read(page->file, new_frame, page->bytes_read) != (int)page->bytes_read)
+      if (file_read(page->file, new_frame->paddr, page->bytes_read) != (int)page->bytes_read)
       {
          lock_release(&file_lock);
          palloc_free_page(new_frame->page);
          printf("fail 292 exception.c\n");
          thread_exit(-1);
+         return;
       }
       lock_release(&file_lock);
 
@@ -241,7 +248,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
 
       // install into a frame
 
-      if (!(pagedir_get_page(t->pagedir, page->vaddr) == NULL && pagedir_set_page(t->pagedir, page->vaddr, kpage, page->writable)))
+      if (!install_page(page->vaddr, new_frame->paddr, page->writable))
       {
          printf("fail 245 exception.c\n");
          thread_exit(-1);
@@ -266,7 +273,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       swap_get(page); // GET PAGE FROM SWAP
 
       // install frame
-      if (!(pagedir_get_page(t->pagedir, page->vaddr) == NULL && pagedir_set_page(t->pagedir, page->vaddr, new_frame->paddr, page->writable)))
+      if (!install_page(page->vaddr, new_frame->paddr, page->writable))
       {
          printf("fail 267 exception.c\n");
          thread_exit(-1);
@@ -278,7 +285,6 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
    if (page->page_status == 0) // mmapped file
    {
       struct frame *new_frame = find_frame();
-      uint8_t *kpage = new_frame->paddr;
       new_frame->page = page;
       page->frame = new_frame;
 
@@ -298,7 +304,7 @@ page_fault(struct intr_frame *f) // TODO: fix to work with SPT
       }
       memset (new_frame + page->bytes_read, 0, page->bytes_zero);
 
-      if (!(pagedir_get_page(t->pagedir, page->vaddr) == NULL && pagedir_set_page(t->pagedir, page->vaddr, kpage, page->writable))){
+      if (!install_page(page->vaddr, new_frame->paddr, page->writable)){
          
       }
       page->page_status = 3;

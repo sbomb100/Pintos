@@ -454,7 +454,6 @@ done:
 
 /* load() helpers. */
 
-static bool install_page(void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -558,27 +557,6 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     hash_insert(&t->spt, &page->elem);
     lock_release(&t->spt_lock);
 
-    /*old code from user prog
-    uint8_t *kpage = palloc_get_page(PAL_USER);
-    if (kpage == NULL)
-      return false;
-
-    // Load this page.
-    if (file_read(file, kpage, page_read_bytes) != (int)page_read_bytes)
-    {
-      palloc_free_page(kpage);
-      return false;
-    }
-    memset(kpage + page_read_bytes, 0, page_zero_bytes);
-
-    //Add the page to the process's address space.
-    if (!install_page(upage, kpage, writable))
-    {
-      palloc_free_page(kpage);
-      return false;
-    }
-    */
-
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
@@ -596,7 +574,8 @@ setup_stack(void **esp)
 {
   uint8_t *kpage;
   bool success = false;
-
+  void * upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  struct thread  * curr = thread_current();
   /* create a page, put it in a frame, then set stack */
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
@@ -606,38 +585,43 @@ setup_stack(void **esp)
     return false;
   }
   page->is_stack = true;
-  page->vaddr = PHYS_BASE - PGSIZE;
+  page->vaddr = pg_round_down(upage);
   page->page_status = 3; // in frame table bc we are adding it right after
   page->writable = true;
   page->file = NULL;
   page->offset = 0;
   page->bytes_read = 0;
-  page->pagedir = thread_current()->pagedir;
+  page->pagedir = curr->pagedir;
   page->swap_index = -1;
-  lock_acquire(&thread_current()->spt_lock);
-  hash_insert(&thread_current()->spt, &page->elem);
-  lock_release(&thread_current()->spt_lock);
+  if (!lock_held_by_current_thread(&curr->spt_lock)) {
+		lock_acquire(&curr->spt_lock);
+	}
+  hash_insert(&curr->spt, &page->elem);
+  lock_release(&curr->spt_lock);
 
   thread_current()->num_stack_pages++;
 
   struct frame *stack_frame = find_frame();
+  if (stack_frame == NULL || stack_frame->paddr == NULL)
+  {
+    printf("NO FRAME 604\n");
+    free(page);
+    thread_exit(-1);
+  }
   kpage = stack_frame->paddr;
   stack_frame->page = page;
   page->frame = stack_frame;
-  // kpage = palloc_get_page(PAL_USER | PAL_ZERO); // replace this with comments above
 
-  if (kpage != NULL)
+  // notice the install page uses kpage so by settting kpage to the frame the rest of stack setup is good
+  success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
+  if (success)
   {
-
-    // notice the install page uses kpage so by settting kpage to the frame the rest of stack setup is good
-    success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-    if (success)
-    {
-      printf("set esp\n");
-      *esp = PHYS_BASE;
-    }
-    else
-      palloc_free_page(kpage);
+    printf("set esp\n");
+    *esp = PHYS_BASE;
+  }
+  else {
+    free(page);
+		free(stack_frame->paddr);
   }
   printf("stack\n");
   return success;
@@ -671,7 +655,7 @@ struct child *find_child(struct list child_list, tid_t child_tid)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page(void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current();
