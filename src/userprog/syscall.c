@@ -179,7 +179,9 @@ tid_t exec(const char *cmd_line)
   if (cmd_line == NULL || !validate_pointer(cmd_line))
     return -1;
   tid_t child_tid = process_execute(cmd_line);
-
+  if (child_tid == TID_ERROR){
+    return -1;
+  }
   // double-check that the new process has loaded and that everything went
   // smoothly by checking that the child struct is in the parent's children list
 

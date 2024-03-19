@@ -86,7 +86,6 @@ start_process(void *file_name_)
   palloc_free_page(file_name);
   if (!success)
   {
-    printf("fail 91\n");
     thread_current()->parent->child_successful = false;
     sema_up(&thread_current()->parent->load_sema);
     thread_exit(-1);
