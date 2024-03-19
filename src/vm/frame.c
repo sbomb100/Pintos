@@ -34,7 +34,6 @@ void frame_init()
         frame_entry->page = NULL;
         frame_entry->paddr = addr;
         frame_entry->unused_count = 0;
-        printf("%x\n", frame_entry->paddr);
         list_push_back(&frame_list, &frame_entry->elem);
         addr = palloc_get_page(PAL_USER | PAL_ZERO);
     }
@@ -148,7 +147,7 @@ struct frame* evict(void) {
         }
 
     }
-    if (candidate = NULL){
+    if (candidate == NULL){
         //2nd run. Unless all the pages are pinned, this should find a candidate
         for ( struct list_elem * e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e) ) {
             struct frame * f = list_entry(e, struct frame, elem);
