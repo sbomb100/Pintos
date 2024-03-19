@@ -20,6 +20,6 @@ struct frame* find_frame(void);
 //chose someone to evict
 
 void free_frame(struct frame *);
-
+struct frame* evict(void);
 
 #endif

@@ -100,7 +100,7 @@ void free_frame(struct frame *f){
 /**
  * eviction - choose a frame to clear out
 */
-struct frame* evict() {
+struct frame* evict(void) {
     // struct frame* candidate;
     // int unused_count_record = -1;
     // for ( struct list_elem * e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e) ) {
@@ -165,7 +165,7 @@ struct frame* evict() {
     ASSERT(candidate!=NULL);
 
     if(candidate->page->page_status == 0){ //mmap
-        if(pagedir_is_dirty(f->page->t->pagedir, candidate->page->vaddr)){ //dirty mmap = need to write
+        if(pagedir_is_dirty(candidate->page->t->pagedir, candidate->page->vaddr)){ //dirty mmap = need to write
             lock_file();
             file_write_at(candidate->page->file, candidate->page->vaddr, candidate->page->bytes_read, candidate->page->offset);
             unlock_file();
