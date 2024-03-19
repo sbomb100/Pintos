@@ -32,7 +32,6 @@ struct spt_entry
 	struct thread * t; 
     int swap_index; // FOR SWAP TABLE
     //maybe?
-    int swap_index; //to know where is in swap fastest
 };
 
 //need funcitons for
