@@ -19,7 +19,7 @@ static struct lock block_lock;
 void swap_init(void)
 {
     lock_init(&block_lock);
-    used_blocks = bitmap_create(1024);
+    used_blocks = bitmap_create(BLOCK_SECTOR_SIZE);
     block_swap = block_get_role(BLOCK_SWAP);
 }
 
@@ -28,11 +28,11 @@ void swap_insert(struct spt_entry *p)
     lock_acquire(&block_lock);
     char *c = (char *)p->frame->paddr;
     size_t sector_num = bitmap_scan_and_flip(used_blocks, 0, 1, false);
-    p->swap_block = sector_num;
+    p->swap_index = sector_num;
     p->page_status = 1;
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < (PGSIZE / BLOCK_SECTOR_SIZE); i++)
     {
-        block_write(block_swap, sector_num * 8 + i, c);
+        block_write(block_swap, sector_num * (PGSIZE / BLOCK_SECTOR_SIZE) + i, c);
         c += 512;
     }
     lock_release(&block_lock);
@@ -43,11 +43,12 @@ void swap_get(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
     char *c = (char *)p->frame->paddr;
-    unsigned read_sector = p->swap_block;
+    unsigned read_sector = p->swap_index;
     int i;
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < (PGSIZE / BLOCK_SECTOR_SIZE); i++)
     {
-        block_read(block_swap, read_sector * 8 + i, c);
+        //instead of c maybe (uint8_t *) upage + i * BLOCK_SECTOR_SIZE) FIX?
+        block_read(block_swap, read_sector * (PGSIZE / BLOCK_SECTOR_SIZE) + i, c);
         c += 512;
     }
     bitmap_reset(used_blocks, read_sector);
@@ -57,6 +58,6 @@ void swap_get(struct spt_entry *p)
 void swap_free(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
-    bitmap_reset(used_blocks, p->swap_block);
+    bitmap_reset(used_blocks, p->swap_index);
     lock_release(&block_lock);
 }

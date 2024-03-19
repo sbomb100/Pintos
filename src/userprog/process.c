@@ -86,13 +86,14 @@ start_process(void *file_name_)
   palloc_free_page(file_name);
   if (!success)
   {
+    printf("fail 91\n");
     thread_current()->parent->child_successful = false;
     sema_up(&thread_current()->parent->load_sema);
-    printf("fail 91\n");
     thread_exit(-1);
   }
   printf("loaded and stack are up\n");
   thread_current()->parent->child_successful = true;
+
   sema_up(&thread_current()->parent->load_sema);
 
   /* Start the user process by simulating a return from an
@@ -297,11 +298,15 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
   fn_copy = malloc(strlen(file_name) + 1);
   if (fn_copy == NULL)
+  {
+    printf("fail 299 p\n");
     return false;
+  }
 
   argv = malloc(4096);
   if (argv == NULL)
   {
+    printf("fail 306 p\n");
     free(fn_copy);
     return false;
   }
@@ -517,8 +522,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT(pg_ofs(upage) == 0);
   ASSERT(ofs % PGSIZE == 0);
+
   struct thread *t = thread_current();
-  file_seek(file, ofs);
 
   while (read_bytes > 0 || zero_bytes > 0)
   {
@@ -534,7 +539,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
     if (page == NULL)
     { // did it malloc?
-      free(page);
+      // free(page);
       return false;
     }
     page->vaddr = upage;
@@ -545,9 +550,9 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->page_status = 2; // its a file page
     page->writable = writable;
     page->bytes_read = page_read_bytes;
-    page->bytes_zero = PGSIZE - page_read_bytes;
+    page->bytes_zero = page_zero_bytes;
     page->pagedir = t->pagedir;
-    page->swap_block = -1;
+    page->swap_index = -1;
 
     lock_acquire(&t->spt_lock);
     hash_insert(&t->spt, &page->elem);
@@ -579,6 +584,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     zero_bytes -= page_zero_bytes;
     upage += PGSIZE;
   }
+  file_seek(file, ofs);
+
   return true;
 }
 
@@ -589,7 +596,7 @@ setup_stack(void **esp)
 {
   uint8_t *kpage;
   bool success = false;
-  
+
   /* create a page, put it in a frame, then set stack */
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
@@ -606,25 +613,26 @@ setup_stack(void **esp)
   page->offset = 0;
   page->bytes_read = 0;
   page->pagedir = thread_current()->pagedir;
-  page->swap_block = -1;
+  page->swap_index = -1;
   lock_acquire(&thread_current()->spt_lock);
   hash_insert(&thread_current()->spt, &page->elem);
   lock_release(&thread_current()->spt_lock);
 
   thread_current()->num_stack_pages++;
 
-  struct frame * stack_frame = find_frame();
+  struct frame *stack_frame = find_frame();
   kpage = stack_frame->paddr;
-  stack_frame -> page = page;
-  page ->frame = stack_frame;
-  //kpage = palloc_get_page(PAL_USER | PAL_ZERO); // replace this with comments above
+  stack_frame->page = page;
+  page->frame = stack_frame;
+  // kpage = palloc_get_page(PAL_USER | PAL_ZERO); // replace this with comments above
 
   if (kpage != NULL)
   {
-    
+
     // notice the install page uses kpage so by settting kpage to the frame the rest of stack setup is good
     success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-    if (success) {
+    if (success)
+    {
       printf("set esp\n");
       *esp = PHYS_BASE;
     }
