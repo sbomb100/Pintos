@@ -157,7 +157,7 @@ page_fault(struct intr_frame *f)
    if (fault_addr == NULL || is_kernel_vaddr(fault_addr))
    { // doesnt exit or is kernel pointer
       //printf("fail 160 exception.c\n");
-      thread_exit(-1); // FIX? CHECK IF CORRECT STATUS CODE
+      goto exit;
    }
    // pointer is good so get the page with it
    struct spt_entry *page = get_page_from_hash(fault_addr);
@@ -170,7 +170,7 @@ page_fault(struct intr_frame *f)
       if ((fault_addr > PHYS_BASE) || (fault_addr < PHYS_BASE - 0x800000) ||
           (fault_addr > (void *)(esp + 32)) || (fault_addr < (void *)(esp - 32)))
       {
-         thread_exit(-1);
+         goto exit;
       }
       // page isnt in table, therefore make new page.
       // if addr is outside stack range then exit
@@ -182,7 +182,7 @@ page_fault(struct intr_frame *f)
          if (new_page == NULL)
          { // check to see it malloced
             printf("fail 185 exception.c\n");
-            thread_exit(-1);
+            goto exit;
          }
          // new page
          new_page->is_stack = true;
@@ -200,7 +200,7 @@ page_fault(struct intr_frame *f)
          if (t->num_stack_pages > 2048) // hard limit
          {
             printf("fail 202 exception.c\n");
-            thread_exit(-1);
+            goto exit;
          }
          // get frame and put it in page
          struct frame *new_frame = find_frame();
@@ -224,23 +224,23 @@ page_fault(struct intr_frame *f)
       if (new_frame == NULL)
       {
          printf("fail 227 exception.c\n");
-         thread_exit(-1);
+         goto exit;
          return;
       }
       uint8_t *kpage = new_frame->paddr;
       new_frame->page = page;
-
-      lock_acquire(&file_lock);
+      //printf("read\n");
+      //lock_acquire(&file_lock);
       file_seek(page->file, page->offset);
       if (file_read(page->file, new_frame->paddr, page->bytes_read) != (int)page->bytes_read)
       {
          lock_release(&file_lock);
          palloc_free_page(new_frame->page);
          printf("fail 292 exception.c\n");
-         thread_exit(-1);
+         goto exit;
          return;
       }
-      lock_release(&file_lock);
+      //lock_release(&file_lock);
 
       // mem set the kpage + bytes read
       memset(kpage + page->bytes_read, 0, page->bytes_zero); // make sure page has memory correct range
@@ -250,7 +250,7 @@ page_fault(struct intr_frame *f)
       if (!install_page(page->vaddr, new_frame->paddr, page->writable))
       {
          printf("fail 245 exception.c\n");
-         thread_exit(-1);
+         goto exit;
       }
       page->page_status = 3; // in frame table
       page->frame = new_frame;
@@ -264,7 +264,7 @@ page_fault(struct intr_frame *f)
       if (new_frame == NULL)
       {
          printf("fail 260 exception.c\n");
-         thread_exit(-1);
+         goto exit;
       }
       new_frame->page = page;
       page->frame = new_frame;
@@ -275,7 +275,7 @@ page_fault(struct intr_frame *f)
       if (!install_page(page->vaddr, new_frame->paddr, page->writable))
       {
          printf("fail 267 exception.c\n");
-         thread_exit(-1);
+         goto exit;
       }
       page->page_status = 3; // in frame table
 
@@ -290,7 +290,7 @@ page_fault(struct intr_frame *f)
       if (new_frame == NULL)
       {
          printf("fail 278 exception.c\n");
-         thread_exit(-1);
+         goto exit;
       }
 
       // get to spot in page
@@ -299,7 +299,7 @@ page_fault(struct intr_frame *f)
       {
          palloc_free_page(new_frame->page);
          printf("fail 292 exception.c\n");
-         thread_exit(-1);
+         goto exit;
       }
       memset (new_frame + page->bytes_read, 0, page->bytes_zero);
 
@@ -314,7 +314,7 @@ page_fault(struct intr_frame *f)
    if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
    {
       printf("fail 277 exception.c\n");
-      thread_exit(-1);
+      goto exit;
    }
    /* Determine cause. */
    not_present = (f->error_code & PF_P) == 0;
@@ -324,9 +324,10 @@ page_fault(struct intr_frame *f)
    // ADDED VM
    if (!not_present && write)
    {
-      thread_exit(-1);
+      goto exit;
    }
-   
+
+exit:
    /* To implement virtual memory, delete the rest of the function
       body, and replace it with code that brings in the page to
       which fault_addr refers. */

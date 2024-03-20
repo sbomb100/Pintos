@@ -40,7 +40,6 @@ syscall_handler(struct intr_frame *f)
   // get pointer (int bc we want sys call number)
   int *p = f->esp; // esp
   // check if its a good pointer
-
   if (!validate_pointer(p))
   {
     thread_exit(-1);
@@ -245,8 +244,9 @@ int open(const char *file)
 {
   // Each process has an independent set of file descriptors. File descriptors are not inherited by child processes
   // openning same file makes new fds (act as if different files)
-  if (file == NULL || !validate_pointer(file))
+  if (file == NULL || !validate_pointer(file)) {
     thread_exit(-1);
+  } 
 
   lock_file();
   struct file *fp = filesys_open(file);
@@ -257,14 +257,13 @@ int open(const char *file)
   }
   unlock_file();
 
-  if (fp == NULL)
+  if (fp == NULL) 
     thread_exit(0);
 
   int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
   if (fd == -1)
   {
     // FIX? maybe fixed oom
-
     file_close(fp);
     thread_exit(-1);
   }
@@ -291,8 +290,11 @@ int filesize(int fd)
 int read(int fd, void *buffer, unsigned size)
 {
   // check pointers / fd
-  if (buffer == NULL || !validate_pointer(buffer))
+
+  if ( buffer == NULL || buffer + size == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || get_page_from_hash(buffer) == NULL ) {
     thread_exit(-1);
+  }
+
   if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
     return -1;
 
@@ -314,7 +316,7 @@ int read(int fd, void *buffer, unsigned size)
   struct file *filePtr = thread_current()->fdToFile[fd - 2];
   if (filePtr == NULL)
     return -1;
-
+  
   lock_file();
   // Read from the file using filesys function
   bytesRead = file_read(filePtr, buffer, size);
