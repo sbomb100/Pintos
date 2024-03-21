@@ -609,11 +609,13 @@ setup_stack(void **esp)
   kpage = stack_frame->paddr;
   stack_frame->page = page;
   page->frame = stack_frame;
+  page->frame->pinned = true;
 
   // notice the install page uses kpage so by settting kpage to the frame the rest of stack setup is good
   success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
   if (success)
   {
+    page->frame->pinned = false;
     *esp = PHYS_BASE;
   }
   else {

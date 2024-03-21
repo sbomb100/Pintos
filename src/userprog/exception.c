@@ -149,7 +149,7 @@ page_fault(struct intr_frame *f)
       be assured of reading CR2 before it changed). */
    intr_enable();
 
-   /* Count page faults. */
+   /* Counts page faults. */
    page_fault_cnt++;
    //--------------------------------------------------VM addons
    // if page isnt in SPT, make new page for it, *(stack page!)

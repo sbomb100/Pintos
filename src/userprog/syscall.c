@@ -7,10 +7,15 @@ static void syscall_handler(struct intr_frame *);
 
 void lock_file()
 {
-  lock_acquire(&file_lock);
+  // ASSERT(!lock_held_by_current_thread(&file_lock));
+  if (!ock_held_by_current_thread(&file_lock))
+  {
+    lock_acquire(&file_lock);
+  }
 }
 void unlock_file()
 {
+  ASSERT(lock_held_by_current_thread(&file_lock));
   lock_release(&file_lock);
 }
 void syscall_init(void)

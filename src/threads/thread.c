@@ -421,10 +421,9 @@ do_thread_exit (void)
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
 void
-thread_exit (int status UNUSED)  //TODO: this shouldn't be unused?????
+thread_exit (int status UNUSED)
 {
   ASSERT(!intr_context ());
-
 #ifdef USERPROG
   process_exit (status);
 #endif
