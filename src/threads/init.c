@@ -161,6 +161,7 @@ main (void)
   filesys_init (format_filesys);
 #endif
   frame_init();
+  swap_init();
   
   /* start other processors */
   unsigned num_started = start_other_cpus ();

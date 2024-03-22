@@ -34,7 +34,7 @@ void frame_init()
         frame_entry->page = NULL;
         frame_entry->paddr = addr;
         frame_entry->unused_count = 0;
-        list_push_back(&frame_list, &frame_entry->elem);
+        list_push_front(&frame_list, &frame_entry->elem);
         addr = palloc_get_page(PAL_USER | PAL_ZERO);
     }
     lock_release(&frame_table_lock);
@@ -44,6 +44,7 @@ void frame_init()
  * Find a usable frame for an incoming frame request.
 */
 struct frame* find_frame(){
+    //printf("finding frame\n");
     if ( !lock_held_by_current_thread(&frame_table_lock)){ 
         lock_acquire(&frame_table_lock);
     }
@@ -56,16 +57,18 @@ struct frame* find_frame(){
             list_remove(e);
             list_push_back(&frame_list, e);
             lock_release(&frame_table_lock);
+            //printf("find_frame found empty frame\n");
             return f;
         }
         else{
-            
+            //printf("evicting\n");
             f = evict();
             ASSERT(f!=NULL);
             //swap_insert(f->page);
             list_remove(&f->elem);
             list_push_back(&frame_list, &f->elem);
             lock_release(&frame_table_lock);
+            //printf("find_frame evicted\n");
             return f;
         
         }
@@ -129,59 +132,69 @@ struct frame* evict(void) {
     // candidate->unused_count=0;
     // return candidate;
 
-    struct frame* candidate;
+    struct frame* candidate = NULL;
     
     for ( struct list_elem * e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e) ) {
         struct frame * f = list_entry(e, struct frame, elem);
         if(!f->pinned){
-            bool page_accessed = pagedir_is_accessed(f->page->t->pagedir, f->page->vaddr);
+            bool page_accessed = pagedir_is_accessed(f->page->pagedir, f->page->vaddr);
+            //printf("accessed passed\n");
+            ASSERT(f->page != NULL);
             
             if(!page_accessed){
 
                 candidate = f;
+                //printf("unaccessed frame found\n");
                 break;
             }
             else{
-                pagedir_set_accessed (f->page->t->pagedir, f->page->vaddr, false);
+                pagedir_set_accessed (f->page->pagedir, f->page->vaddr, false);
             }
         }
 
     }
     if (candidate == NULL){
+        //printf("2ndrun \n");
         //2nd run. Unless all the pages are pinned, this should find a candidate
         for ( struct list_elem * e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e) ) {
             struct frame * f = list_entry(e, struct frame, elem);
             if(!f->pinned){
-                bool page_accessed = pagedir_is_accessed(f->page->t->pagedir, f->page->vaddr);
-                bool page_dirty = pagedir_is_dirty(f->page->t->pagedir, f->page->vaddr);
+                bool page_accessed = pagedir_is_accessed(f->page->pagedir, f->page->vaddr);
+                bool page_dirty = pagedir_is_dirty(f->page->pagedir, f->page->vaddr);
                 if(!page_accessed){
 
                     candidate = f;
                     break;
                 }
                 else{
-                    pagedir_set_accessed (f->page->t->pagedir, f->page->vaddr, false);
+                    pagedir_set_accessed (f->page->pagedir, f->page->vaddr, false);
                 }
             }
 
         }
     }
     ASSERT(candidate!=NULL);
-
+    ASSERT(candidate->page != NULL);
+    //printf("candidate found \n");
+    //printf("pagestatus: %d\n", candidate->page->page_status);
     if(candidate->page->page_status == 0){ //mmap
-        if(pagedir_is_dirty(candidate->page->t->pagedir, candidate->page->vaddr)){ //dirty mmap = need to write
+        //printf("mmap\n");
+        if(pagedir_is_dirty(candidate->page->pagedir, candidate->page->vaddr)){ //dirty mmap = need to write
             lock_file();
             file_write_at(candidate->page->file, candidate->page->vaddr, candidate->page->bytes_read, candidate->page->offset);
             unlock_file();
+            //do I need to set the is_dirty to false here, or will it take care of itself
         }
         //clean mmap = no need to swap? do I need to destroy the page here or something?
     }
     else{
+        //printf("swapping\n");
         swap_insert(candidate->page);
     }
+    pagedir_clear_page(candidate->page->pagedir, candidate->page->vaddr);
     //else if(candidate->page->page_status == 2) //file
     
-
+    //printf("evict completed!\n");
 
     return candidate;
    

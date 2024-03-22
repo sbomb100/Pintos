@@ -13,18 +13,24 @@
 static struct bitmap *used_blocks;
 struct block *block_swap;
 static struct lock block_lock;
+bool swap_init_v = false;
 // Block sector size is 512 bytes => 8 sectors = 1 page
 
 // create bitmap
 void swap_init(void)
 {
+    
+    if(!swap_init_v){
     lock_init(&block_lock);
     used_blocks = bitmap_create(BLOCK_SECTOR_SIZE);
     block_swap = block_get_role(BLOCK_SWAP);
+    }
+    swap_init_v = true;
 }
 
 void swap_insert(struct spt_entry *p)
 {
+    //swap_init();
     lock_acquire(&block_lock);
     char *c = (char *)p->frame->paddr;
     size_t sector_num = bitmap_scan_and_flip(used_blocks, 0, 1, false);

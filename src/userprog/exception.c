@@ -203,6 +203,7 @@ page_fault(struct intr_frame *f)
             goto exit;
          }
          // get frame and put it in page
+         //printf("new page\n");
          struct frame *new_frame = find_frame();
          new_frame->page = new_page;
          /* Install */
@@ -220,6 +221,7 @@ page_fault(struct intr_frame *f)
    if (page->page_status == 2) // filesys
    {
       // get frame and its page
+      //printf("in filesys\n");
       struct frame *new_frame = find_frame();
       if (new_frame == NULL)
       {
@@ -259,7 +261,7 @@ page_fault(struct intr_frame *f)
    if (page->page_status == 1) // in swap table
    {
       // get frame and its page
-
+      //printf("in swap\n");
       struct frame *new_frame = find_frame();
       if (new_frame == NULL)
       {
@@ -283,6 +285,7 @@ page_fault(struct intr_frame *f)
    }
    if (page->page_status == 0) // mmapped file
    {
+      //printf("in mmap\n");
       struct frame *new_frame = find_frame();
       new_frame->page = page;
       page->frame = new_frame;
