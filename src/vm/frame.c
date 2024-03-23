@@ -138,7 +138,7 @@ struct frame* evict(void) {
     
     for ( struct list_elem * e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e) ) {
         struct frame * f = list_entry(e, struct frame, elem);
-        if(!f->pinned){
+        if(!f->page->pinned){
             bool page_accessed = pagedir_is_accessed(f->page->pagedir, f->page->vaddr);
             //printf("accessed passed\n");
             ASSERT(f->page != NULL);
@@ -160,7 +160,7 @@ struct frame* evict(void) {
         //2nd run. Unless all the pages are pinned, this should find a candidate
         for ( struct list_elem * e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e) ) {
             struct frame * f = list_entry(e, struct frame, elem);
-            if(!f->pinned){
+            if(!f->page->pinned){
                 bool page_accessed = pagedir_is_accessed(f->page->pagedir, f->page->vaddr);
                 //bool page_dirty = pagedir_is_dirty(f->page->pagedir, f->page->vaddr);
                 if(!page_accessed){

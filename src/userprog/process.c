@@ -169,13 +169,13 @@ void process_exit(int status)
   sema_up(&cur_child->wait_sema);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
-  lock_file();
+
   if (cur->exec_file != NULL)
   {
     file_allow_write(cur->exec_file);
   }
   file_close(cur->exec_file);
-  unlock_file();
+  
   pd = cur->pagedir;
   // FIX? free page for oom??
   if (pd != NULL)
@@ -320,7 +320,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     goto done;
   process_activate();
 
-  lock_file();
   /* Open executable file. */
   file = filesys_open(token);
   if (file == NULL)
@@ -446,7 +445,6 @@ done:
   /* We arrive here whether the load is successful or not. */
   free(fn_copy);
   free(argv);
-  unlock_file();
   return success;
 }
 
@@ -551,9 +549,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->pagedir = t->pagedir;
     page->swap_index = -1;
 
-    lock_acquire(&t->spt_lock);
     hash_insert(&t->spt, &page->elem);
-    lock_release(&t->spt_lock);
     
     /* Advance. */
     read_bytes -= page_read_bytes;
@@ -591,11 +587,8 @@ setup_stack(void **esp)
   page->bytes_read = 0;
   page->pagedir = curr->pagedir;
   page->swap_index = -1;
-  if (!lock_held_by_current_thread(&curr->spt_lock)) {
-		lock_acquire(&curr->spt_lock);
-	}
+
   hash_insert(&curr->spt, &page->elem);
-  lock_release(&curr->spt_lock);
 
   thread_current()->num_stack_pages++;
 

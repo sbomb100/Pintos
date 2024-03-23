@@ -223,20 +223,16 @@ page_fault(struct intr_frame *f)
          printf("fail 278 exception.c\n");
          goto exit;
       }
-      if (!lock_held_by_current_thread(&file_lock))
-      {
-         lock_acquire(&file_lock);
-      }
+      
       // get to spot in page
       file_seek(page->file, page->offset);
       if (file_read(page->file, new_frame, page->bytes_read) != (int)page->bytes_read)
       {
-         lock_release(&file_lock);
+         
          palloc_free_page(new_frame->page);
          printf("fail 292 exception.c\n");
          goto exit;
       }
-      lock_release(&file_lock);
       memset(new_frame + page->bytes_read, 0, page->bytes_zero);
 
       if (!install_page(page->vaddr, new_frame->paddr, page->writable))
@@ -267,18 +263,11 @@ exit:
       // goto exit;
       thread_exit(-1);
    }
-   /* To implement virtual memory, delete the rest of the function
-      body, and replace it with code that brings in the page to
-      which fault_addr refers. */
-   // printf("Page fault at %p: %s error %s page in %s context.\n",
-   //        fault_addr,
-   //        not_present ? "not present" : "rights violation",
-   //        write ? "writing" : "reading",
-   //        user ? "user" : "kernel");
    kill(f);
 }
 
 void load_file_to_spt(struct spt_entry* page){
+   page->pinned = true;
    struct frame *new_frame = find_frame();
       if (new_frame == NULL)
       {
@@ -288,21 +277,16 @@ void load_file_to_spt(struct spt_entry* page){
       }
       uint8_t *kpage = new_frame->paddr;
       new_frame->page = page;
-      // printf("read\n");
-      if (!lock_held_by_current_thread(&file_lock))
-      {
-         lock_acquire(&file_lock);
-      }
+      
       file_seek(page->file, page->offset);
       if (file_read(page->file, new_frame->paddr, page->bytes_read) != (int)page->bytes_read)
       {
-         lock_release(&file_lock);
          palloc_free_page(new_frame->page);
          printf("fail 292 exception.c\n");
          thread_exit(-1);
          return;
       }
-      lock_release(&file_lock);
+
 
       // mem set the kpage + bytes read
       memset(kpage + page->bytes_read, 0, page->bytes_zero); // make sure page has memory correct range
@@ -316,6 +300,7 @@ void load_file_to_spt(struct spt_entry* page){
       }
       page->page_status = 3; // in frame table
       page->frame = new_frame;
+      page->pinned = false;
       return;
 }
 
@@ -323,7 +308,7 @@ void load_extra_stack_page(void* fault_addr){
       //  if its not in stack range
       // page isnt in table, therefore make new page.
       // if addr is outside stack range then exit
-      struct thread* t = thread_current();
+      ASSERT(!lock_held_by_current_thread(&thread_current()->spt_lock));
       struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
       if (new_page == NULL)
       { // check to see it malloced
@@ -335,21 +320,21 @@ void load_extra_stack_page(void* fault_addr){
       new_page->vaddr = pg_round_down(fault_addr);
       new_page->page_status = 3;
       new_page->writable = true;
+      new_page->pinned = false;
       new_page->file = NULL;
       new_page->offset = 0;
       new_page->bytes_read = 0;
       new_page->pagedir = thread_current()->pagedir;
       new_page->swap_index = -1;
 
-      if (!lock_held_by_current_thread(&t->spt_lock))
-      {
-         lock_acquire(&t->spt_lock);
+      if(!lock_held_by_current_thread(&thread_current()->spt_lock)){
+         lock_acquire(&thread_current()->spt_lock);
       }
-      hash_insert(&t->spt, &new_page->elem);
-      lock_release(&t->spt_lock);
+      hash_insert(&thread_current()->spt, &new_page->elem);
+      lock_release(&thread_current()->spt_lock);
 
-      t->num_stack_pages++;
-      if (t->num_stack_pages > 2048) // hard limit
+      thread_current()->num_stack_pages++;
+      if (thread_current()->num_stack_pages > 2048) // hard limit
       {
          printf("fail 202 exception.c\n");
           thread_exit(-1);

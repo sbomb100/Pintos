@@ -255,17 +255,21 @@ int open(const char *file)
   // openning same file makes new fds (act as if different files)
   if (file == NULL || !validate_pointer(file))
   {
+    if(lock_held_by_current_thread(&file_lock))
+			lock_release(&file_lock);
     thread_exit(-1);
   }
-
-  lock_file();
+  if (!lock_held_by_current_thread(&file_lock))
+  {
+    lock_acquire(&file_lock);
+  }
   struct file *fp = filesys_open(file);
   if (fp == NULL)
   {
-    unlock_file();
+    if(lock_held_by_current_thread(&file_lock))
+			lock_release(&file_lock);
     return -1;
   }
-  unlock_file();
 
   if (fp == NULL)
     thread_exit(0);
@@ -273,11 +277,13 @@ int open(const char *file)
   int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
   if (fd == -1)
   {
+    if(lock_held_by_current_thread(&file_lock))
+			lock_release(&file_lock);
     file_close(fp);
     thread_exit(-1);
   }
   thread_current()->fdToFile[fd - 2] = fp;
-
+  unlock_file();
   return fd;
 }
 /*
@@ -285,10 +291,10 @@ int open(const char *file)
 */
 int filesize(int fd)
 {
+  lock_acquire(&file_lock);
   struct file *filePtr = thread_current()->fdToFile[fd - 2];
-  lock_file();
   int length = file_length(filePtr);
-  unlock_file();
+  lock_release(&file_lock);
   return length;
 }
 /*
@@ -300,16 +306,24 @@ int read(int fd, void *buffer, unsigned size)
 {
   // check pointers / fd
 
-  if (buffer == NULL || !is_user_vaddr(buffer) || buffer + size == NULL || !is_user_vaddr(buffer + size))
-  {
-    thread_exit(-1);
-  }
-  // Fd 0 reads from the keyboard using input_getc().
-  lock_file();
   if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
   {
     return -1;
   }
+
+  if (buffer == NULL || !is_user_vaddr(buffer))
+  {
+    // thread_exit(-1);
+    return -1;
+  }
+
+  if (buffer + size == NULL || !is_user_vaddr(buffer + size))
+  {
+    thread_exit(-1);
+  }
+  lock_acquire(&file_lock);
+  // Fd 0 reads from the keyboard using input_getc().
+
   int byteCount = 0;
   int success = 0;
 
@@ -327,13 +341,7 @@ int read(int fd, void *buffer, unsigned size)
       load_extra_stack_page(buffer_page);
       byteCount++;
     }
-    if (page->page_status == 2) // filesys
-    {
-      load_file_to_spt(page);
-      byteCount++;
-    }
   }
-
   // If fd == 0, reads from keyboard using input_getc()
   if (fd == 0)
   {
@@ -395,8 +403,7 @@ int read(int fd, void *buffer, unsigned size)
       success += bytes_read;
     }
   }
-  unlock_file();
-
+  lock_release(&file_lock);
   return success;
 }
 /*
@@ -407,6 +414,11 @@ int write(int fd, const void *buffer, unsigned size)
 {
   // length >= 0 (fails from create)
   // check pointers and bad fd
+  if (!lock_held_by_current_thread(&file_lock))
+  {
+    lock_acquire(&file_lock);
+  }
+
   if (buffer == NULL || !validate_pointer(buffer))
     thread_exit(-1);
   if (fd < 1 || fd > 1025)
@@ -416,24 +428,28 @@ int write(int fd, const void *buffer, unsigned size)
   // Your code to write to the console should write all of buffer in one call to putbuf(),
   // at least as long as size is not bigger than a few hundred bytes.
   // if fd == 1, write to standard output
-  lock_file();
+  int ret = -1;
   if (fd == 1)
   {
     putbuf(buffer, size);
-    unlock_file();
-    return size;
+    ret = size;
   }
-
-  struct file *fileDes = thread_current()->fdToFile[fd - 2];
-  if (fileDes == NULL)
+  else
   {
-    unlock_file();
-    return -1;
-  }
 
-  // write to the file using filesys function
-  int ret = file_write(fileDes, buffer, size);
-  unlock_file();
+    struct file *fileDes = thread_current()->fdToFile[fd - 2];
+    if (fileDes != NULL)
+    {
+      // write to the file using filesys function
+      ret = file_write(fileDes, buffer, size);
+      if (ret == 0)
+      {
+        file_seek(fileDes, 0);
+        ret = file_write(fileDes, buffer, size);
+      }
+    }
+  }
+  lock_release(&file_lock);
   return ret;
 }
 
@@ -444,12 +460,12 @@ int write(int fd, const void *buffer, unsigned size)
 */
 void seek(int fd, unsigned position)
 {
+  lock_file();
   struct file *fileDes = thread_current()->fdToFile[fd - 2];
 
   if (fileDes == NULL)
     return;
 
-  lock_file();
   file_seek(thread_current()->fdToFile[fd - 2], position);
   unlock_file();
 }
@@ -458,13 +474,13 @@ void seek(int fd, unsigned position)
 */
 unsigned tell(int fd)
 {
+  lock_acquire(&file_lock);
   struct file *fileDes = thread_current()->fdToFile[fd - 2];
   if (fileDes == NULL)
     return -1;
 
-  lock_file();
   unsigned pos = file_tell(fileDes);
-  unlock_file();
+  lock_release(&file_lock);
   return pos;
 }
 /*
@@ -474,6 +490,7 @@ void close(int fd)
 {
   //`inode->deny_write_cnt <= inode->open_cnt    close twice not good
   // check if fd is good
+  lock_acquire(&file_lock);
   if (fd < 2 || fd > 1025)
     return;
 
@@ -481,11 +498,10 @@ void close(int fd)
   if (fileDes == NULL)
     return;
 
-  lock_file();
   // Closing file using file sys function
   file_close(fileDes);
   thread_current()->fdToFile[fd - 2] = NULL;
-  unlock_file();
+  lock_release(&file_lock);
 }
 
 // index of zero is fd of 2
@@ -641,7 +657,11 @@ bool munmap(mapid_t mapping)
       }
 
       // FIX? maybe move outside loop
-      lock_acquire(&thread_current()->spt_lock);
+
+      if (!lock_held_by_current_thread(&thread_current()->spt_lock))
+      {
+        lock_acquire(&thread_current()->spt_lock);
+      }
       hash_delete(&thread_current()->spt, &page->elem);
       lock_release(&thread_current()->spt_lock);
 

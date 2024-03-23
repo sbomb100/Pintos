@@ -25,9 +25,10 @@ struct spt_entry
     size_t bytes_read;
     size_t bytes_zero;
 	off_t offset;
-    //bool is_in_memory;
+
 	bool is_stack;
 	bool writable;
+    bool pinned;
     struct spinlock lock; //syncro lock
 	struct thread * t; 
     int swap_index; // FOR SWAP TABLE
