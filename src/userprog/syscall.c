@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include "userprog/process.h"
 #include "threads/malloc.h"
+#include "userprog/exception.h"
 struct lock file_lock;
 
 static void syscall_handler(struct intr_frame *);
@@ -164,7 +165,8 @@ syscall_handler(struct intr_frame *f)
       thread_exit(-1);
       return;
     }
-    if(!munmap(args[0])){ //FIX? may not need to check return
+    if (!munmap(args[0]))
+    { // FIX? may not need to check return
       thread_exit(-1);
       return;
     }
@@ -183,7 +185,8 @@ tid_t exec(const char *cmd_line)
   if (cmd_line == NULL || !validate_pointer(cmd_line))
     return -1;
   tid_t child_tid = process_execute(cmd_line);
-  if (child_tid == TID_ERROR){
+  if (child_tid == TID_ERROR)
+  {
     return -1;
   }
   // double-check that the new process has loaded and that everything went
@@ -249,9 +252,10 @@ int open(const char *file)
 {
   // Each process has an independent set of file descriptors. File descriptors are not inherited by child processes
   // openning same file makes new fds (act as if different files)
-  if (file == NULL || !validate_pointer(file)) {
+  if (file == NULL || !validate_pointer(file))
+  {
     thread_exit(-1);
-  } 
+  }
 
   lock_file();
   struct file *fp = filesys_open(file);
@@ -262,7 +266,7 @@ int open(const char *file)
   }
   unlock_file();
 
-  if (fp == NULL) 
+  if (fp == NULL)
     thread_exit(0);
 
   int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
@@ -296,7 +300,8 @@ int read(int fd, void *buffer, unsigned size)
 {
   // check pointers / fd
 
-  if ( buffer == NULL || buffer + size == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size) || get_page_from_hash(buffer) == NULL ) {
+  if (buffer == NULL || buffer + size == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size))
+  {
     thread_exit(-1);
   }
 
@@ -305,6 +310,8 @@ int read(int fd, void *buffer, unsigned size)
 
   // Fd 0 reads from the keyboard using input_getc().
   unsigned bytesRead = 0;
+
+  lock_file();
 
   // If fd == 0, reads from keyboard using input_getc()
   if (fd == 0)
@@ -321,8 +328,8 @@ int read(int fd, void *buffer, unsigned size)
   struct file *filePtr = thread_current()->fdToFile[fd - 2];
   if (filePtr == NULL)
     return -1;
-  
-  lock_file();
+ 
+
   // Read from the file using filesys function
   bytesRead = file_read(filePtr, buffer, size);
   unlock_file();
@@ -461,7 +468,8 @@ mapid_t mmap(int fd, void *addr)
   {
     return -1;
   }
-  if ((int)addr % PGSIZE != 0){
+  if ((int)addr % PGSIZE != 0)
+  {
     return -1;
   }
   struct thread *curr = thread_current();
@@ -550,25 +558,25 @@ bool munmap(mapid_t mapping)
   {
     return false;
   }
-  struct list * map_list = &(thread_current()->mmap_list);
-  struct list_elem * e = list_begin(map_list);
-   for(e = list_begin(map_list); e != list_end(map_list); e = e)
+  struct list *map_list = &(thread_current()->mmap_list);
+  struct list_elem *e = list_begin(map_list);
+  for (e = list_begin(map_list); e != list_end(map_list); e = e)
   {
-    struct mapped_item * mmapped = list_entry(e, struct mapped_item, elem);
+    struct mapped_item *mmapped = list_entry(e, struct mapped_item, elem);
 
-    if(mmapped->id == mapping)
+    if (mmapped->id == mapping)
     {
-      
-      struct spt_entry * page = mmapped->page;
+
+      struct spt_entry *page = mmapped->page;
       file_seek(page->file, 0);
 
-      if ( pagedir_is_dirty(thread_current()->pagedir, page->vaddr)) 
+      if (pagedir_is_dirty(thread_current()->pagedir, page->vaddr))
       {
-        //FIX? maybe check value
+        // FIX? maybe check value
         file_write_at(page->file, page->vaddr, page->bytes_read, page->offset);
       }
 
-      //FIX? maybe move outside loop
+      // FIX? maybe move outside loop
       lock_acquire(&thread_current()->spt_lock);
       hash_delete(&thread_current()->spt, &page->elem);
       lock_release(&thread_current()->spt_lock);
@@ -576,11 +584,10 @@ bool munmap(mapid_t mapping)
       e = list_remove(&mmapped->elem);
       free(mmapped);
     }
-    else 
+    else
     {
       e = list_next(e);
     }
-
   }
 
   thread_current()->num_mapped--;

@@ -38,8 +38,7 @@ void swap_insert(struct spt_entry *p)
     p->page_status = 1;
     for (int i = 0; i < (PGSIZE / BLOCK_SECTOR_SIZE); i++)
     {
-        block_write(block_swap, sector_num * (PGSIZE / BLOCK_SECTOR_SIZE) + i, c);
-        c += 512;
+        block_write(block_swap, sector_num * (PGSIZE / BLOCK_SECTOR_SIZE) + i, (uint8_t *) c + i * BLOCK_SECTOR_SIZE);
     }
     lock_release(&block_lock);
 }
@@ -54,8 +53,7 @@ void swap_get(struct spt_entry *p)
     for (i = 0; i < (PGSIZE / BLOCK_SECTOR_SIZE); i++)
     {
         //instead of c maybe (uint8_t *) upage + i * BLOCK_SECTOR_SIZE) FIX?
-        block_read(block_swap, read_sector * (PGSIZE / BLOCK_SECTOR_SIZE) + i, c);
-        c += 512;
+        block_read(block_swap, read_sector * (PGSIZE / BLOCK_SECTOR_SIZE) + i, (uint8_t *) c + i * BLOCK_SECTOR_SIZE);
     }
     bitmap_reset(used_blocks, read_sector);
     lock_release(&block_lock);

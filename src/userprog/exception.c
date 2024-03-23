@@ -18,7 +18,7 @@ static long long page_fault_cnt;
 
 static void kill(struct intr_frame *);
 static void page_fault(struct intr_frame *);
-
+void load_file_to_spt(struct spt_entry* page);
 /* Registers handlers for interrupts that can be caused by user
    programs.
 
@@ -134,7 +134,7 @@ page_fault(struct intr_frame *f)
    void *fault_addr; /* Fault address. */
 
    // get current thread?-------------------- FIX? make sure its not holding a lock?
-   //printf("%x\n", (uint32_t)f->eip);
+   // printf("%x\n", (uint32_t)f->eip);
 
    /* Obtain faulting address, the virtual address that was
       accessed to cause the fault.  It may point to code or to
@@ -156,7 +156,7 @@ page_fault(struct intr_frame *f)
    struct thread *t = thread_current();
    if (fault_addr == NULL || is_kernel_vaddr(fault_addr))
    { // doesnt exit or is kernel pointer
-      //printf("fail 160 exception.c\n");
+      // printf("fail 160 exception.c\n");
       goto exit;
    }
    // pointer is good so get the page with it
@@ -164,64 +164,48 @@ page_fault(struct intr_frame *f)
 
    if (page == NULL) // page not found
    {
-      char *esp = f->esp;
-      printf(esp);
-      // if its not in stack range
-      if ((fault_addr > PHYS_BASE) || (fault_addr < PHYS_BASE - 0x800000) ||
-          (fault_addr > (void *)(esp + 32)) || (fault_addr < (void *)(esp - 32)))
+      uint32_t *esp = f->esp;
+      // printf(esp);
+      //  if its not in stack range
+      if (!((PHYS_BASE - pg_round_down(fault_addr)) <= 0x800000 && (uint32_t *)fault_addr >= (esp - 32) && (fault_addr < PHYS_BASE)))
       {
          goto exit;
       }
       // page isnt in table, therefore make new page.
       // if addr is outside stack range then exit
-      char *current_stack = PHYS_BASE - (t->num_stack_pages * PGSIZE);
-      char *new_page_addr = (char *)(pg_no(fault_addr) << PGBITS);
-      for (; new_page_addr < current_stack; new_page_addr += PGSIZE)
-      {
-         struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
-         if (new_page == NULL)
-         { // check to see it malloced
-            printf("fail 185 exception.c\n");
-            goto exit;
-         }
-         // new page
-         new_page->is_stack = true;
-         new_page->vaddr = new_page_addr;
-         new_page->page_status = 3;
-         new_page->writable = true;
-         new_page->file = NULL;
-         new_page->offset = 0;
-         new_page->bytes_read = 0;
-         new_page->pagedir = t->pagedir;
-         page->swap_index = -1;
-         hash_insert(&t->spt, &new_page->elem);
 
-         t->num_stack_pages++;
-         if (t->num_stack_pages > 2048) // hard limit
-         {
-            printf("fail 202 exception.c\n");
-            goto exit;
-         }
-         // get frame and put it in page
-         //printf("new page\n");
-         struct frame *new_frame = find_frame();
-         new_frame->page = new_page;
-         /* Install */
-         if (!install_page(page->vaddr, new_frame->paddr, page->writable))
-         {
-            PANIC("Error growing stack page!");
-         }
-
-         return;
+      struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
+      if (new_page == NULL)
+      { // check to see it malloced
+         printf("fail 185 exception.c\n");
+         goto exit;
       }
+      // new page
+      new_page->is_stack = true;
+      new_page->vaddr = pg_round_down(fault_addr);
+      new_page->page_status = 3;
+      new_page->writable = true;
+      new_page->file = NULL;
+      new_page->offset = 0;
+      new_page->bytes_read = 0;
+      new_page->pagedir = thread_current()->pagedir;
+      new_page->swap_index = -1;
 
-      return;
-      // make new additional stack page and put it in a frame
-   }
-   if (page->page_status == 2) // filesys
-   {
-      // get frame and its page
-      //printf("in filesys\n");
+      if (!lock_held_by_current_thread(&t->spt_lock))
+      {
+         lock_acquire(&t->spt_lock);
+      }
+      hash_insert(&t->spt, &new_page->elem);
+      lock_release(&t->spt_lock);
+
+      t->num_stack_pages++;
+      if (t->num_stack_pages > 2048) // hard limit
+      {
+         printf("fail 202 exception.c\n");
+         goto exit;
+      }
+      // get frame and put it in page
+      // printf("new page\n");
       struct frame *new_frame = find_frame();
       if (new_frame == NULL)
       {
@@ -229,39 +213,29 @@ page_fault(struct intr_frame *f)
          goto exit;
          return;
       }
-      uint8_t *kpage = new_frame->paddr;
-      new_frame->page = page;
-      //printf("read\n");
-      //lock_acquire(&file_lock);
-      file_seek(page->file, page->offset);
-      if (file_read(page->file, new_frame->paddr, page->bytes_read) != (int)page->bytes_read)
+      new_frame->page = new_page;
+      new_page->frame = new_frame;
+      /* Install */
+      if (!install_page(new_page->vaddr, new_frame->paddr, new_page->writable))
       {
-         lock_release(&file_lock);
-         palloc_free_page(new_frame->page);
-         printf("fail 292 exception.c\n");
-         goto exit;
-         return;
+         PANIC("Error growing stack page!");
       }
-      //lock_release(&file_lock);
 
-      // mem set the kpage + bytes read
-      memset(kpage + page->bytes_read, 0, page->bytes_zero); // make sure page has memory correct range
+      return;
 
-      // install into a frame
-
-      if (!install_page(page->vaddr, new_frame->paddr, page->writable))
-      {
-         printf("fail 245 exception.c\n");
-         goto exit;
-      }
-      page->page_status = 3; // in frame table
-      page->frame = new_frame;
+      // make new additional stack page and put it in a frame
+   }
+   if (page->page_status == 2) // filesys
+   {
+      // get frame and its page
+      // printf("in filesys\n");
+      load_file_to_spt(page);
       return;
    }
    if (page->page_status == 1) // in swap table
    {
       // get frame and its page
-      //printf("in swap\n");
+      // printf("in swap\n");
       struct frame *new_frame = find_frame();
       if (new_frame == NULL)
       {
@@ -285,7 +259,7 @@ page_fault(struct intr_frame *f)
    }
    if (page->page_status == 0) // mmapped file
    {
-      //printf("in mmap\n");
+      // printf("in mmap\n");
       struct frame *new_frame = find_frame();
       new_frame->page = page;
       page->frame = new_frame;
@@ -295,19 +269,26 @@ page_fault(struct intr_frame *f)
          printf("fail 278 exception.c\n");
          goto exit;
       }
-
+      if (!lock_held_by_current_thread(&file_lock))
+      {
+         lock_acquire(&file_lock);
+      }
       // get to spot in page
       file_seek(page->file, page->offset);
       if (file_read(page->file, new_frame, page->bytes_read) != (int)page->bytes_read)
       {
+         lock_release(&file_lock);
          palloc_free_page(new_frame->page);
          printf("fail 292 exception.c\n");
          goto exit;
       }
-      memset (new_frame + page->bytes_read, 0, page->bytes_zero);
+      lock_release(&file_lock);
+      memset(new_frame + page->bytes_read, 0, page->bytes_zero);
 
-      if (!install_page(page->vaddr, new_frame->paddr, page->writable)){
-         
+      if (!install_page(page->vaddr, new_frame->paddr, page->writable))
+      {
+         printf("fail 267 exception.c\n");
+         goto exit;
       }
       page->page_status = 3;
 
@@ -341,4 +322,45 @@ exit:
    //        write ? "writing" : "reading",
    //        user ? "user" : "kernel");
    kill(f);
+}
+
+void load_file_to_spt(struct spt_entry* page){
+   struct frame *new_frame = find_frame();
+      if (new_frame == NULL)
+      {
+         printf("fail 227 exception.c\n");
+         thread_exit(-1);
+         return;
+      }
+      uint8_t *kpage = new_frame->paddr;
+      new_frame->page = page;
+      // printf("read\n");
+      if (!lock_held_by_current_thread(&file_lock))
+      {
+         lock_acquire(&file_lock);
+      }
+      file_seek(page->file, page->offset);
+      if (file_read(page->file, new_frame->paddr, page->bytes_read) != (int)page->bytes_read)
+      {
+         lock_release(&file_lock);
+         palloc_free_page(new_frame->page);
+         printf("fail 292 exception.c\n");
+         thread_exit(-1);
+         return;
+      }
+      lock_release(&file_lock);
+
+      // mem set the kpage + bytes read
+      memset(kpage + page->bytes_read, 0, page->bytes_zero); // make sure page has memory correct range
+
+      // install into a frame
+
+      if (!install_page(page->vaddr, new_frame->paddr, page->writable))
+      {
+         printf("fail 245 exception.c\n");
+         thread_exit(-1);
+      }
+      page->page_status = 3; // in frame table
+      page->frame = new_frame;
+      return;
 }

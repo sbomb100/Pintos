@@ -10,7 +10,7 @@
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
-
+#include "userprog/syscall.h"
 static struct list frame_list;       // frame list
 static struct lock frame_table_lock; // lock for the frame table
 
@@ -95,7 +95,9 @@ void frame_allocate_page(struct spt_entry *page)
  */
 void free_frame(struct frame *f)
 {
-    lock_acquire(&frame_table_lock);
+    if ( !lock_held_by_current_thread(&frame_table_lock)){ 
+        lock_acquire(&frame_table_lock);
+    }
     f->pinned = false;
     f->page = NULL;
     f->unused_count = 0;
@@ -160,7 +162,7 @@ struct frame* evict(void) {
             struct frame * f = list_entry(e, struct frame, elem);
             if(!f->pinned){
                 bool page_accessed = pagedir_is_accessed(f->page->pagedir, f->page->vaddr);
-                bool page_dirty = pagedir_is_dirty(f->page->pagedir, f->page->vaddr);
+                //bool page_dirty = pagedir_is_dirty(f->page->pagedir, f->page->vaddr);
                 if(!page_accessed){
 
                     candidate = f;

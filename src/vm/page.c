@@ -6,7 +6,6 @@
 #include "threads/malloc.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
-
 /* hash function, address comparator */
 /* Returns a hash value for spt_entry p. */
 unsigned
@@ -44,11 +43,13 @@ void destroy_page (struct hash_elem *elem1, void *aux UNUSED)
 //search the hash table for a page, returns null if no such
 struct spt_entry * get_page_from_hash (void *given_address)
 {
+  
   struct thread *t = thread_current ();
   struct spt_entry page;
   struct hash_elem *elem_in_hash;
 
   page.vaddr = (void *) (pg_no(given_address) << PGBITS);
   elem_in_hash = hash_find (&t->spt, &page.elem);
-  return elem_in_hash != NULL ? hash_entry (elem_in_hash, struct spt_entry, elem) : NULL; //????
+  return elem_in_hash != NULL ? hash_entry (elem_in_hash, struct spt_entry, elem) : NULL;
 }
+
