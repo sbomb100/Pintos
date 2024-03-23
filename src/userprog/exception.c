@@ -167,60 +167,14 @@ page_fault(struct intr_frame *f)
       uint32_t *esp = f->esp;
       // printf(esp);
       //  if its not in stack range
-      if (!((PHYS_BASE - pg_round_down(fault_addr)) <= 0x800000 && (uint32_t *)fault_addr >= (esp - 32) && (fault_addr < PHYS_BASE)))
+      if (((PHYS_BASE - pg_round_down(fault_addr)) <= 0x800000 && (uint32_t *)fault_addr >= (esp - 32)))
       {
-         goto exit;
+         load_extra_stack_page(fault_addr);
+      } else {
+         thread_exit(-1);
       }
       // page isnt in table, therefore make new page.
       // if addr is outside stack range then exit
-
-      struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
-      if (new_page == NULL)
-      { // check to see it malloced
-         printf("fail 185 exception.c\n");
-         goto exit;
-      }
-      // new page
-      new_page->is_stack = true;
-      new_page->vaddr = pg_round_down(fault_addr);
-      new_page->page_status = 3;
-      new_page->writable = true;
-      new_page->file = NULL;
-      new_page->offset = 0;
-      new_page->bytes_read = 0;
-      new_page->pagedir = thread_current()->pagedir;
-      new_page->swap_index = -1;
-
-      if (!lock_held_by_current_thread(&t->spt_lock))
-      {
-         lock_acquire(&t->spt_lock);
-      }
-      hash_insert(&t->spt, &new_page->elem);
-      lock_release(&t->spt_lock);
-
-      t->num_stack_pages++;
-      if (t->num_stack_pages > 2048) // hard limit
-      {
-         printf("fail 202 exception.c\n");
-         goto exit;
-      }
-      // get frame and put it in page
-      // printf("new page\n");
-      struct frame *new_frame = find_frame();
-      if (new_frame == NULL)
-      {
-         printf("fail 227 exception.c\n");
-         goto exit;
-         return;
-      }
-      new_frame->page = new_page;
-      new_page->frame = new_frame;
-      /* Install */
-      if (!install_page(new_page->vaddr, new_frame->paddr, new_page->writable))
-      {
-         PANIC("Error growing stack page!");
-      }
-
       return;
 
       // make new additional stack page and put it in a frame
@@ -362,5 +316,60 @@ void load_file_to_spt(struct spt_entry* page){
       }
       page->page_status = 3; // in frame table
       page->frame = new_frame;
+      return;
+}
+
+void load_extra_stack_page(void* fault_addr){
+      //  if its not in stack range
+      // page isnt in table, therefore make new page.
+      // if addr is outside stack range then exit
+      struct thread* t = thread_current();
+      struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
+      if (new_page == NULL)
+      { // check to see it malloced
+         printf("fail 185 exception.c\n");
+          thread_exit(-1);
+      }
+      // new page
+      new_page->is_stack = true;
+      new_page->vaddr = pg_round_down(fault_addr);
+      new_page->page_status = 3;
+      new_page->writable = true;
+      new_page->file = NULL;
+      new_page->offset = 0;
+      new_page->bytes_read = 0;
+      new_page->pagedir = thread_current()->pagedir;
+      new_page->swap_index = -1;
+
+      if (!lock_held_by_current_thread(&t->spt_lock))
+      {
+         lock_acquire(&t->spt_lock);
+      }
+      hash_insert(&t->spt, &new_page->elem);
+      lock_release(&t->spt_lock);
+
+      t->num_stack_pages++;
+      if (t->num_stack_pages > 2048) // hard limit
+      {
+         printf("fail 202 exception.c\n");
+          thread_exit(-1);
+      }
+      // get frame and put it in page
+      // printf("new page\n");
+      struct frame *new_frame = find_frame();
+      if (new_frame == NULL)
+      {
+         printf("fail 227 exception.c\n");
+          thread_exit(-1);
+         return;
+      }
+      new_frame->page = new_page;
+      new_page->frame = new_frame;
+      /* Install */
+      if (!install_page(new_page->vaddr, new_frame->paddr, new_page->writable))
+      {
+         PANIC("Error growing stack page!");
+      }
+
       return;
 }

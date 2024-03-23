@@ -2,6 +2,7 @@
 #include "userprog/process.h"
 #include "threads/malloc.h"
 #include "userprog/exception.h"
+#include "threads/vaddr.h"
 struct lock file_lock;
 
 static void syscall_handler(struct intr_frame *);
@@ -272,7 +273,6 @@ int open(const char *file)
   int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
   if (fd == -1)
   {
-    // FIX? maybe fixed oom
     file_close(fp);
     thread_exit(-1);
   }
@@ -300,40 +300,104 @@ int read(int fd, void *buffer, unsigned size)
 {
   // check pointers / fd
 
-  if (buffer == NULL || buffer + size == NULL || !is_user_vaddr(buffer) || !is_user_vaddr(buffer + size))
+  if (buffer == NULL || !is_user_vaddr(buffer) || buffer + size == NULL || !is_user_vaddr(buffer + size))
   {
     thread_exit(-1);
   }
-
-  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
-    return -1;
-
   // Fd 0 reads from the keyboard using input_getc().
-  unsigned bytesRead = 0;
-
   lock_file();
+  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
+  {
+    return -1;
+  }
+  int byteCount = 0;
+  int success = 0;
+
+  void *buffer_rd = pg_round_down(buffer);
+  void *buffer_page;
+
+  unsigned readsize = (unsigned)(buffer_rd + PGSIZE - buffer);
+  unsigned bytes_read = 0;
+
+  for (buffer_page = buffer_rd; buffer_page <= buffer + size; buffer_page += PGSIZE)
+  {
+    struct spt_entry *page = get_page_from_hash(buffer_page);
+    if (page == NULL) // page not found
+    {
+      load_extra_stack_page(buffer_page);
+      byteCount++;
+    }
+    if (page->page_status == 2) // filesys
+    {
+      load_file_to_spt(page);
+      byteCount++;
+    }
+  }
 
   // If fd == 0, reads from keyboard using input_getc()
   if (fd == 0)
   {
-    while (bytesRead < size)
+    while ((unsigned int)byteCount < size)
     {
-      *((char *)buffer + bytesRead) = input_getc();
-      bytesRead++;
+      *((char *)buffer + byteCount) = input_getc();
+      byteCount++;
     }
-    return bytesRead;
+    return size;
   }
 
   // fd is not 0, so read it
   struct file *filePtr = thread_current()->fdToFile[fd - 2];
   if (filePtr == NULL)
     return -1;
- 
 
   // Read from the file using filesys function
-  bytesRead = file_read(filePtr, buffer, size);
+  if (buffer_rd == (void *)0x08048000)
+  {
+    thread_exit(-1);
+  }
+  else if (size <= readsize)
+  {
+
+    success = file_read(filePtr, buffer, size);
+  }
+  else
+  {
+    bool stillReading = true;
+    while (stillReading)
+    {
+      bytes_read = file_read(filePtr, buffer, readsize);
+
+      // some error caused not to fully read
+      if (bytes_read != readsize)
+      {
+        stillReading = false;
+      }
+
+      size -= bytes_read;
+      // no more to read
+      if (size == 0)
+      {
+        stillReading = false;
+      }
+      else
+      {
+        buffer += bytes_read;
+        if (size >= PGSIZE)
+        {
+          readsize = PGSIZE;
+        }
+        else
+        {
+          readsize = size;
+        }
+      }
+
+      success += bytes_read;
+    }
+  }
   unlock_file();
-  return bytesRead;
+
+  return success;
 }
 /*
   Writes size bytes from buffer to the open file fd.
