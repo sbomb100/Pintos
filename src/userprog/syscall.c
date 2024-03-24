@@ -613,7 +613,6 @@ mapid_t mmap(int fd, void *addr)
     page->bytes_zero = PGSIZE - page_read_bytes;
     page->writable = true;
     page->page_status = 2; // in file
-    // page->is_in_memory = false;
     page->pagedir = thread_current()->pagedir;
 
     // add entry
@@ -660,8 +659,6 @@ bool munmap(mapid_t mapping)
       {
         file_write_at(page->file, page->vaddr, page->bytes_read, page->offset);
       }
-
-      // FIX? maybe move outside loop
 
       if (!lock_held_by_current_thread(&thread_current()->spt_lock))
       {

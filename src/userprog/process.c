@@ -533,8 +533,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     // VM making a page
     struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
     if (page == NULL)
-    { // did it malloc?
-      // free(page);
+    { 
       return false;
     }
     page->vaddr = upage;
@@ -548,9 +547,9 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->bytes_zero = page_zero_bytes;
     page->pagedir = t->pagedir;
     page->swap_index = -1;
-
+    lock_acquire(&t->spt_lock);
     hash_insert(&t->spt, &page->elem);
-    
+    lock_release(&t->spt_lock);
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
@@ -587,9 +586,9 @@ setup_stack(void **esp)
   page->bytes_read = 0;
   page->pagedir = curr->pagedir;
   page->swap_index = -1;
-
+  lock_acquire(&curr->spt_lock);
   hash_insert(&curr->spt, &page->elem);
-
+  lock_release(&curr->spt_lock);
   thread_current()->num_stack_pages++;
 
   struct frame *stack_frame = find_frame();
@@ -602,13 +601,11 @@ setup_stack(void **esp)
   kpage = stack_frame->paddr;
   stack_frame->page = page;
   page->frame = stack_frame;
-  page->frame->pinned = true;
 
   // notice the install page uses kpage so by settting kpage to the frame the rest of stack setup is good
   success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
   if (success)
   {
-    page->frame->pinned = false;
     *esp = PHYS_BASE;
   }
   else {

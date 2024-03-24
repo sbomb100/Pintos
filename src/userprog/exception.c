@@ -321,7 +321,6 @@ void load_extra_stack_page(void *fault_addr)
    new_page->swap_index = -1;
 
    lock_acquire(&thread_current()->spt_lock);
-
    hash_insert(&thread_current()->spt, &new_page->elem);
    lock_release(&thread_current()->spt_lock);
 
