@@ -253,15 +253,12 @@ int open(const char *file)
 {
   // Each process has an independent set of file descriptors. File descriptors are not inherited by child processes
   // openning same file makes new fds (act as if different files)
+  lock_acquire(&file_lock);
   if (file == NULL || !validate_pointer(file))
   {
     if(lock_held_by_current_thread(&file_lock))
 			lock_release(&file_lock);
     thread_exit(-1);
-  }
-  if (!lock_held_by_current_thread(&file_lock))
-  {
-    lock_acquire(&file_lock);
   }
   struct file *fp = filesys_open(file);
   if (fp == NULL)
