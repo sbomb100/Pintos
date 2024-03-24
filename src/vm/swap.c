@@ -30,7 +30,6 @@ void swap_init(void)
 
 void swap_insert(struct spt_entry *p)
 {
-    //swap_init();
     lock_acquire(&block_lock);
     size_t sector_num = bitmap_scan_and_flip(used_blocks, 0, 1, false);
     p->swap_index = sector_num;

@@ -253,21 +253,21 @@ int open(const char *file)
 {
   // Each process has an independent set of file descriptors. File descriptors are not inherited by child processes
   // openning same file makes new fds (act as if different files)
+
+  lock_acquire(&file_lock);
+
   if (file == NULL || !validate_pointer(file))
   {
-    if(lock_held_by_current_thread(&file_lock))
-			lock_release(&file_lock);
+    if (lock_held_by_current_thread(&file_lock))
+      lock_release(&file_lock);
     thread_exit(-1);
   }
-  if (!lock_held_by_current_thread(&file_lock))
-  {
-    lock_acquire(&file_lock);
-  }
+
   struct file *fp = filesys_open(file);
   if (fp == NULL)
   {
-    if(lock_held_by_current_thread(&file_lock))
-			lock_release(&file_lock);
+    if (lock_held_by_current_thread(&file_lock))
+      lock_release(&file_lock);
     return -1;
   }
 
@@ -277,8 +277,8 @@ int open(const char *file)
   int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
   if (fd == -1)
   {
-    if(lock_held_by_current_thread(&file_lock))
-			lock_release(&file_lock);
+    if (lock_held_by_current_thread(&file_lock))
+      lock_release(&file_lock);
     file_close(fp);
     thread_exit(-1);
   }
@@ -368,7 +368,7 @@ int read(int fd, void *buffer, unsigned size)
   {
     thread_exit(-1);
   }
-  else if (size <= readsize) //we can fit the whole read in 1 buffer chunk
+  else if (size <= readsize) // we can fit the whole read in 1 buffer chunk
   {
 
     success = file_read(filePtr, buffer, size);
@@ -417,7 +417,6 @@ int read(int fd, void *buffer, unsigned size)
 */
 int write(int fd, const void *buffer, unsigned size)
 {
-  // length >= 0 (fails from create)
   // check pointers and bad fd
   if (!lock_held_by_current_thread(&file_lock))
   {
@@ -639,8 +638,10 @@ mapid_t mmap(int fd, void *addr)
 bool munmap(mapid_t mapping)
 {
   // does mapping make sense
+  lock_acquire(&file_lock);
   if (mapping <= 0)
   {
+    lock_release(&file_lock);
     return false;
   }
   struct list *map_list = &(thread_current()->mmap_list);
@@ -657,7 +658,6 @@ bool munmap(mapid_t mapping)
 
       if (pagedir_is_dirty(thread_current()->pagedir, page->vaddr))
       {
-        // FIX? maybe check value
         file_write_at(page->file, page->vaddr, page->bytes_read, page->offset);
       }
 
@@ -678,7 +678,7 @@ bool munmap(mapid_t mapping)
       e = list_next(e);
     }
   }
-
+  lock_release(&file_lock);
   thread_current()->num_mapped--;
   return true;
 }
