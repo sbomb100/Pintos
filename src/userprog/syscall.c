@@ -114,7 +114,9 @@ syscall_handler(struct intr_frame *f)
       thread_exit(-1);
       return;
     }
-    f->eax = (uint32_t)read(args[0], (void *)args[1], (unsigned int)args[2]);
+    //buffer one page below the current stack pointer
+
+    f->eax = (uint32_t)read(args[0], (void *)args[1], (unsigned int)args[2], p);
     break;
   case SYS_WRITE:
     if (!parse_arguments(f, &args[0], 3))
@@ -302,7 +304,7 @@ int filesize(int fd)
   Returns: the number of bytes actually read (0 at end of file),
      or -1 if the file could not be read (due to a condition other than end of file).
 */
-int read(int fd, void *buffer, unsigned size)
+int read(int fd, void *buffer, unsigned size, void* esp)
 {
   // check pointers / fd
 
@@ -312,15 +314,17 @@ int read(int fd, void *buffer, unsigned size)
   }
 
   if (buffer == NULL || !is_user_vaddr(buffer))
-  {
-    thread_exit(-1);
-    return -1;
-  }
+	{
+		thread_exit(-1);
+	}
 
-  if (buffer + size == NULL || !is_user_vaddr(buffer + size))
-  {
-    thread_exit(-1);
-  }
+
+	if((void*)get_page_from_hash(buffer) == NULL) 
+	{
+		if ( buffer < esp) {
+		  thread_exit(-1);
+		}    
+	}
   lock_acquire(&file_lock);
   // Fd 0 reads from the keyboard using input_getc().
 
@@ -363,7 +367,7 @@ int read(int fd, void *buffer, unsigned size)
   if (filePtr == NULL)
     return -1;
 
-  // Read from the file using filesys function
+
   if (buffer_start == (void *)0x08048000)
   {
     thread_exit(-1);
@@ -660,10 +664,7 @@ bool munmap(mapid_t mapping)
         file_write_at(page->file, page->vaddr, page->bytes_read, page->offset);
       }
 
-      if (!lock_held_by_current_thread(&thread_current()->spt_lock))
-      {
-        lock_acquire(&thread_current()->spt_lock);
-      }
+      lock_acquire(&thread_current()->spt_lock);
       hash_delete(&thread_current()->spt, &page->elem);
       lock_release(&thread_current()->spt_lock);
 
@@ -694,6 +695,5 @@ bool put_mmap_in_list(struct spt_entry *page)
   mmapped->page = page;
   mmapped->id = t->num_mapped;
   list_push_back(&t->mmap_list, &mmapped->elem);
-
   return true;
 }

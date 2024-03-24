@@ -154,9 +154,12 @@ void process_exit(int status)
   struct thread *cur = thread_current();
   uint32_t *pd;
   // VM delete hash and pass a function to kill its elems
+  
+  lock_acquire(&cur->spt_lock);
   hash_destroy(&cur->spt, destroy_page);
+  lock_release(&cur->spt_lock);
   // FIX BREAK LOCKS OFF AND CLEAR MMAP LIST
-
+  
   /* Process Termination Message */
   char *tmp;
   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
