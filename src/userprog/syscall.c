@@ -3,6 +3,8 @@
 #include "threads/malloc.h"
 #include "userprog/exception.h"
 #include "threads/vaddr.h"
+
+#include "threads/cpu.h"
 struct lock file_lock;
 
 static void syscall_handler(struct intr_frame *);
@@ -255,23 +257,19 @@ int open(const char *file)
 {
   // Each process has an independent set of file descriptors. File descriptors are not inherited by child processes
   // openning same file makes new fds (act as if different files)
-
-  lock_acquire(&file_lock);
-
   if (file == NULL || !validate_pointer(file))
   {
-    if (lock_held_by_current_thread(&file_lock))
-      lock_release(&file_lock);
     thread_exit(-1);
   }
 
+  lock_file();
   struct file *fp = filesys_open(file);
   if (fp == NULL)
   {
-    if (lock_held_by_current_thread(&file_lock))
-      lock_release(&file_lock);
+    unlock_file();
     return -1;
   }
+  unlock_file();
 
   if (fp == NULL)
     thread_exit(0);
@@ -279,15 +277,14 @@ int open(const char *file)
   int fd = findFdForFile(); // does index + 2 to avoid 0 or 1
   if (fd == -1)
   {
-    if (lock_held_by_current_thread(&file_lock))
-      lock_release(&file_lock);
     file_close(fp);
     thread_exit(-1);
   }
   thread_current()->fdToFile[fd - 2] = fp;
-  unlock_file();
+
   return fd;
 }
+
 /*
   Returns: the size, in bytes, of the file open as fd.
 */

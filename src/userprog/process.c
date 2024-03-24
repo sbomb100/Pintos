@@ -154,15 +154,9 @@ void process_exit(int status)
   struct thread *cur = thread_current();
   uint32_t *pd;
   // VM delete hash and pass a function to kill its elems
-  
-  while (cur->num_mapped != 0) {
-    munmap(cur->num_mapped);
-  }
-  lock_acquire(&cur->spt_lock);
   hash_destroy(&cur->spt, destroy_page);
-  lock_release(&cur->spt_lock);
   // FIX BREAK LOCKS OFF AND CLEAR MMAP LIST
-  
+
   /* Process Termination Message */
   char *tmp;
   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
@@ -175,13 +169,13 @@ void process_exit(int status)
   sema_up(&cur_child->wait_sema);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
-
+  lock_file();
   if (cur->exec_file != NULL)
   {
     file_allow_write(cur->exec_file);
   }
   file_close(cur->exec_file);
-
+  unlock_file();
   pd = cur->pagedir;
   // FIX? free page for oom??
   if (pd != NULL)
@@ -198,6 +192,7 @@ void process_exit(int status)
     pagedir_destroy(pd);
   }
 }
+
 
 /* Sets up the CPU for running user code in the current
    thread.
@@ -327,13 +322,15 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   process_activate();
 
   /* Open executable file. */
+  lock_file();
   file = filesys_open(token);
   if (file == NULL)
   {
+    unlock_file();
     printf("load: %s: open failed\n", token);
     goto done;
   }
-
+  unlock_file();
   /* Read and verify executable header. */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 3 || ehdr.e_version != 1 || ehdr.e_phentsize != sizeof(struct Elf32_Phdr) || ehdr.e_phnum > 1024)
   {
