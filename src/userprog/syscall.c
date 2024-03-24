@@ -327,18 +327,23 @@ int read(int fd, void *buffer, unsigned size)
   int byteCount = 0;
   int success = 0;
 
-  void *buffer_rd = pg_round_down(buffer);
+  void *buffer_start = pg_round_down(buffer);
   void *buffer_page;
 
-  unsigned readsize = (unsigned)(buffer_rd + PGSIZE - buffer);
+  unsigned readsize = (unsigned)(buffer_start + PGSIZE - buffer);
   unsigned bytes_read = 0;
 
-  for (buffer_page = buffer_rd; buffer_page <= buffer + size; buffer_page += PGSIZE)
+  for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
   {
     struct spt_entry *page = get_page_from_hash(buffer_page);
     if (page == NULL) // page not found
     {
       load_extra_stack_page(buffer_page);
+      byteCount++;
+    }
+    else if (page->page_status == 2) // page in filesys
+    {
+      load_file_to_spt(buffer_page);
       byteCount++;
     }
   }
@@ -359,11 +364,11 @@ int read(int fd, void *buffer, unsigned size)
     return -1;
 
   // Read from the file using filesys function
-  if (buffer_rd == (void *)0x08048000)
+  if (buffer_start == (void *)0x08048000)
   {
     thread_exit(-1);
   }
-  else if (size <= readsize)
+  else if (size <= readsize) //we can fit the whole read in 1 buffer chunk
   {
 
     success = file_read(filePtr, buffer, size);

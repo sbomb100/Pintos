@@ -32,13 +32,12 @@ void swap_insert(struct spt_entry *p)
 {
     //swap_init();
     lock_acquire(&block_lock);
-    char *c = (char *)p->frame->paddr;
     size_t sector_num = bitmap_scan_and_flip(used_blocks, 0, 1, false);
     p->swap_index = sector_num;
     p->page_status = 1;
     for (int i = 0; i < (PGSIZE / BLOCK_SECTOR_SIZE); i++)
     {
-        block_write(block_swap, sector_num * (PGSIZE / BLOCK_SECTOR_SIZE) + i, (uint8_t *) c + i * BLOCK_SECTOR_SIZE);
+        block_write(block_swap, sector_num * (PGSIZE / BLOCK_SECTOR_SIZE) + i, (uint8_t *) p->frame->paddr + i * BLOCK_SECTOR_SIZE);
     }
     lock_release(&block_lock);
 }
