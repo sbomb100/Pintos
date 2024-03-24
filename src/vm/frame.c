@@ -55,26 +55,27 @@ struct frame *find_frame()
         if (f->pinned)
             continue;
 
-        if (f->page == NULL)
+        else if (f->page == NULL)
         {
             list_remove(e);
             list_push_back(&frame_list, e);
             lock_release(&frame_table_lock);
             return f;
         }
-        else
-        {
-            f = evict();
-            ASSERT(f != NULL);
-            list_remove(&f->elem);
-            list_push_back(&frame_list, &f->elem);
-            lock_release(&frame_table_lock);
-            return f;
-        }
+        
     }
-
+    struct frame *f;
+        
+    f = evict();
+    ASSERT(f != NULL);
+    list_remove(&f->elem);
+    list_push_back(&frame_list, &f->elem);
     lock_release(&frame_table_lock);
-    return NULL; // only returns null if all is pinned
+    return f;
+        
+
+    // lock_release(&frame_table_lock);
+    // return NULL; // only returns null if all is pinned
 }
 
 /**
@@ -115,6 +116,8 @@ struct frame *evict(void)
     for (struct list_elem *e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e))
     {
         struct frame *f = list_entry(e, struct frame, elem);
+        ASSERT(f != NULL);
+        ASSERT(f->page != NULL);
         if (!f->page->pinned)
         {
             bool page_accessed = pagedir_is_accessed(f->page->pagedir, f->page->vaddr);
