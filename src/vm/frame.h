@@ -5,20 +5,14 @@
 
 struct frame {
 	struct spt_entry * page;
-	struct list_elem elem; //since we are using linked list
-	int unused_count;
-    bool pinned; //may need to be swapped into page
-	void* paddr; //physical address
+	struct list_elem elem; /* List element for frame table */
+    bool pinned; /* If pinned, don't evict */
+	void* paddr; /* Physical address */
 };
 
-//methods
-void frame_init(void); //frame table init
-//allocate page into table
-void frame_allocate_page(struct spt_entry* page);
+/* Methods */
+void frame_init(void);
 struct frame* find_frame(void);
-//evict page from table
-//chose someone to evict
-
 void free_frame(struct frame *);
 struct frame* evict(void);
 

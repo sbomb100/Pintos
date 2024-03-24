@@ -133,9 +133,6 @@ page_fault(struct intr_frame *f)
    // bool user;        /* True: access by user, false: access by kernel. */
    void *fault_addr; /* Fault address. */
 
-   // get current thread?-------------------- FIX? make sure its not holding a lock?
-   // printf("%x\n", (uint32_t)f->eip);
-
    /* Obtain faulting address, the virtual address that was
       accessed to cause the fault.  It may point to code or to
       data.  It is not necessarily the address of the instruction
@@ -151,20 +148,18 @@ page_fault(struct intr_frame *f)
 
    /* Counts page faults. */
    page_fault_cnt++;
-   //--------------------------------------------------VM addons
-   // if page isnt in SPT, make new page for it, *(stack page!)
    struct thread *t = thread_current();
    if (fault_addr == NULL || is_kernel_vaddr(fault_addr))
-   { // doesnt exit or is kernel pointer
+   {
       goto exit;
    }
-   // pointer is good so get the page with it
+   /* Pointer is good so get the page with it */
    struct spt_entry *page = get_page_from_hash(fault_addr);
 
-   if (page == NULL) // page not found
+   if (page == NULL) /* Page not found */
    {
       uint32_t *esp = f->esp;
-      //  if its not in stack range
+      /* if its not in stack range */
       if (((PHYS_BASE - pg_round_down(fault_addr)) <= 0x800000 && (uint32_t *)fault_addr >= (esp - 32)))
       {
          load_extra_stack_page(fault_addr);
@@ -173,21 +168,16 @@ page_fault(struct intr_frame *f)
       {
          thread_exit(-1);
       }
-      // page isnt in table, therefore make new page.
-      // if addr is outside stack range then exit
       return;
-
-      // make new additional stack page and put it in a frame
    }
-   if (page->page_status == 2) // filesys
+   if (page->page_status == 2) /* in filesys */
    {
-      // get frame and its page
       load_file_to_spt(page);
       return;
    }
-   if (page->page_status == 1) // in swap table
+   if (page->page_status == 1) /* in swap table */
    {
-      // get frame and its page
+      /* get frame and its page */
       struct frame *new_frame = find_frame();
       if (new_frame == NULL)
       {
@@ -196,18 +186,17 @@ page_fault(struct intr_frame *f)
       new_frame->page = page;
       page->frame = new_frame;
 
-      swap_get(page); // GET PAGE FROM SWAP
+      swap_get(page); /* Get page from swap */
 
-      // install frame
       if (!install_page(page->vaddr, new_frame->paddr, page->writable))
       {
          goto exit;
       }
-      page->page_status = 3; // in frame table
+      page->page_status = 3; /* in frame table */
 
       return;
    }
-   if (page->page_status == 0) // mmapped file
+   if (page->page_status == 0) /* mmapped file */
    {
       struct frame *new_frame = find_frame();
       new_frame->page = page;
@@ -218,7 +207,6 @@ page_fault(struct intr_frame *f)
          goto exit;
       }
 
-      // get to spot in page
       file_seek(page->file, page->offset);
       if (file_read(page->file, new_frame, page->bytes_read) != (int)page->bytes_read)
       {
@@ -236,7 +224,6 @@ page_fault(struct intr_frame *f)
 
       return;
    }
-   // if page doesnt exist
    if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
    {
       goto exit;
@@ -246,14 +233,13 @@ exit:
    not_present = (f->error_code & PF_P) == 0;
    write = (f->error_code & PF_W) != 0;
 
-   // ADDED VM
    if (!not_present && write)
    {
-      // goto exit;
       thread_exit(-1);
    }
    kill(f);
 }
+
 /*
    loads a file into the spt by reading the files data into a frame's paddr
 */
@@ -280,35 +266,32 @@ void load_file_to_spt(struct spt_entry *page)
          thread_exit(-1);
       }
 
-      // mem set the kpage + bytes read
-      memset(kpage + page->bytes_read, 0, page->bytes_zero); // make sure page has memory correct range
+      /* memset the kpage + bytes read */
+      memset(kpage + page->bytes_read, 0, page->bytes_zero); /* make sure page has memory correct range */
    }
-   // install into a frame
-   
+
    if (!install_page(page->vaddr, new_frame->paddr, page->writable))
    {
       thread_exit(-1);
    }
-   page->page_status = 3; // in frame table
+   page->page_status = 3; /* in frame table */
    page->frame = new_frame;
    page->pinned = false;
    return;
 }
+
 /*
    Creates a new page to put into the spt and a frame for a stack frame
 */
 void load_extra_stack_page(void *fault_addr)
 {
-   //  if its not in stack range
-   // page isnt in table, therefore make new page.
-   // if addr is outside stack range then exit
    ASSERT(!lock_held_by_current_thread(&thread_current()->spt_lock));
    struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
    if (new_page == NULL)
-   { // check to see it malloced
+   {
       thread_exit(-1);
    }
-   // new page
+   /* Creates a new page */
    new_page->is_stack = true;
    new_page->vaddr = pg_round_down(fault_addr);
    new_page->page_status = 3;
@@ -325,11 +308,10 @@ void load_extra_stack_page(void *fault_addr)
    lock_release(&thread_current()->spt_lock);
 
    thread_current()->num_stack_pages++;
-   if (thread_current()->num_stack_pages > 2048) // hard limit
+   if (thread_current()->num_stack_pages > 2048)
    {
       thread_exit(-1);
    }
-   // get frame and put it in page
    struct frame *new_frame = find_frame();
    if (new_frame == NULL)
    {
@@ -338,6 +320,7 @@ void load_extra_stack_page(void *fault_addr)
    }
    new_frame->page = new_page;
    new_page->frame = new_frame;
+
    /* Install */
    if (!install_page(new_page->vaddr, new_frame->paddr, new_page->writable))
    {

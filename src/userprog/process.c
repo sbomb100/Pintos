@@ -148,14 +148,17 @@ int process_wait(tid_t child_tid UNUSED)
 }
 
 /* Free the current process's resources. */
-// TODO: clean up mmap list, clear and free SPT,
 void process_exit(int status)
 {
   struct thread *cur = thread_current();
   uint32_t *pd;
-  // VM delete hash and pass a function to kill its elems
+
+  while (cur->num_mapped != 0)
+  {
+    munmap(cur->num_mapped);
+  }
+
   hash_destroy(&cur->spt, destroy_page);
-  // FIX BREAK LOCKS OFF AND CLEAR MMAP LIST
 
   /* Process Termination Message */
   char *tmp;
@@ -177,7 +180,6 @@ void process_exit(int status)
   file_close(cur->exec_file);
   unlock_file();
   pd = cur->pagedir;
-  // FIX? free page for oom??
   if (pd != NULL)
   {
     /* Correct ordering here is crucial.  We must set
@@ -529,10 +531,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
        and zero the final PAGE_ZERO_BYTES bytes. */
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
-    // then fill as many values as you can
-
-    /* Get a page of memory. */
-    // VM making a page
+    
+    /* Creates a page*/
     struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
     if (page == NULL)
     {
@@ -543,7 +543,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->frame = NULL;
     page->file = file;
     page->offset = ofs;
-    page->page_status = 2; // its a file page
+    page->page_status = 2; /* file page */
     page->writable = writable;
     page->bytes_read = page_read_bytes;
     page->bytes_zero = page_zero_bytes;
@@ -572,16 +572,16 @@ setup_stack(void **esp)
   bool success = false;
   void *upage = ((uint8_t *)PHYS_BASE) - PGSIZE;
   struct thread *curr = thread_current();
-  /* create a page, put it in a frame, then set stack */
+  /* Create a page, put it in a frame, then set stack */
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
-  { // did it malloc?
+  {
     free(page);
     return false;
   }
   page->is_stack = true;
   page->vaddr = pg_round_down(upage);
-  page->page_status = 3; // in frame table bc we are adding it right after
+  page->page_status = 3;
   page->writable = true;
   page->file = NULL;
   page->offset = 0;
@@ -604,7 +604,7 @@ setup_stack(void **esp)
   stack_frame->page = page;
   page->frame = stack_frame;
 
-  // notice the install page uses kpage so by settting kpage to the frame the rest of stack setup is good
+  /* By setting kpage to the frame the rest of stack setup is good */
   success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
   if (success)
   {

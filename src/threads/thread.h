@@ -132,12 +132,11 @@ struct thread
    uint32_t *pagedir; /* Page directory. */
 #endif
 
-   // VM STUFF
-   //SPT
+   /* Virtual Memory */
    struct hash spt;
    struct lock spt_lock;
    size_t num_stack_pages;
-   //MMAP
+
    struct list mmap_list;
    size_t num_mapped;
 
@@ -154,7 +153,7 @@ struct child
    struct list_elem elem;
 };
 
-// VM MMAP
+/* VM MMAP */
 struct mapped_item
 {
    mapid_t id;

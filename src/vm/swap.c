@@ -14,9 +14,10 @@ static struct bitmap *used_blocks;
 struct block *block_swap;
 static struct lock block_lock;
 bool swap_init_v = false;
-// Block sector size is 512 bytes => 8 sectors = 1 page
 
-// create bitmap
+/*
+ * Creates bitmap
+ */
 void swap_init(void)
 {
     
@@ -28,6 +29,9 @@ void swap_init(void)
     swap_init_v = true;
 }
 
+/*
+ * Write the page to swap
+ */
 void swap_insert(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
@@ -41,7 +45,9 @@ void swap_insert(struct spt_entry *p)
     lock_release(&block_lock);
 }
 
-/* Read from swap into the page */
+/*
+ * Read from swap into the page
+ */
 void swap_get(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
@@ -50,13 +56,15 @@ void swap_get(struct spt_entry *p)
     int i;
     for (i = 0; i < (PGSIZE / BLOCK_SECTOR_SIZE); i++)
     {
-        //instead of c maybe (uint8_t *) upage + i * BLOCK_SECTOR_SIZE) FIX?
         block_read(block_swap, read_sector * (PGSIZE / BLOCK_SECTOR_SIZE) + i, (uint8_t *) c + i * BLOCK_SECTOR_SIZE);
     }
     bitmap_reset(used_blocks, read_sector);
     lock_release(&block_lock);
 }
 
+/*
+ * Free the swap block
+ */
 void swap_free(struct spt_entry *p)
 {
     lock_acquire(&block_lock);

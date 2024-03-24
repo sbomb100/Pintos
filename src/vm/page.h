@@ -1,9 +1,6 @@
 #ifndef VM_PAGE_H
 #define VM_PAGE_H
 
-//The header file for a supplemental page table entry
-
-
 #include <stdint.h>
 #include <hash.h>
 #include "threads/palloc.h"
@@ -13,14 +10,13 @@
 
 struct spt_entry
 {
-	// hash table elem
-	struct hash_elem elem;
-    //virtual address
-    void *vaddr;       
-    struct frame *frame;
-    int page_status; //0: mmaped 1: in swap 2: in file 3: in frame
-    uint32_t *pagedir; //holder for owner page directory, used instead of holding owner thread
-	// if we mmap file
+	struct hash_elem elem; /* Hash table elem */
+    void *vaddr; /* Page's virtual address */
+    struct frame *frame; /* Frame that holds this page */
+    int page_status; /* 0: mmaped 1: in swap 2: in file 3: in frame */
+    uint32_t *pagedir; /* Holder for owner page directory, used instead of holding owner thread */
+
+    /* MMAP */
 	struct file * file;
     size_t bytes_read;
     size_t bytes_zero;
@@ -29,18 +25,10 @@ struct spt_entry
 	bool is_stack;
 	bool writable;
     bool pinned;
-    struct spinlock lock; //syncro lock
-    int swap_index; // FOR SWAP TABLE
-    //maybe?
+    struct spinlock lock;
+    int swap_index; /* Used for swap table */
 };
 
-//need funcitons for
-//getting spt entry from hash : DONE
-//putting in hash : DONE
-//removing from hash : DONE
-//initialization: initialized in process.c
-
-// Moved to process.c
 unsigned page_hash (const struct hash_elem *, void *);
 bool is_page_before (const struct hash_elem *, const struct hash_elem *, void *);
 void destroy_page (struct hash_elem *, void *);
