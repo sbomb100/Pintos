@@ -76,7 +76,7 @@ start_process(void *file_name_)
   }
 
   /* Initialize interrupt frame and load executable. */
-  memset(&if_, 0, sizeof if_); 
+  memset(&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
@@ -155,6 +155,9 @@ void process_exit(int status)
   uint32_t *pd;
   // VM delete hash and pass a function to kill its elems
   
+  while (cur->num_mapped != 0) {
+    munmap(cur->num_mapped);
+  }
   lock_acquire(&cur->spt_lock);
   hash_destroy(&cur->spt, destroy_page);
   lock_release(&cur->spt_lock);
@@ -178,7 +181,7 @@ void process_exit(int status)
     file_allow_write(cur->exec_file);
   }
   file_close(cur->exec_file);
-  
+
   pd = cur->pagedir;
   // FIX? free page for oom??
   if (pd != NULL)
@@ -453,7 +456,6 @@ done:
 
 /* load() helpers. */
 
-
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
 static bool
@@ -536,7 +538,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     // VM making a page
     struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
     if (page == NULL)
-    { 
+    {
       return false;
     }
     page->vaddr = upage;
@@ -571,8 +573,8 @@ setup_stack(void **esp)
 {
   uint8_t *kpage;
   bool success = false;
-  void * upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  struct thread  * curr = thread_current();
+  void *upage = ((uint8_t *)PHYS_BASE) - PGSIZE;
+  struct thread *curr = thread_current();
   /* create a page, put it in a frame, then set stack */
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
@@ -611,9 +613,10 @@ setup_stack(void **esp)
   {
     *esp = PHYS_BASE;
   }
-  else {
+  else
+  {
     free(page);
-		free(stack_frame->paddr);
+    free(stack_frame->paddr);
   }
   return success;
 }
@@ -646,8 +649,7 @@ struct child *find_child(struct list child_list, tid_t child_tid)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-bool
-install_page(void *upage, void *kpage, bool writable)
+bool install_page(void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current();
 
