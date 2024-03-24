@@ -313,7 +313,7 @@ int read(int fd, void *buffer, unsigned size)
 
   if (buffer == NULL || !is_user_vaddr(buffer))
   {
-    // thread_exit(-1);
+    thread_exit(-1);
     return -1;
   }
 
@@ -343,7 +343,7 @@ int read(int fd, void *buffer, unsigned size)
     }
     else if (page->page_status == 2) // page in filesys
     {
-      load_file_to_spt(buffer_page);
+      load_file_to_spt(page);
       byteCount++;
     }
   }

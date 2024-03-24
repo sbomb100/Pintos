@@ -271,7 +271,9 @@ exit:
 void load_file_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
+   
    struct frame *new_frame = find_frame();
+   
    if (new_frame == NULL)
    {
       printf("fail 227 exception.c\n");
@@ -285,8 +287,9 @@ void load_file_to_spt(struct spt_entry *page)
       file_seek(page->file, page->offset);
       if (file_read(page->file, new_frame->paddr, page->bytes_read) != (int)page->bytes_read)
       {
-         palloc_free_page(new_frame->page);
          printf("fail 292 exception.c\n");
+         palloc_free_page(new_frame->page);
+         
          thread_exit(-1);
       }
 
@@ -294,7 +297,7 @@ void load_file_to_spt(struct spt_entry *page)
       memset(kpage + page->bytes_read, 0, page->bytes_zero); // make sure page has memory correct range
    }
    // install into a frame
-
+   
    if (!install_page(page->vaddr, new_frame->paddr, page->writable))
    {
       printf("fail 245 exception.c\n");
