@@ -158,7 +158,7 @@ void process_exit(int status)
     munmap(cur->num_mapped);
   }
 
-  hash_destroy(&cur->spt, destroy_page);
+
 
   /* Process Termination Message */
   char *tmp;
@@ -178,25 +178,10 @@ void process_exit(int status)
   struct child *cur_child = find_child(cur->parent->children, cur->tid);
   cur_child->exit_status = status;
   sema_up(&cur_child->wait_sema);
-  /* Destroy the current process's page directory and switch back
-     to the kernel-only page directory. */
+  /* Destroy the current process's spt entries */
   
+  hash_destroy(&cur->spt, destroy_page);
 
-  /*
-  pd = cur->pagedir;
-  if (pd != NULL)
-  {
-     Correct ordering here is crucial.  We must set
-       cur->pagedir to NULL before switching page directories,
-       so that a timer interrupt can't switch back to the
-       process page directory.  We must activate the base page
-       directory before destroying the process's page
-       directory, or our active page directory will be one
-       that's been freed (and cleared). 
-    cur->pagedir = NULL;
-    pagedir_activate(NULL);
-    pagedir_destroy(pd);
-  }*/
 }
 
 

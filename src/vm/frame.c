@@ -92,7 +92,7 @@ void free_frame(struct frame *f)
 }
 
 /*
- * Eviction - choose a frame to clear out
+ * Eviction - choose a frame to clear out and saves/swaps as needed
  */
 struct frame *evict(void)
 {
@@ -133,6 +133,7 @@ struct frame *evict(void)
         if (pagedir_is_dirty(candidate->page->pagedir, candidate->page->vaddr)) {
             lock_file();
             file_write_at(candidate->page->file, candidate->page->vaddr, candidate->page->bytes_read, candidate->page->offset);
+            unlock_file();
         }
     } else {
         swap_insert(candidate->page);

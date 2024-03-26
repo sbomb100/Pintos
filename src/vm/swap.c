@@ -36,6 +36,7 @@ void swap_insert(struct spt_entry *p)
 {
     lock_acquire(&block_lock);
     size_t sector_num = bitmap_scan_and_flip(used_blocks, 0, 1, false);
+    ASSERT(sector_num!=BITMAP_ERROR);
     p->swap_index = sector_num;
     p->page_status = 1;
     for (int i = 0; i < (PGSIZE / BLOCK_SECTOR_SIZE); i++)
