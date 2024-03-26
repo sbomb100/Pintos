@@ -10,6 +10,8 @@ void exception_init (void);
 void exception_print_stats (void);
 
 //load a file into the spt
+void load_swap_to_spt(struct spt_entry* );
+void load_mmap_to_spt(struct spt_entry* );
 void load_file_to_spt(struct spt_entry* );
 //create another single stack page
 void load_extra_stack_page(void*);

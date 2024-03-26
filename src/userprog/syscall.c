@@ -325,7 +325,7 @@ int read(int fd, void *buffer, unsigned size, void* esp)
 
   unsigned readsize = (unsigned)(buffer_start + PGSIZE - buffer);
   unsigned bytes_read = 0;
-
+  
   for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
   {
     struct spt_entry *page = get_page_from_hash(buffer_page);
@@ -337,6 +337,14 @@ int read(int fd, void *buffer, unsigned size, void* esp)
     else if (page->page_status == 2) /* Page in filesys */
     {
       load_file_to_spt(page);
+      byteCount++;
+    }
+    else if (page->page_status == 1 ) {
+        load_swap_to_spt(page);
+        byteCount++;
+    }
+    else if (page->page_status == 0 ) {
+      load_mmap_to_spt(page);
       byteCount++;
     }
   }

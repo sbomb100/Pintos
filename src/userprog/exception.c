@@ -18,7 +18,6 @@ static long long page_fault_cnt;
 
 static void kill(struct intr_frame *);
 static void page_fault(struct intr_frame *);
-void load_file_to_spt(struct spt_entry *page);
 /* Registers handlers for interrupts that can be caused by user
    programs.
 
@@ -177,51 +176,12 @@ page_fault(struct intr_frame *f)
    }
    if (page->page_status == 1) /* in swap table */
    {
-      /* get frame and its page */
-      struct frame *new_frame = find_frame();
-      if (new_frame == NULL)
-      {
-         goto exit;
-      }
-      new_frame->page = page;
-      page->frame = new_frame;
-
-      swap_get(page); /* Get page from swap */
-
-      if (!install_page(page->vaddr, new_frame->paddr, page->writable))
-      {
-         goto exit;
-      }
-      page->page_status = 3; /* in frame table */
-
+      load_swap_to_spt(page);
       return;
    }
    if (page->page_status == 0) /* mmapped file */
    {
-      struct frame *new_frame = find_frame();
-      new_frame->page = page;
-      page->frame = new_frame;
-
-      if (new_frame == NULL)
-      {
-         goto exit;
-      }
-
-      file_seek(page->file, page->offset);
-      if (file_read(page->file, new_frame, page->bytes_read) != (int)page->bytes_read)
-      {
-
-         palloc_free_page(new_frame->page);
-         goto exit;
-      }
-      memset(new_frame + page->bytes_read, 0, page->bytes_zero);
-
-      if (!install_page(page->vaddr, new_frame->paddr, page->writable))
-      {
-         goto exit;
-      }
-      page->page_status = 3;
-
+      load_mmap_to_spt(page);
       return;
    }
    if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
@@ -238,6 +198,49 @@ exit:
       thread_exit(-1);
    }
    kill(f);
+}
+
+void load_swap_to_spt(struct spt_entry *page) {
+    struct frame * new_frame = find_frame();
+    if (new_frame == NULL) {
+        thread_exit(-1);
+    }
+
+    new_frame->page = page;
+    page->frame = new_frame;
+
+    swap_get(page);
+
+    if ( !install_page(page->vaddr, new_frame->paddr, page->writable)) {
+        thread_exit(-1);
+    }
+    page->page_status = 3;
+}
+
+void load_mmap_to_spt(struct spt_entry *page) {
+    page->pinned = true;
+    struct frame * new_frame = find_frame();
+
+    if ( new_frame == NULL ) {
+        thread_exit(-1);
+    }
+
+    new_frame->page = page;
+    page->frame = new_frame;
+
+    file_seek(page->file, page->offset);
+    if (file_read(page->file, new_frame, page->bytes_read) != (int) page->bytes_read ) {
+        palloc_free_page(new_frame->page);
+        thread_exit(-1);
+    }
+    memset(new_frame + page->bytes_read, 0, page->bytes_zero);
+
+    if (!install_page(page->vaddr, new_frame->paddr, page->writable)) {
+        thread_exit(-1);
+    }
+
+    page->page_status = 3;
+    page->pinned = false;
 }
 
 /*
