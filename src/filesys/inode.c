@@ -6,6 +6,7 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "filesys/cache.h"
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -19,9 +20,6 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
     uint32_t unused[125];               /* Not used. */
-    // unused will get changed as we put in cache pointers?
-    //like when we add an array of blocks or smtn?
-    //or parent ptr?  
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -35,13 +33,11 @@ bytes_to_sectors (off_t size)
 /* In-memory inode. */
 struct inode 
   {
-    //TODO add a lock
     struct list_elem elem;              /* Element in inode list. */
     block_sector_t sector;              /* Sector number of disk location. */
     int open_cnt;                       /* Number of openers. */
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    //TODO should get removed \/
     struct inode_disk data;             /* Inode content. */
   };
 
@@ -62,7 +58,6 @@ byte_to_sector (const struct inode *inode, off_t pos)
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
-//TODO lock for this list?
 
 
 /* Initializes the inode module. */
