@@ -44,7 +44,7 @@ void frame_init()
 /**
  * Find a usable frame for an incoming frame request.
  */
-struct frame *find_frame()
+struct frame *find_frame(struct spt_entry * page)
 {
     if (!lock_held_by_current_thread(&frame_table_lock))
     {
@@ -60,6 +60,8 @@ struct frame *find_frame()
         {
             list_remove(e);
             list_push_back(&frame_list, e);
+            f->page = page;
+            page->frame = f;
             lock_release(&frame_table_lock);
             return f;
         }
@@ -71,6 +73,8 @@ struct frame *find_frame()
     ASSERT(f != NULL);
     list_remove(&f->elem);
     list_push_back(&frame_list, &f->elem);
+    f->page = page;
+    page->frame = f;
     lock_release(&frame_table_lock);
     return f;
 }
@@ -136,7 +140,9 @@ struct frame *evict(void)
             unlock_file();
         }
     } else {
+        candidate->page->pinned = true;
         swap_insert(candidate->page);
+        candidate->page->pinned = false;
     }
     pagedir_clear_page(candidate->page->pagedir, candidate->page->vaddr);
     return candidate;

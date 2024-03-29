@@ -12,7 +12,7 @@ struct frame {
 
 /* Methods */
 void frame_init(void);
-struct frame* find_frame(void);
+struct frame* find_frame(struct spt_entry *);
 void free_frame(struct frame *);
 struct frame* evict(void);
 

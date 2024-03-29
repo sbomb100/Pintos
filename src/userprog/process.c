@@ -582,7 +582,7 @@ setup_stack(void **esp)
   lock_release(&curr->spt_lock);
   thread_current()->num_stack_pages++;
 
-  struct frame *stack_frame = find_frame();
+  struct frame *stack_frame = find_frame(page);
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
     printf("NO FRAME 604\n");
@@ -590,8 +590,6 @@ setup_stack(void **esp)
     thread_exit(-1);
   }
   kpage = stack_frame->paddr;
-  stack_frame->page = page;
-  page->frame = stack_frame;
 
   /* By setting kpage to the frame the rest of stack setup is good */
   success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);

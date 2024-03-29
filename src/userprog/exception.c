@@ -201,13 +201,10 @@ exit:
 }
 
 void load_swap_to_spt(struct spt_entry *page) {
-    struct frame * new_frame = find_frame();
+    struct frame * new_frame = find_frame(page);
     if (new_frame == NULL) {
         thread_exit(-1);
     }
-
-    new_frame->page = page;
-    page->frame = new_frame;
 
     swap_get(page);
 
@@ -219,14 +216,11 @@ void load_swap_to_spt(struct spt_entry *page) {
 
 void load_mmap_to_spt(struct spt_entry *page) {
     page->pinned = true;
-    struct frame * new_frame = find_frame();
+    struct frame * new_frame = find_frame(page);
 
     if ( new_frame == NULL ) {
         thread_exit(-1);
     }
-
-    new_frame->page = page;
-    page->frame = new_frame;
 
     file_seek(page->file, page->offset);
     if (file_read(page->file, new_frame, page->bytes_read) != (int) page->bytes_read ) {
@@ -250,7 +244,7 @@ void load_file_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
    
-   struct frame *new_frame = find_frame();
+   struct frame *new_frame = find_frame(page);
    
    if (new_frame == NULL)
    {
@@ -258,7 +252,6 @@ void load_file_to_spt(struct spt_entry *page)
       return;
    }
    uint8_t *kpage = new_frame->paddr;
-   new_frame->page = page;
    if (page->bytes_read != 0)
    {
       file_seek(page->file, page->offset);
@@ -278,7 +271,6 @@ void load_file_to_spt(struct spt_entry *page)
       thread_exit(-1);
    }
    page->page_status = 3; /* in frame table */
-   page->frame = new_frame;
    page->pinned = false;
    return;
 }
@@ -315,14 +307,12 @@ void load_extra_stack_page(void *fault_addr)
    {
       thread_exit(-1);
    }
-   struct frame *new_frame = find_frame();
+   struct frame *new_frame = find_frame(new_page);
    if (new_frame == NULL)
    {
       thread_exit(-1);
       return;
    }
-   new_frame->page = new_page;
-   new_page->frame = new_frame;
 
    /* Install */
    if (!install_page(new_page->vaddr, new_frame->paddr, new_page->writable))
