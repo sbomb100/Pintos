@@ -166,8 +166,6 @@ thread_print_stats (void)
 
 /* The default policy for choosing to which CPU to assign a
  * new thread is a round-robin policy.
- *
- * EDIT: PUT LOAD BALANCE HERE?
  */
 static struct cpu *
 choose_cpu_for_new_thread (struct thread *t)
@@ -504,7 +502,9 @@ idle (void *idle_started_ UNUSED)
        *
        * The baseline implementation does not ensure this.
        */
-      //sched_load_balance();
+      if(cpu_started_others){
+        sched_load_balance();
+      }
       thread_block (NULL);
 
       /* Re-enable interrupts and wait for the next one.
