@@ -133,12 +133,12 @@ struct thread
 #endif
 
    /* Virtual Memory */
-   struct hash spt;
+   struct hash spt; //TODO THIS GOES IN PCB ---
    struct lock spt_lock;
    size_t num_stack_pages;
 
    struct list mmap_list;
-   size_t num_mapped;
+   size_t num_mapped; //------------------------
 
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */
