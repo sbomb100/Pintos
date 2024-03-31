@@ -24,7 +24,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
-struct child *find_child(struct list child_list, tid_t child_tid);
+struct process *find_child(pid_t child_pid);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -46,11 +46,20 @@ tid_t process_execute(const char *file_name)
   strlcpy(fn_copy, file_name, PGSIZE);
 
   tid = thread_create(file_name, NICE_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page(fn_copy);
-  sema_down(&thread_current()->load_sema);
-  if (!thread_current()->child_successful)
-    tid = -1;
+    return tid;
+  }
+  else {
+    struct process * child = find_child((pid_t) tid);
+    sema_down(&child->wait_sema);
+
+    if ( child->status == PROCESS_ABORT ) {
+        list_remove(&child->elem);
+        free(child);
+        tid = -1;
+    }
+  }
 
   return tid;
 }
@@ -86,13 +95,10 @@ start_process(void *file_name_)
   palloc_free_page(file_name);
   if (!success)
   {
-    thread_current()->parent->child_successful = false;
-    sema_up(&thread_current()->parent->load_sema);
+    thread_current()->parent->status = PROCESS_ABORT;
     thread_exit(-1);
   }
-  thread_current()->parent->child_successful = true;
-
-  sema_up(&thread_current()->parent->load_sema);
+  sema_up(&thread_current()->parent->wait_sema);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -113,36 +119,20 @@ start_process(void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-int process_wait(tid_t child_tid UNUSED)
+int process_wait(tid_t child_tid)
 {
   /* Finds the child */
-  struct thread *cur = thread_current();
-  struct child *cur_child = NULL;
-  struct list_elem *e;
-
-  for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e))
-  {
-    struct child *temp = list_entry(e, struct child, elem);
-    if (temp->tid == child_tid)
-    {
-      cur_child = temp;
-      break;
-    }
-  }
+  struct process *cur_child = find_child((pid_t) child_tid);
 
   /* exits if no child was found */
   if (cur_child == NULL)
   {
     return -1;
   }
-
-  if (!cur_child->has_exited)
-  {
-    sema_down(&cur_child->wait_sema);
-  }
-
+  
+  list_remove(&cur_child->elem);
+  sema_down(&cur_child->wait_sema);
   int exit_status = cur_child->exit_status;
-  list_remove(e);
   free(cur_child);
   return exit_status;
 }
@@ -151,37 +141,57 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(int status)
 {
   struct thread *cur = thread_current();
-  //uint32_t *pd;
 
   while (cur->num_mapped != 0)
   {
     munmap(cur->num_mapped);
   }
 
-
-
   /* Process Termination Message */
   char *tmp;
   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
   
   lock_file();
-  if (cur->exec_file != NULL)
-  {
+  if ( cur->exec_file != NULL ) {
     file_allow_write(cur->exec_file);
   }
   file_close(cur->exec_file);
   unlock_file();
   
-  /* Find the child */
-  ASSERT(cur->parent != NULL);
-  ASSERT(!list_empty(&cur->parent->children));
-  struct child *cur_child = find_child(cur->parent->children, cur->tid);
-  cur_child->exit_status = status;
-  sema_up(&cur_child->wait_sema);
-  /* Destroy the current process's spt entries */
-  
-  hash_destroy(&cur->spt, destroy_page);
+  /* Mark orphanized child processes */
+  for ( struct list_elem * e = list_begin(&cur->children); e != list_end(&cur->children);) {
+    struct process * p = list_entry(e, struct process, elem);
+    lock_acquire(&p->process_lock);
+    if ( p->status == PROCESS_RUNNING ) {
+        p->status = PROCESS_ORPHAN;
+        lock_release(&p->process_lock);
+        e = list_next(e);
+    }
+    else {
+        lock_release(&p->process_lock);
+        e = list_remove(e);
+        free(p);
+    }
+  }
 
+  /* Cleanup semantics for orphan or child process */
+  if ( cur->parent != NULL ) {
+    lock_acquire(&cur->parent->process_lock);
+    if ( cur->parent->status == PROCESS_ORPHAN ) {
+        lock_release(&cur->parent->process_lock);
+        free(cur->parent);
+        cur->parent = NULL;
+    }
+    else {
+        cur->parent->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
+        lock_release(&cur->parent->process_lock);
+        cur->parent->exit_status = status;
+        sema_up(&cur->parent->wait_sema);
+    }
+  }
+
+  /* Destroy the current process's spt entries */
+  hash_destroy(&cur->spt, destroy_page);
 }
 
 
@@ -606,22 +616,17 @@ setup_stack(void **esp)
 }
 
 /* Helper function for finding the relevant child */
-struct child *find_child(struct list child_list, tid_t child_tid)
+struct process *find_child(pid_t child_tid)
 {
-  struct child *cur_child = NULL;
-  struct list_elem *e;
-
-  for (e = list_begin(&child_list); e != list_end(&child_list); e = list_next(e))
+  for (struct list_elem * e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e = list_next(e))
   {
-    struct child *temp = list_entry(e, struct child, elem);
-    if (temp->tid == child_tid)
+    struct process *temp = list_entry(e, struct process, elem);
+    if (temp->pid == child_tid)
     {
-      cur_child = temp;
-      break;
+      return temp;
     }
   }
-
-  return cur_child;
+  return NULL;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel

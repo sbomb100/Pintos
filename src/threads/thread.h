@@ -17,12 +17,21 @@ enum thread_status
    THREAD_DYING    /* About to be destroyed. */
 };
 
+enum process_status {
+    PROCESS_RUNNING, /* Running process. */
+    PROCESS_ORPHAN,  /* Parent process exited without waiting for this. */
+    PROCESS_ABORT,   /* Looking to abort from fail load. */
+    PROCESS_EXIT,    /* Looking to exit normally. */
+};
+
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
-
 typedef int mapid_t;
 typedef int tid_t;
+typedef int pid_t;
+
 #define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
+#define PID_ERROR ((pid_t)-1) /* Error value for pid_t. */
 #define THREAD_NAME_MAX 16
 /* Thread priorities. */
 #define NICE_MIN -20   /* Highest priority. */
@@ -114,43 +123,37 @@ struct thread
    int64_t vruntime;
    int64_t vruntime_0;
    int64_t actual_runtime;
-   /*added in P2 for File Descriptors*/
-   struct file **fdToFile;
-   /*this thread's exe file*/
-   struct file *exec_file;
-
-   /* Parent-Child Relationship */
-   struct thread *parent;
-   struct list children;
-
-   /*loading child*/
-   struct semaphore load_sema;
-   bool child_successful;
 
 #ifdef USERPROG
    /* Owned by userprog/process.c. */
    uint32_t *pagedir; /* Page directory. */
+
+   struct file **fdToFile;
+   struct file *exec_file;
+
+   struct process *parent;
+   struct list children;
 #endif
 
    /* Virtual Memory */
-   struct hash spt; //TODO THIS GOES IN PCB ---
+   struct hash spt;
    struct lock spt_lock;
    size_t num_stack_pages;
 
    struct list mmap_list;
-   size_t num_mapped; //------------------------
+   size_t num_mapped;
 
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */
 };
 
-struct child
-{
-   tid_t tid;
-   int exit_status;
-   bool has_exited;
-   struct semaphore wait_sema;
-   struct list_elem elem;
+struct process {
+    pid_t pid;
+    int exit_status;
+    enum process_status status;
+    struct semaphore wait_sema;
+    struct list_elem elem;
+    struct lock process_lock;
 };
 
 /* VM MMAP */
