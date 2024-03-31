@@ -567,7 +567,6 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack(void **esp)
 {
-  uint8_t *kpage;
   bool success = false;
   void *upage = ((uint8_t *)PHYS_BASE) - PGSIZE;
   struct thread *curr = thread_current();
@@ -599,10 +598,9 @@ setup_stack(void **esp)
     free(page);
     thread_exit(-1);
   }
-  kpage = stack_frame->paddr;
 
   /* By setting kpage to the frame the rest of stack setup is good */
-  success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
+  success = install_page(page->vaddr, page->frame->paddr, page->writable);
   if (success)
   {
     *esp = PHYS_BASE;
@@ -610,7 +608,6 @@ setup_stack(void **esp)
   else
   {
     free(page);
-    free(stack_frame->paddr);
   }
   return success;
 }

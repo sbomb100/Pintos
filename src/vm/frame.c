@@ -133,17 +133,9 @@ struct frame *evict(void)
     }
     ASSERT(candidate != NULL);
     ASSERT(candidate->page != NULL);
-    if (candidate->page->page_status == 0) {
-        if (pagedir_is_dirty(candidate->page->pagedir, candidate->page->vaddr)) {
-            lock_file();
-            file_write_at(candidate->page->file, candidate->page->vaddr, candidate->page->bytes_read, candidate->page->offset);
-            unlock_file();
-        }
-    } else {
-        candidate->page->pinned = true;
-        swap_insert(candidate->page);
-        candidate->page->pinned = false;
-    }
+    candidate->page->pinned = true;
+    swap_insert(candidate->page);
     pagedir_clear_page(candidate->page->pagedir, candidate->page->vaddr);
+    candidate->page->pinned = false;
     return candidate;
 }
