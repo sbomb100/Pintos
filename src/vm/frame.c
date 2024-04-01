@@ -134,7 +134,19 @@ struct frame *evict(void)
     ASSERT(candidate != NULL);
     ASSERT(candidate->page != NULL);
     candidate->page->pinned = true;
+    
+    /*
+    if ( candidate->page->writable && pagedir_is_dirty(candidate->page->pagedir, candidate->page->vaddr) && candidate->page->file != NULL ) {
+        lock_file();
+        file_write_at(candidate->page->file, candidate->page->vaddr, candidate->page->bytes_read, candidate->page->offset);
+        unlock_file();
+    }
+    else {
+        swap_insert(candidate->page);
+    }*/
+    
     swap_insert(candidate->page);
+
     pagedir_clear_page(candidate->page->pagedir, candidate->page->vaddr);
     candidate->page->pinned = false;
     return candidate;
