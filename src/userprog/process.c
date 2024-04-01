@@ -159,6 +159,7 @@ void process_exit(int status)
   unlock_file();
   
   /* Mark orphanized child processes */
+  lock_acquire(&cur->children_lock);
   for ( struct list_elem * e = list_begin(&cur->children); e != list_end(&cur->children);) {
     struct process * p = list_entry(e, struct process, elem);
     lock_acquire(&p->process_lock);
@@ -173,6 +174,7 @@ void process_exit(int status)
         free(p);
     }
   }
+  lock_release(&cur->children_lock);
 
   /* Cleanup semantics for orphan or child process */
   if ( cur->parent != NULL ) {
@@ -615,14 +617,17 @@ setup_stack(void **esp)
 /* Helper function for finding the relevant child */
 struct process *find_child(pid_t child_tid)
 {
+  lock_acquire(&thread_current()->children_lock);
   for (struct list_elem * e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e = list_next(e))
   {
     struct process *temp = list_entry(e, struct process, elem);
     if (temp->pid == child_tid)
     {
+      lock_release(&thread_current()->children_lock);
       return temp;
     }
   }
+  lock_release(&thread_current()->children_lock);
   return NULL;
 }
 

@@ -11,6 +11,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 
 static struct list frame_list;       /* Frame list */
 static struct lock frame_table_lock; /* Frame table lock */
@@ -135,19 +136,29 @@ struct frame *evict(void)
     ASSERT(candidate->page != NULL);
     candidate->page->pinned = true;
     
-    /*
-    if ( candidate->page->writable && pagedir_is_dirty(candidate->page->pagedir, candidate->page->vaddr) && candidate->page->file != NULL ) {
+    pagedir_clear_page(candidate->page->pagedir, candidate->page->vaddr);
+
+    if ( candidate->page->writable && candidate->page->page_status == 0 && pagedir_is_dirty(candidate->page->pagedir, candidate->page->vaddr) ) {
         lock_file();
         file_write_at(candidate->page->file, candidate->page->vaddr, candidate->page->bytes_read, candidate->page->offset);
         unlock_file();
     }
     else {
         swap_insert(candidate->page);
-    }*/
+    }
     
-    swap_insert(candidate->page);
-
-    pagedir_clear_page(candidate->page->pagedir, candidate->page->vaddr);
     candidate->page->pinned = false;
     return candidate;
+}
+
+void acquire_frame_lock_and_swap(struct spt_entry * page) {
+    lock_acquire(&frame_table_lock);
+
+    if ( !install_page(page->vaddr, page->frame->paddr, page->writable)) {
+        thread_exit(-1);
+    }
+
+    swap_get(page);
+
+    lock_release(&frame_table_lock);
 }

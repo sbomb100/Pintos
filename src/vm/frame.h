@@ -15,5 +15,6 @@ void frame_init(void);
 struct frame* find_frame(struct spt_entry *);
 void free_frame(struct frame *);
 struct frame* evict(void);
+void acquire_frame_lock_and_swap(struct spt_entry *);
 
 #endif

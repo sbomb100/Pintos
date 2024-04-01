@@ -133,6 +133,7 @@ struct thread
 
    struct process *parent;
    struct list children;
+   struct lock children_lock;
 #endif
 
    /* Virtual Memory */

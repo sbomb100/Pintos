@@ -216,7 +216,9 @@ do_thread_create (const char *name, int nice, thread_func *function, void *aux)
     sema_init(&cur_child->wait_sema, 0);
     lock_init(&cur_child->process_lock);
     t->parent = cur_child;
+    lock_acquire(&thread_current()->children_lock);
     list_push_back(&thread_current()->children, &cur_child->elem);
+    lock_release(&thread_current()->children_lock);
     /* Stack frame for kernel_thread(). */
     kf = alloc_frame (t, sizeof *kf);
     kf->eip = NULL;
@@ -603,6 +605,7 @@ init_thread (struct thread *t, const char *name, int nice)
   t->nice = nice;
   t->magic = THREAD_MAGIC;
   list_init(&t->children);
+  lock_init(&t->children_lock);
   //t->parent = running_thread()->parent;
   if (cpu_can_acquire_spinlock)
     spinlock_acquire (&all_lock);
