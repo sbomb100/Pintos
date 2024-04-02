@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <bitmap.h>
 #include <round.h>
+#include <string.h>
 #include "vm/page.h"
 #include "vm/swap.h"
 #include "userprog/pagedir.h"
@@ -16,6 +17,13 @@
 static struct list frame_list;       /* Frame list */
 static struct lock frame_table_lock; /* Frame table lock */
 
+void lock_frame() {
+    lock_acquire(&frame_table_lock);
+}
+
+void unlock_frame() {
+    lock_release(&frame_table_lock);
+}
 /*
  * Set up frame table
  */
@@ -47,10 +55,6 @@ void frame_init()
  */
 struct frame *find_frame(struct spt_entry * page)
 {
-    if (!lock_held_by_current_thread(&frame_table_lock))
-    {
-        lock_acquire(&frame_table_lock);
-    }
     for (struct list_elem *e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e))
     {
         struct frame *f = list_entry(e, struct frame, elem);
@@ -63,7 +67,6 @@ struct frame *find_frame(struct spt_entry * page)
             list_push_back(&frame_list, e);
             f->page = page;
             page->frame = f;
-            lock_release(&frame_table_lock);
             return f;
         }
         
@@ -76,7 +79,6 @@ struct frame *find_frame(struct spt_entry * page)
     list_push_back(&frame_list, &f->elem);
     f->page = page;
     page->frame = f;
-    lock_release(&frame_table_lock);
     return f;
 }
 
@@ -85,15 +87,10 @@ struct frame *find_frame(struct spt_entry * page)
  */
 void free_frame(struct frame *f)
 {
-    if (!lock_held_by_current_thread(&frame_table_lock))
-    {
-        lock_acquire(&frame_table_lock);
-    }
     f->pinned = false;
     f->page = NULL;
     list_remove(&f->elem);
     list_push_back(&frame_list, &f->elem);
-    lock_release(&frame_table_lock);
 }
 
 /*
@@ -147,18 +144,7 @@ struct frame *evict(void)
         swap_insert(candidate->page);
     }
     
+    memset(candidate->paddr, 0, PGSIZE);
     candidate->page->pinned = false;
     return candidate;
-}
-
-void acquire_frame_lock_and_swap(struct spt_entry * page) {
-    lock_acquire(&frame_table_lock);
-
-    if ( !install_page(page->vaddr, page->frame->paddr, page->writable)) {
-        thread_exit(-1);
-    }
-
-    swap_get(page);
-
-    lock_release(&frame_table_lock);
 }

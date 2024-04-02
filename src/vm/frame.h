@@ -12,9 +12,10 @@ struct frame {
 
 /* Methods */
 void frame_init(void);
+void lock_frame(void);
+void unlock_frame(void);
 struct frame* find_frame(struct spt_entry *);
 void free_frame(struct frame *);
 struct frame* evict(void);
-void acquire_frame_lock_and_swap(struct spt_entry *);
 
 #endif

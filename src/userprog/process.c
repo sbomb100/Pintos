@@ -593,7 +593,9 @@ setup_stack(void **esp)
   lock_release(&curr->spt_lock);
   thread_current()->num_stack_pages++;
 
+  lock_frame();
   struct frame *stack_frame = find_frame(page);
+  unlock_frame();
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
     printf("NO FRAME 604\n");
