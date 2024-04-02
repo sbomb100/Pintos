@@ -55,7 +55,9 @@ tid_t process_execute(const char *file_name)
     sema_down(&child->wait_sema);
 
     if ( child->status == PROCESS_ABORT ) {
+        lock_acquire(&thread_current()->children_lock);
         list_remove(&child->elem);
+        lock_release(&thread_current()->children_lock);
         free(child);
         tid = -1;
     }
@@ -130,7 +132,9 @@ int process_wait(tid_t child_tid)
     return -1;
   }
   
+  lock_acquire(&thread_current()->children_lock);
   list_remove(&cur_child->elem);
+  lock_release(&thread_current()->children_lock);
   sema_down(&cur_child->wait_sema);
   int exit_status = cur_child->exit_status;
   free(cur_child);
