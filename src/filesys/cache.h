@@ -13,8 +13,10 @@ struct cache_block {
     int num_writers; /* Number of writers currently accessing the block */
     int num_pending_requests; /* Number of pending requests for the block */
     struct lock cache_lock; /* Lock for the cache block */
-    struct condition signaling_variable;
+    struct condition is_available;;
     void *data;
+
+    struct list_elem read_ahead_elem;
 };
 
 /* Intializes the cache */
