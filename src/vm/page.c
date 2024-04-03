@@ -29,9 +29,11 @@ void destroy_page (struct hash_elem *elem1, void *aux UNUSED)
 {
   struct spt_entry *page = hash_entry (elem1, struct spt_entry, elem);
   if (page->frame != NULL) { /* if it has a frame, free the frame */
+    lock_frame();
     struct frame *f = page->frame;
     page->frame = NULL;
     free_frame (f);
+    unlock_frame();
   }
   if (page->swap_index != -1){
     swap_free (page);

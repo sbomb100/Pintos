@@ -153,8 +153,10 @@ page_fault(struct intr_frame *f)
       goto exit;
    }
    /* Pointer is good so get the page with it */
+   lock_frame();
    struct spt_entry *page = get_page_from_hash(fault_addr);
 
+    
    if (page == NULL) /* Page not found */
    {
       uint32_t *esp = f->esp;
@@ -162,9 +164,11 @@ page_fault(struct intr_frame *f)
       if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1<<23) && (uint32_t *)fault_addr >= (esp - 32)))
       {
          load_extra_stack_page(fault_addr);
+         unlock_frame();
       }
       else
       {
+         unlock_frame();
          thread_exit(-1);
       }
       return;
@@ -172,20 +176,24 @@ page_fault(struct intr_frame *f)
    if (page->page_status == 2) /* in filesys */
    {
       load_file_to_spt(page);
+      unlock_frame();
       return;
    }
    if (page->page_status == 1) /* in swap table */
    {
       load_swap_to_spt(page);
+      unlock_frame();
       return;
    }
    if (page->page_status == 0) /* mmapped file */
    {
       load_mmap_to_spt(page);
+      unlock_frame();
       return;
    }
    if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
    {
+      unlock_frame();
       goto exit;
    }
    /* Determine cause. */
@@ -203,26 +211,25 @@ exit:
 
 void load_swap_to_spt(struct spt_entry *page) {
     page->pinned = true;
-    lock_frame();
     page->frame = find_frame(page);
     if (page->frame == NULL) {
         thread_exit(-1);
     }
 
     if ( !install_page(page->vaddr, page->frame->paddr, page->writable)) {
+        unlock_frame();
         thread_exit(-1);
     }
 
     swap_get(page);
-    
+
     page->page_status = 3;
-    unlock_frame();
+    
     page->pinned = false;
 }
 
 void load_mmap_to_spt(struct spt_entry *page) {
     page->pinned = true;
-    lock_frame();
     struct frame * new_frame = find_frame(page);
 
     if ( new_frame == NULL ) {
@@ -244,7 +251,6 @@ void load_mmap_to_spt(struct spt_entry *page) {
     }
 
     page->page_status = 3;
-    unlock_frame();
     page->pinned = false;
 }
 
@@ -254,7 +260,6 @@ void load_mmap_to_spt(struct spt_entry *page) {
 void load_file_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
-   lock_frame();
    struct frame *new_frame = find_frame(page);
    
    if (new_frame == NULL)
@@ -284,9 +289,7 @@ void load_file_to_spt(struct spt_entry *page)
    }
    
    page->page_status = 3; /* in frame table */
-   unlock_frame();
    page->pinned = false;
-   return;
 }
 
 /*
@@ -298,6 +301,7 @@ void load_extra_stack_page(void *fault_addr)
    struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
    if (new_page == NULL)
    {
+      unlock_frame();
       thread_exit(-1);
    }
    /* Creates a new page */
@@ -319,10 +323,10 @@ void load_extra_stack_page(void *fault_addr)
    thread_current()->num_stack_pages++;
    if (thread_current()->num_stack_pages > 2048)
    {
+      unlock_frame();
       thread_exit(-1);
    }
    
-   lock_frame();
    struct frame *new_frame = find_frame(new_page);
    if (new_frame == NULL)
    {
@@ -337,7 +341,4 @@ void load_extra_stack_page(void *fault_addr)
       unlock_frame();
       PANIC("Error growing stack page!");
    }
-   
-   unlock_frame();
-   return;
 }

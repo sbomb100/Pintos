@@ -197,7 +197,9 @@ void process_exit(int status)
   }
 
   /* Destroy the current process's spt entries */
+  lock_acquire(&cur->spt_lock);
   hash_destroy(&cur->spt, destroy_page);
+  lock_release(&cur->spt_lock);
 }
 
 
@@ -599,11 +601,12 @@ setup_stack(void **esp)
 
   lock_frame();
   struct frame *stack_frame = find_frame(page);
-  unlock_frame();
+  
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
     printf("NO FRAME 604\n");
     free(page);
+    unlock_frame();
     thread_exit(-1);
   }
 
@@ -617,6 +620,7 @@ setup_stack(void **esp)
   {
     free(page);
   }
+  unlock_frame();
   return success;
 }
 
