@@ -159,9 +159,9 @@ page_fault(struct intr_frame *f)
     
    if (page == NULL) /* Page not found */
    {
-      uint32_t *esp = f->esp;
+      //uint32_t *esp = f->esp;
       /* if its not in stack range */
-      if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1<<23) && (uint32_t *)fault_addr >= (esp - 32)))
+      if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1<<23) && fault_addr >= (f->esp - 32)))
       {
          load_extra_stack_page(fault_addr);
          unlock_frame();
