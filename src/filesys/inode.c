@@ -269,7 +269,10 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
         {
           /* Read full sector directly into caller's buffer. */
-          block_read (fs_device, sector_idx, buffer + bytes_read);
+          struct cache_block *cache_block = cache_get_block (sector_idx, false);
+          void *cache_data = cache_read_block(cache_block);
+          memcpy(buffer + bytes_read, cache_data, BLOCK_SECTOR_SIZE);
+          cache_put_block(cache_block);
         }
       else 
         {
@@ -281,7 +284,10 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
               if (bounce == NULL)
                 break;
             }
-          block_read (fs_device, sector_idx, bounce);
+          struct cache_block *cache_block = cache_get_block (sector_idx, false);
+          void *cache_data = cache_read_block(cache_block);
+          memcpy(bounce, cache_data, BLOCK_SECTOR_SIZE);
+          cache_put_block(cache_block);
           memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
         }
       
@@ -330,7 +336,11 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
         {
           /* Write full sector directly to disk. */
-          block_write (fs_device, sector_idx, buffer + bytes_written);
+          struct cache_block *cache_block = cache_get_block (sector_idx, true);
+          void *cache_data = cache_zero_block(cache_block);
+          memcpy(cache_data, buffer + bytes_written, BLOCK_SECTOR_SIZE);
+          cache_mark_block_dirty(cache_block);
+          cache_put_block(cache_block);
         }
       else 
         {
@@ -345,14 +355,21 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
           /* If the sector contains data before or after the chunk
              we're writing, then we need to read in the sector
              first.  Otherwise we start with a sector of all zeros. */
-          if (sector_ofs > 0 || chunk_size < sector_left) 
-            block_read (fs_device, sector_idx, bounce);
+          if (sector_ofs > 0 || chunk_size < sector_left) {
+            struct cache_block *cache_block = cache_get_block (sector_idx, false);
+            void *cache_data = cache_read_block(cache_block);
+            memcpy (bounce, cache_data, BLOCK_SECTOR_SIZE);
+            cache_put_block(cache_block);
+          }
           else
             memset (bounce, 0, BLOCK_SECTOR_SIZE);
           memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
-          block_write (fs_device, sector_idx, bounce);
+          struct cache_block *cache_block = cache_get_block (sector_idx, true);
+          void *cache_data = cache_zero_block(cache_block);
+          memcpy(cache_data, bounce, BLOCK_SECTOR_SIZE);
+          cache_mark_block_dirty(cache_block);
+          cache_put_block(cache_block);
         }
-
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
