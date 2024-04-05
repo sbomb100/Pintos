@@ -173,6 +173,46 @@ syscall_handler(struct intr_frame *f)
     }
     break;
   }
+  case SYS_CHDIR:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)chdir((const char *)args[0]);
+    break;
+  case SYS_MKDIR:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)mkdir((const char *)args[0]);
+    break;
+  case SYS_READDIR:
+    if (!parse_arguments(f, &args[0], 2))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)readdir(args[0], (char *)args[1]);
+    break;
+  case SYS_ISDIR:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)isdir(args[0]);
+    break;
+  case SYS_INUMBER:
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+    f->eax = (uint32_t)inumber(args[0]);
+    break;
   default:
     thread_exit(-1);
   }
@@ -684,4 +724,53 @@ bool put_mmap_in_list(struct spt_entry *page)
   mmapped->id = t->num_mapped;
   list_push_back(&t->mmap_list, &mmapped->elem);
   return true;
+}
+
+/*
+ * Changes the current working directory of the process to dir, which may be relative or absolute. Returns true if successful, false on failure. 
+ */
+bool chdir (const char *dir UNUSED) {
+  return false;
+}
+
+/*
+ * Creates the directory named dir, which may be relative or absolute. Returns true if successful, false on failure. 
+ * Fails if dir already exists or if any directory name in dir, besides the last, does not already exist.
+ * That is, mkdir("/a/b/c") succeeds only if "/a/b" already exists and "/a/b/c" does not. 
+ */
+bool mkdir (const char *dir UNUSED) {
+  return false;
+}
+
+/*
+ * Reads a directory entry from file descriptor fd, which must represent a directory.
+ * If successful, stores the null-terminated file name in name, which must have room for READDIR_MAX_LEN + 1 bytes, and returns true.
+ * If no entries are left in the directory, returns false.
+ * 
+ * "." and ".." should not be returned by readdir.
+ *
+ * If the directory changes while it is open, then it is acceptable for some entries not to be read at all or to be read multiple times.
+ * Otherwise, each directory entry should be read once, in any order.
+ * 
+ * READDIR_MAX_LEN is defined in "lib/user/syscall.h".
+ * If your file system supports longer file names than the basic file system, you should increase this value from the default of 14. 
+ */
+bool readdir (int fd UNUSED, char *name UNUSED) {
+  return false;
+}
+
+/* 
+ * Returns true if fd represents a directory, false if it represents an ordinary file. 
+ */
+bool isdir (int fd UNUSED) {
+  return false;
+}
+
+/*
+ * Returns the inode number of the inode associated with fd, which may represent an ordinary file or a directory.
+ *
+ * An inode number persistently identifies a file or directory. It is unique during the file's existence. In Pintos, the sector number of the inode is suitable for use as an inode number. 
+ */
+int inumber (int fd UNUSED) {
+  return false;
 }

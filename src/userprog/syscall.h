@@ -36,10 +36,11 @@ mapid_t mmap(int, void *);
 bool munmap(mapid_t);
 bool put_mmap_in_list(struct spt_entry *);
 
-//FUNCTIONS FOR FILESYS
-//mkdir
-//chdir
-//readdr
-//isdir
-//inumber?
+/* Filesystem Functions */
+bool chdir (const char *dir);
+bool mkdir (const char *dir);
+bool readdir (int fd, char *name);
+bool isdir (int fd);
+int inumber (int fd);
+
 #endif /* userprog/syscall.h */

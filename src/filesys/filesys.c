@@ -104,3 +104,22 @@ do_format (void)
   free_map_close ();
   printf ("done.\n");
 }
+
+
+/* Creates a directory named NAME.
+   Returns true if successful, false on failure.
+   Fails if a directory named NAME already exists,
+   or if an internal memory allocation fails. */
+bool filesys_mkdir (const char *name) {
+  block_sector_t inode_sector = 0;
+  struct dir *dir = dir_open_root ();
+  bool success = (dir != NULL
+                  && free_map_allocate (1, &inode_sector)
+                  && dir_create (inode_sector, 16)
+                  && dir_add (dir, name, inode_sector));
+  if (!success && inode_sector != 0) 
+    free_map_release (inode_sector, 1);
+  dir_close (dir);
+
+  return success;
+}
