@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include "filesys/file.h"
 #include "threads/synch.h"
-#include "lib/kernel/hash.h" 
+#include "lib/kernel/hash.h"
 #include "vm/page.h"
 /* States in a thread's life cycle. */
 enum thread_status
@@ -17,11 +17,12 @@ enum thread_status
    THREAD_DYING    /* About to be destroyed. */
 };
 
-enum process_status {
-    PROCESS_RUNNING, /* Running process. */
-    PROCESS_ORPHAN,  /* Parent process exited without waiting for this. */
-    PROCESS_ABORT,   /* Looking to abort from fail load. */
-    PROCESS_EXIT,    /* Looking to exit normally. */
+enum process_status
+{
+   PROCESS_RUNNING, /* Running process. */
+   PROCESS_ORPHAN,  /* Parent process exited without waiting for this. */
+   PROCESS_ABORT,   /* Looking to abort from fail load. */
+   PROCESS_EXIT,    /* Looking to exit normally. */
 };
 
 /* Thread identifier type.
@@ -98,6 +99,7 @@ typedef int pid_t;
 struct thread
 {
    /* Owned by thread.c. */
+   /* Owned by thread.c. */
    tid_t tid;                  /* Thread identifier. */
    enum thread_status status;  /* Thread state. */
    char name[THREAD_NAME_MAX]; /* Name (for debugging purposes). */
@@ -126,43 +128,49 @@ struct thread
 
 #ifdef USERPROG
    /* Owned by userprog/process.c. */
-   uint32_t *pagedir;           /* Page directory. */
+   uint32_t *pagedir; /* Page directory. */
 
-   struct file **fdToFile;      /* Array of 128 file descriptors. */
-   struct file *exec_file;      /* Thread's executable, to be given write access at the end of the process. */
+   struct file *exec_file;
 
-   struct process *parent;      /* The parent process of the thread. */
-   struct list children;        /* Child processes spawned by the parent. */
-   struct lock children_lock;   /* Lock for inserting/removing processes from the children list. */
 #endif
 
-   /* Virtual Memory */
-   struct hash spt;             /* Supplemental Page Table. */
-   struct lock spt_lock;        /* Lock for inserting/removing pages from the spt. */
-   size_t num_stack_pages;      /* The total number of stack pages in the thread. Starts at 1 but can grow to 2048. */
-
-   struct list mmap_list;       /* List of mmapped files. */
-   size_t num_mapped;           /* Number of mmapped files, serves as fd to be handed to user. */
+   struct process *parent_process;
 
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */
 };
 
-struct process {
-    pid_t pid;                      /* Process ID. */
-    int exit_status;                /* Exit status of the process. */
-    enum process_status status;     /* Process state. */
-    struct semaphore wait_sema;     /* Semaphore to signal waiting parent process. */
-    struct list_elem elem;          /* List_elem for the parent process's children list. */
-    struct lock process_lock;       /* Lock for process state, to be accessed by itself or its parent when orphanized. */
+struct process
+{
+   pid_t pid;
+   int exit_status;
+   enum process_status status;
+   struct semaphore wait_sema;
+   struct list_elem elem;
+   struct lock process_lock;
+   /*USERPROG STUFF*/
+   struct lock fdLock;
+   struct file **fdToFile;
+
+   /*VM STUFF*/
+   struct hash spt;
+   struct lock spt_lock;
+   size_t num_stack_pages;
+
+   struct list mmap_list;
+   struct lock mmap_lock;
+   size_t num_mapped;
+
+   struct process *parent;
+   struct list children;
 };
 
 /* VM MMAP */
 struct mapped_item
 {
-   mapid_t id;              /* mmap ID. */
-   struct spt_entry* page;  /* Page table entry of mmapped file. */
-   struct list_elem elem;   /* List_elem for the parent's mmap_list. */
+   mapid_t id;             /* mmap ID. */
+   struct spt_entry *page; /* Page table entry of mmapped file. */
+   struct list_elem elem;  /* List_elem for the parent's mmap_list. */
 };
 
 void thread_init(void);

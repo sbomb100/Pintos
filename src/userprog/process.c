@@ -55,9 +55,9 @@ tid_t process_execute(const char *file_name)
     sema_down(&child->wait_sema);
 
     if ( child->status == PROCESS_ABORT ) {
-        lock_acquire(&thread_current()->children_lock);
+        lock_acquire(&thread_current()->parent_process->process_lock);
         list_remove(&child->elem);
-        lock_release(&thread_current()->children_lock);
+        lock_release(&thread_current()->parent_process->process_lock);
         free(child);
         tid = -1;
     }
@@ -74,16 +74,7 @@ start_process(void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  thread_current()->fdToFile = malloc(128 * sizeof(struct file *));
-  if (thread_current()->fdToFile == NULL)
-  {
-    thread_exit(-1);
-  }
-
-  for (int i = 0; i < 128; i++)
-  {
-    thread_current()->fdToFile[i] = NULL;
-  }
+  
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -96,10 +87,10 @@ start_process(void *file_name_)
   palloc_free_page(file_name);
   if (!success)
   {
-    thread_current()->parent->status = PROCESS_ABORT;
+    thread_current()->parent_process->status = PROCESS_ABORT;
     thread_exit(-1);
   }
-  sema_up(&thread_current()->parent->wait_sema);
+  sema_up(&thread_current()->parent_process->wait_sema);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -131,9 +122,9 @@ int process_wait(tid_t child_tid)
     return -1;
   }
   
-  lock_acquire(&thread_current()->children_lock);
+  lock_acquire(&thread_current()->parent_process->process_lock);
   list_remove(&cur_child->elem);
-  lock_release(&thread_current()->children_lock);
+  lock_release(&thread_current()->parent_process->process_lock);
   sema_down(&cur_child->wait_sema);
   int exit_status = cur_child->exit_status;
   free(cur_child);
@@ -145,9 +136,9 @@ void process_exit(int status)
 {
   struct thread *cur = thread_current();
 
-  while (cur->num_mapped != 0)
+  while (cur->parent_process->num_mapped != 0)
   {
-    munmap(cur->num_mapped);
+    munmap(cur->parent_process->num_mapped);
   }
 
   /* Process Termination Message */
@@ -162,8 +153,8 @@ void process_exit(int status)
   unlock_file();
   
   /* Mark orphanized child processes */
-  lock_acquire(&cur->children_lock);
-  for ( struct list_elem * e = list_begin(&cur->children); e != list_end(&cur->children);) {
+  lock_acquire(&cur->parent_process->process_lock);
+  for ( struct list_elem * e = list_begin(&cur->parent_process->children); e != list_end(&cur->parent_process->children);) {
     struct process * p = list_entry(e, struct process, elem);
     lock_acquire(&p->process_lock);
     if ( p->status == PROCESS_RUNNING ) {
@@ -177,29 +168,29 @@ void process_exit(int status)
         free(p);
     }
   }
-  lock_release(&cur->children_lock);
+  lock_release(&cur->parent_process->process_lock);
 
   /* Cleanup semantics for orphan or child process */
-  if ( cur->parent != NULL ) {
-    lock_acquire(&cur->parent->process_lock);
-    if ( cur->parent->status == PROCESS_ORPHAN ) {
-        lock_release(&cur->parent->process_lock);
-        free(cur->parent);
-        cur->parent = NULL;
+  if ( cur->parent_process != NULL ) {
+    lock_acquire(&cur->parent_process->process_lock);
+    if ( cur->parent_process->status == PROCESS_ORPHAN ) {
+        lock_release(&cur->parent_process->process_lock);
+        free(cur->parent_process);
+        cur->parent_process = NULL;
     }
     else {
-        cur->parent->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
-        lock_release(&cur->parent->process_lock);
-        cur->parent->exit_status = status;
-        sema_up(&cur->parent->wait_sema);
+        cur->parent_process->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
+        lock_release(&cur->parent_process->process_lock);
+        cur->parent_process->exit_status = status;
+        sema_up(&cur->parent_process->wait_sema);
     }
   }
 
   /* Destroy the current process's spt entries */
   lock_frame();
-  lock_acquire(&cur->spt_lock);
-  hash_destroy(&cur->spt, destroy_page);
-  lock_release(&cur->spt_lock);
+  lock_acquire(&cur->parent_process->spt_lock);
+  hash_destroy(&cur->parent_process->spt, destroy_page);
+  lock_release(&cur->parent_process->spt_lock);
   unlock_frame();
 }
 
@@ -557,9 +548,9 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->bytes_zero = page_zero_bytes;
     page->pagedir = t->pagedir;
     page->swap_index = -1;
-    lock_acquire(&t->spt_lock);
-    hash_insert(&t->spt, &page->elem);
-    lock_release(&t->spt_lock);
+    lock_acquire(&t->parent_process->spt_lock);
+    hash_insert(&t->parent_process->spt, &page->elem);
+    lock_release(&t->parent_process->spt_lock);
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
@@ -595,10 +586,10 @@ setup_stack(void **esp)
   page->bytes_read = 0;
   page->pagedir = curr->pagedir;
   page->swap_index = -1;
-  lock_acquire(&curr->spt_lock);
-  hash_insert(&curr->spt, &page->elem);
-  lock_release(&curr->spt_lock);
-  thread_current()->num_stack_pages++;
+  lock_acquire(&curr->parent_process->spt_lock);
+  hash_insert(&curr->parent_process->spt, &page->elem);
+  curr->parent_process->num_stack_pages++;
+  lock_release(&curr->parent_process->spt_lock);
 
   lock_frame();
   struct frame *stack_frame = find_frame(page);
@@ -628,17 +619,17 @@ setup_stack(void **esp)
 /* Helper function for finding the relevant child */
 struct process *find_child(pid_t child_tid)
 {
-  lock_acquire(&thread_current()->children_lock);
-  for (struct list_elem * e = list_begin(&thread_current()->children); e != list_end(&thread_current()->children); e = list_next(e))
+  lock_acquire(&thread_current()->parent_process->process_lock);
+  for (struct list_elem * e = list_begin(&thread_current()->parent_process->children); e != list_end(&thread_current()->parent_process->children); e = list_next(e))
   {
     struct process *temp = list_entry(e, struct process, elem);
     if (temp->pid == child_tid)
     {
-      lock_release(&thread_current()->children_lock);
+      lock_release(&thread_current()->parent_process->process_lock);
       return temp;
     }
   }
-  lock_release(&thread_current()->children_lock);
+  lock_release(&thread_current()->parent_process->process_lock);
   return NULL;
 }
 
