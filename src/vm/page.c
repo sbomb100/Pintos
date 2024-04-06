@@ -47,7 +47,7 @@ struct spt_entry * get_page_from_hash (void *given_address)
   struct hash_elem *elem_in_hash;
 
   page.vaddr = (void *) (pg_no(given_address) << PGBITS);
-  elem_in_hash = hash_find (&t->parent_process->spt, &page.elem);
+  elem_in_hash = hash_find (&t->spt, &page.elem);
   return elem_in_hash != NULL ? hash_entry (elem_in_hash, struct spt_entry, elem) : NULL;
 }
 
