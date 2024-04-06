@@ -154,9 +154,10 @@ page_fault(struct intr_frame *f)
    }
    /* Pointer is good so get the page with it */
    lock_frame();
+   lock_acquire(&t->spt_lock);
    struct spt_entry *page = get_page_from_hash(fault_addr);
+   lock_release(&t->spt_lock);
 
-    
    if (page == NULL) /* Page not found */
    {
       //uint32_t *esp = f->esp;
@@ -191,9 +192,10 @@ page_fault(struct intr_frame *f)
       unlock_frame();
       return;
    }
+
+   unlock_frame();
    if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
    {
-      unlock_frame();
       goto exit;
    }
    /* Determine cause. */
@@ -212,7 +214,9 @@ exit:
 void load_swap_to_spt(struct spt_entry *page) {
     page->pinned = true;
     page->frame = find_frame(page);
+    
     if (page->frame == NULL) {
+        unlock_frame();
         thread_exit(-1);
     }
 
@@ -261,7 +265,7 @@ void load_file_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
    struct frame *new_frame = find_frame(page);
-   
+
    if (new_frame == NULL)
    {
       unlock_frame();
@@ -285,9 +289,11 @@ void load_file_to_spt(struct spt_entry *page)
          thread_exit(-1);
       }
       /* memset the kpage + bytes read */
+
+      /* TODO: */
       memset(new_frame->paddr + page->bytes_read, 0, page->bytes_zero); /* make sure page has memory correct range */
    }
-   
+
    page->page_status = 3; /* in frame table */
    page->pinned = false;
 }

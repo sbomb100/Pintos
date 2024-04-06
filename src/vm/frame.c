@@ -61,7 +61,7 @@ struct frame *find_frame(struct spt_entry * page)
         if (f->pinned)
             continue;
 
-        else if (f->page == NULL)
+        else if (f->page == NULL || f->page->pagedir == NULL || f->page->vaddr == NULL )
         {
             list_remove(e);
             list_push_back(&frame_list, e);
@@ -87,10 +87,9 @@ struct frame *find_frame(struct spt_entry * page)
  */
 void free_frame(struct frame *f)
 {
-    f->pinned = false;
+    //list_remove(&f->elem);
     f->page = NULL;
-    list_remove(&f->elem);
-    list_push_back(&frame_list, &f->elem);
+    //list_push_back(&frame_list, &f->elem);
 }
 
 /*

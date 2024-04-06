@@ -77,7 +77,6 @@ start_process(void *file_name_)
   thread_current()->fdToFile = malloc(128 * sizeof(struct file *));
   if (thread_current()->fdToFile == NULL)
   {
-    printf("fail 69\n");
     thread_exit(-1);
   }
 
@@ -197,9 +196,11 @@ void process_exit(int status)
   }
 
   /* Destroy the current process's spt entries */
+  lock_frame();
   lock_acquire(&cur->spt_lock);
   hash_destroy(&cur->spt, destroy_page);
   lock_release(&cur->spt_lock);
+  unlock_frame();
 }
 
 
