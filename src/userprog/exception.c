@@ -154,9 +154,9 @@ page_fault(struct intr_frame *f)
    }
    /* Pointer is good so get the page with it */
    lock_frame();
-   lock_acquire(&t->spt_lock);
+   lock_acquire(&t->parent_process->spt_lock);
    struct spt_entry *page = get_page_from_hash(fault_addr);
-   lock_release(&t->spt_lock);
+   lock_release(&t->parent_process->spt_lock);
 
    if (page == NULL) /* Page not found */
    {
@@ -303,7 +303,7 @@ void load_file_to_spt(struct spt_entry *page)
 */
 void load_extra_stack_page(void *fault_addr)
 {
-   ASSERT(!lock_held_by_current_thread(&thread_current()->spt_lock));
+   ASSERT(!lock_held_by_current_thread(&thread_current()->parent_process->spt_lock));
    struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
    if (new_page == NULL)
    {
@@ -322,16 +322,17 @@ void load_extra_stack_page(void *fault_addr)
    new_page->pagedir = thread_current()->pagedir;
    new_page->swap_index = -1;
 
-   lock_acquire(&thread_current()->spt_lock);
-   hash_insert(&thread_current()->spt, &new_page->elem);
-   lock_release(&thread_current()->spt_lock);
-
-   thread_current()->num_stack_pages++;
-   if (thread_current()->num_stack_pages > 2048)
+   lock_acquire(&thread_current()->parent_process->spt_lock);
+   hash_insert(&thread_current()->parent_process->spt, &new_page->elem);
+   thread_current()->parent_process->num_stack_pages++;
+   if (thread_current()->parent_process->num_stack_pages > 2048)
    {
       unlock_frame();
       thread_exit(-1);
    }
+   lock_release(&thread_current()->parent_process->spt_lock);
+
+   
    
    struct frame *new_frame = find_frame(new_page);
    if (new_frame == NULL)

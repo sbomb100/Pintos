@@ -124,37 +124,43 @@ struct thread
    int64_t vruntime_0;
    int64_t actual_runtime;
 
-#ifdef USERPROG
    /* Owned by userprog/process.c. */
    uint32_t *pagedir;           /* Page directory. */
 
-   struct file **fdToFile;      /* Array of 128 file descriptors. */
-   struct file *exec_file;      /* Thread's executable, to be given write access at the end of the process. */
+   
+   struct file *exec_file;
 
-   struct process *parent;      /* The parent process of the thread. */
-   struct list children;        /* Child processes spawned by the parent. */
-   struct lock children_lock;   /* Lock for inserting/removing processes from the children list. */
-#endif
 
-   /* Virtual Memory */
-   struct hash spt;             /* Supplemental Page Table. */
-   struct lock spt_lock;        /* Lock for inserting/removing pages from the spt. */
-   size_t num_stack_pages;      /* The total number of stack pages in the thread. Starts at 1 but can grow to 2048. */
+   struct process* parent_process;
 
-   struct list mmap_list;       /* List of mmapped files. */
-   size_t num_mapped;           /* Number of mmapped files, serves as fd to be handed to user. */
 
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */
 };
 
 struct process {
-    pid_t pid;                      /* Process ID. */
-    int exit_status;                /* Exit status of the process. */
-    enum process_status status;     /* Process state. */
-    struct semaphore wait_sema;     /* Semaphore to signal waiting parent process. */
-    struct list_elem elem;          /* List_elem for the parent process's children list. */
-    struct lock process_lock;       /* Lock for process state, to be accessed by itself or its parent when orphanized. */
+    pid_t pid;
+    int exit_status;
+    enum process_status status;
+    struct semaphore wait_sema;
+    struct list_elem elem;
+    struct lock process_lock;
+   /*USERPROG STUFF*/
+   struct lock fdLock;
+   struct file **fdToFile;
+
+   /*VM STUFF*/
+   struct hash spt;
+   struct lock spt_lock;
+   size_t num_stack_pages;
+
+   struct list mmap_list;
+   struct lock mmap_lock;
+   size_t num_mapped;
+
+   struct process* parent;
+   struct lock children_lock;
+   struct list children;
 };
 
 /* VM MMAP */
@@ -191,3 +197,4 @@ int thread_get_nice(void);
 void thread_set_nice(int);
 
 #endif /* threads/thread.h */
+
