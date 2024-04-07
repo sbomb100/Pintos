@@ -36,7 +36,7 @@ static struct list all_list;
 static struct spinlock all_lock;
 /* Initial thread, the thread running init.c:main(). */
 static struct thread *initial_thread;
-
+static bool boot_process_created = false;
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
 {
@@ -241,9 +241,37 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     list_push_back(&thread_current()->parent_process->children, &new_proc->elem);
     lock_release(&thread_current()->parent_process->process_lock);
   }
-  else
+  else if (!boot_process_created)
   {
-    thread_current()->parent_process = new_proc;
+    boot_process_created = true;
+    struct process *boot_proc = malloc(sizeof(struct process));
+    if (boot_proc == NULL)
+      return NULL;
+    boot_proc->pid = allocate_pid();
+    boot_proc->exit_status = -1;
+    boot_proc->status = PROCESS_RUNNING;
+    boot_proc->parent = NULL;
+    /*children init*/
+    list_init(&boot_proc->children);
+    sema_init(&boot_proc->wait_sema, 0);
+    lock_init(&boot_proc->process_lock);
+
+    //prob dont need this stuff but for now just leaving it TODO
+    /*hash init*/
+    hash_init(&boot_proc->spt, page_hash, is_page_before, NULL);
+    lock_init(&boot_proc->spt_lock);
+    /* init mmap */
+    list_init(&boot_proc->mmap_list);
+    lock_init(&boot_proc->mmap_lock);
+    boot_proc->num_mapped = 0;
+    /* init fd array*/
+    // this should init it to null pointers
+    boot_proc->fdToFile = calloc(128, sizeof(struct file *));
+    if (boot_proc->fdToFile == NULL)
+    {
+      thread_exit(-1);
+    }
+    thread_current()->parent_process = boot_proc;
   }
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
@@ -279,7 +307,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
    nice, but it's not actually used. You will implement it as part of
    Project 1. */
 tid_t thread_create(const char *name, int nice, thread_func *function, void *aux)
-{
+{ 
   struct thread *t;
 
   t = do_thread_create(name, nice, function, aux);
@@ -288,13 +316,12 @@ tid_t thread_create(const char *name, int nice, thread_func *function, void *aux
 
   /* Must save tid here - 't' could already be freed when we return
      from wake_up_new_thread */
-    // ITS RETURNING THE PID OF THE PARENT PROCESS BECAUSE WE NEED THE PID FOR FIND CHILD IN PROCESS EXEC
+  // ITS RETURNING THE PID OF THE PARENT PROCESS BECAUSE WE NEED THE PID FOR FIND CHILD IN PROCESS EXEC
   tid_t tid = t->parent_process->pid;
 
   /* Add to ready queue. */
   wake_up_new_thread(t);
   return tid;
-
 }
 
 /* Puts the current thread to sleep (i.e., in the BLOCKED state).
@@ -441,7 +468,7 @@ void thread_exit(int status)
   ASSERT(!intr_context());
 #ifdef USERPROG
   thread_current()->parent_process->exit_status = status;
-  //TODO FIX LATER
+  // TODO FIX LATER
   process_exit(status);
 #endif
 
