@@ -154,9 +154,12 @@ page_fault(struct intr_frame *f)
    }
    /* Pointer is good so get the page with it */
    lock_frame();
-   lock_acquire(&t->spt_lock);
+   if (!lock_held_by_current_thread(&t->parent_process->spt_lock)){
+      lock_acquire(&t->parent_process->spt_lock);
+   }
+   
    struct spt_entry *page = get_page_from_hash(fault_addr);
-   lock_release(&t->spt_lock);
+   
 
    if (page == NULL) /* Page not found */
    {
@@ -165,10 +168,12 @@ page_fault(struct intr_frame *f)
       if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1<<23) && fault_addr >= (f->esp - 32)))
       {
          load_extra_stack_page(fault_addr);
+         lock_release(&t->parent_process->spt_lock);
          unlock_frame();
       }
       else
       {
+         lock_release(&t->parent_process->spt_lock);
          unlock_frame();
          thread_exit(-1);
       }
@@ -177,22 +182,25 @@ page_fault(struct intr_frame *f)
    if (page->page_status == 2) /* in filesys */
    {
       load_file_to_spt(page);
+      lock_release(&t->parent_process->spt_lock);
       unlock_frame();
       return;
    }
    if (page->page_status == 1) /* in swap table */
    {
       load_swap_to_spt(page);
+      lock_release(&t->parent_process->spt_lock);
       unlock_frame();
       return;
    }
    if (page->page_status == 0) /* mmapped file */
    {
       load_mmap_to_spt(page);
+      lock_release(&t->parent_process->spt_lock);
       unlock_frame();
       return;
    }
-
+   lock_release(&t->parent_process->spt_lock);
    unlock_frame();
    if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
    {
@@ -303,12 +311,11 @@ void load_file_to_spt(struct spt_entry *page)
 */
 void load_extra_stack_page(void *fault_addr)
 {
-   ASSERT(!lock_held_by_current_thread(&thread_current()->spt_lock));
    struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
    if (new_page == NULL)
    {
       unlock_frame();
-      thread_exit(-1);
+      thread_exit(-2);
    }
    /* Creates a new page */
    new_page->is_stack = true;
@@ -322,23 +329,24 @@ void load_extra_stack_page(void *fault_addr)
    new_page->pagedir = thread_current()->pagedir;
    new_page->swap_index = -1;
 
-   lock_acquire(&thread_current()->spt_lock);
-   hash_insert(&thread_current()->spt, &new_page->elem);
-   lock_release(&thread_current()->spt_lock);
-
-   thread_current()->num_stack_pages++;
-   if (thread_current()->num_stack_pages > 2048)
+   hash_insert(&thread_current()->parent_process->spt, &new_page->elem);
+   thread_current()->parent_process->num_stack_pages++;
+   
+   if (thread_current()->parent_process->num_stack_pages > 2048)
    {
+      
+      lock_release(&thread_current()->parent_process->spt_lock);
       unlock_frame();
-      thread_exit(-1);
+      thread_exit(-3);
    }
    
    struct frame *new_frame = find_frame(new_page);
    if (new_frame == NULL)
    {
+      
+      lock_release(&thread_current()->parent_process->spt_lock);
       unlock_frame();
-      thread_exit(-1);
-      return;
+      thread_exit(-4);
    }
 
    /* Install */

@@ -210,7 +210,7 @@ bool create(const char *file, unsigned initial_size)
 /*
  * Deletes a file, however does not close it
  * Returns true on success, false otherwise
-*/
+ */
 bool remove(const char *file)
 {
   if (file == NULL || !validate_pointer(file))
@@ -231,7 +231,7 @@ bool remove(const char *file)
  */
 int open(const char *file)
 {
-  // 
+  //
   if (file == NULL || !validate_pointer(file))
   {
     thread_exit(-1);
@@ -255,7 +255,7 @@ int open(const char *file)
     file_close(fp);
     thread_exit(-1);
   }
-  thread_current()->fdToFile[fd - 2] = fp;
+  thread_current()->parent_process->fdToFile[fd - 2] = fp;
 
   return fd;
 }
@@ -266,7 +266,7 @@ int open(const char *file)
 int filesize(int fd)
 {
   lock_acquire(&file_lock);
-  struct file *filePtr = thread_current()->fdToFile[fd - 2];
+  struct file *filePtr = thread_current()->parent_process->fdToFile[fd - 2];
   int length = file_length(filePtr);
   lock_release(&file_lock);
   return length;
@@ -275,24 +275,25 @@ int filesize(int fd)
  * Reads size bytes from the file open as fd into buffer.
  * Returns: the number of bytes actually read (0 at end of file) or -1 if the file could not be read (due to a condition other than end of file).
  */
-int read(int fd, void *buffer, unsigned size, void* esp)
+int read(int fd, void *buffer, unsigned size, void *esp)
 {
-  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
+  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->parent_process->fdToFile[fd - 2] == NULL)
   {
     return -1;
   }
 
   if (buffer == NULL || !is_user_vaddr(buffer))
-	{
-		thread_exit(-1);
-	}
+  {
+    thread_exit(-1);
+  }
 
-	if((void*)get_page_from_hash(buffer) == NULL) 
-	{
-		if ( buffer < esp) {
-		  thread_exit(-1);
-		}    
-	}
+  if ((void *)get_page_from_hash(buffer) == NULL)
+  {
+    if (buffer < esp)
+    {
+      thread_exit(-1);
+    }
+  }
   lock_acquire(&file_lock);
 
   int byteCount = 0;
@@ -303,7 +304,7 @@ int read(int fd, void *buffer, unsigned size, void* esp)
 
   unsigned readsize = (unsigned)(buffer_start + PGSIZE - buffer);
   unsigned bytes_read = 0;
-  
+
   for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
   {
     struct spt_entry *page = get_page_from_hash(buffer_page);
@@ -317,11 +318,13 @@ int read(int fd, void *buffer, unsigned size, void* esp)
       load_file_to_spt(page);
       byteCount++;
     }
-    else if (page->page_status == 1 ) {
-        load_swap_to_spt(page);
-        byteCount++;
+    else if (page->page_status == 1)
+    {
+      load_swap_to_spt(page);
+      byteCount++;
     }
-    else if (page->page_status == 0 ) {
+    else if (page->page_status == 0)
+    {
       load_mmap_to_spt(page);
       byteCount++;
     }
@@ -338,10 +341,9 @@ int read(int fd, void *buffer, unsigned size, void* esp)
   }
 
   /* fd is not 0, so read it */
-  struct file *filePtr = thread_current()->fdToFile[fd - 2];
+  struct file *filePtr = thread_current()->parent_process->fdToFile[fd - 2];
   if (filePtr == NULL)
     return -1;
-
 
   if (buffer_start == (void *)0x08048000)
   {
@@ -403,7 +405,7 @@ int write(int fd, const void *buffer, unsigned size)
     thread_exit(-1);
   if (fd < 1 || fd > 1025)
     return -1;
-  
+
   int ret = -1;
   if (fd == 1)
   {
@@ -413,7 +415,7 @@ int write(int fd, const void *buffer, unsigned size)
   else
   {
 
-    struct file *fileDes = thread_current()->fdToFile[fd - 2];
+    struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
     if (fileDes != NULL)
     {
       ret = file_write(fileDes, buffer, size);
@@ -436,12 +438,12 @@ int write(int fd, const void *buffer, unsigned size)
 void seek(int fd, unsigned position)
 {
   lock_file();
-  struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
 
   if (fileDes == NULL)
     return;
 
-  file_seek(thread_current()->fdToFile[fd - 2], position);
+  file_seek(thread_current()->parent_process->fdToFile[fd - 2], position);
   unlock_file();
 }
 /*
@@ -450,7 +452,7 @@ void seek(int fd, unsigned position)
 unsigned tell(int fd)
 {
   lock_acquire(&file_lock);
-  struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
   if (fileDes == NULL)
     return -1;
 
@@ -468,23 +470,24 @@ void close(int fd)
   if (fd < 2 || fd > 1025)
     return;
 
-  struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
   if (fileDes == NULL)
     return;
 
   /* Closing file using file sys function */
   file_close(fileDes);
-  thread_current()->fdToFile[fd - 2] = NULL;
+  thread_current()->parent_process->fdToFile[fd - 2] = NULL;
   lock_release(&file_lock);
 }
 
-/* 
+/*
  * Returns the file descriptor for the file
  * index of zero is fd of 2
+ * MUST BE CALLED WITH A LOCK OVER IT
  */
 int findFdForFile()
 {
-  struct file **fdArray = thread_current()->fdToFile;
+  struct file **fdArray = thread_current()->parent_process->fdToFile;
 
   for (int i = 0; i < 128; i++)
   {
@@ -529,7 +532,7 @@ mapid_t mmap(int fd, void *addr)
   lock_acquire(&file_lock);
 
   /* Open File */
-  struct file *file = curr->fdToFile[fd - 2];
+  struct file *file = curr->parent_process->fdToFile[fd - 2];
   if (file == NULL)
   {
     lock_release(&file_lock);
@@ -559,8 +562,8 @@ mapid_t mmap(int fd, void *addr)
     }
   }
 
-  thread_current()->num_mapped++;
-  mapid_t id = thread_current()->num_mapped;
+  thread_current()->parent_process->num_mapped++;
+  mapid_t id = thread_current()->parent_process->num_mapped; // race cond?
   off_t offset = 0;
   uint32_t read_bytes = length_of_file;
 
@@ -582,9 +585,9 @@ mapid_t mmap(int fd, void *addr)
     page->page_status = 2;
     page->pagedir = thread_current()->pagedir;
 
-    lock_acquire(&thread_current()->spt_lock);
-    hash_insert(&thread_current()->spt, &page->elem);
-    lock_release(&thread_current()->spt_lock);
+    lock_acquire(&thread_current()->parent_process->spt_lock);
+    hash_insert(&thread_current()->parent_process->spt, &page->elem);
+    lock_release(&thread_current()->parent_process->spt_lock);
 
     if (put_mmap_in_list(page) == false)
     {
@@ -599,7 +602,6 @@ mapid_t mmap(int fd, void *addr)
   return id;
 }
 
-
 /*
  * VM munmap
  */
@@ -611,7 +613,7 @@ bool munmap(mapid_t mapping)
     lock_release(&file_lock);
     return false;
   }
-  struct list *map_list = &(thread_current()->mmap_list);
+  struct list *map_list = &(thread_current()->parent_process->mmap_list);
   struct list_elem *e = list_begin(map_list);
   for (e = list_begin(map_list); e != list_end(map_list); e = e)
   {
@@ -628,9 +630,10 @@ bool munmap(mapid_t mapping)
         file_write_at(page->file, page->vaddr, page->bytes_read, page->offset);
       }
 
-      lock_acquire(&thread_current()->spt_lock);
-      hash_delete(&thread_current()->spt, &page->elem);
-      lock_release(&thread_current()->spt_lock);
+      lock_acquire(&thread_current()->parent_process->spt_lock);
+      hash_delete(&thread_current()->parent_process->spt, &page->elem);
+      thread_current()->parent_process->num_mapped--;
+      lock_release(&thread_current()->parent_process->spt_lock);
 
       e = list_remove(&mmapped->elem);
       free(mmapped);
@@ -641,13 +644,13 @@ bool munmap(mapid_t mapping)
     }
   }
   lock_release(&file_lock);
-  thread_current()->num_mapped--;
   return true;
 }
 
 /*
  * Helper for mmap
  * Puts page in mmap list
+ * MUST BE CALLED WITH LOCK
  */
 bool put_mmap_in_list(struct spt_entry *page)
 {
@@ -659,7 +662,7 @@ bool put_mmap_in_list(struct spt_entry *page)
 
   struct thread *t = thread_current();
   mmapped->page = page;
-  mmapped->id = t->num_mapped;
-  list_push_back(&t->mmap_list, &mmapped->elem);
+  mmapped->id = t->parent_process->num_mapped;
+  list_push_back(&t->parent_process->mmap_list, &mmapped->elem);
   return true;
 }
