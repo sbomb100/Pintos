@@ -37,6 +37,7 @@ static struct spinlock all_lock;
 /* Initial thread, the thread running init.c:main(). */
 static struct thread *initial_thread;
 static bool boot_process_created = false;
+static struct process *initial_process;
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
 {
@@ -58,6 +59,7 @@ static tid_t allocate_tid(void);
 static pid_t allocate_pid(void);
 
 static struct thread *do_thread_create(const char *, int, thread_func *, void *);
+static struct thread *make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux);
 static void init_boot_thread(struct thread *boot_thread, struct cpu *cpu);
 static void init_thread(struct thread *t, const char *name, int nice);
 static void lock_own_ready_queue(void);
@@ -115,7 +117,7 @@ void thread_start_idle_thread(void)
 
   /* Create the idle thread. */
   // change to MAKE_THREAD_FOR_PROCESS
-  struct thread *idle_thread = do_thread_create(idle_name, NICE_MAX, idle, NULL);
+  struct thread *idle_thread = make_thread_for_proc(idle_name, NICE_MAX, idle, thread_current()->parent_process, NULL);
   ASSERT(idle_thread);
   idle_thread->cpu = get_cpu();
   get_cpu()->rq.idle_thread = idle_thread;
@@ -183,7 +185,84 @@ wake_up_new_thread(struct thread *t)
   sched_unblock(&t->cpu->rq, t, 1);
   spinlock_release(&t->cpu->rq.lock);
 }
+static struct thread *
+make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux)
+{
+  struct thread *t;
+  struct kernel_thread_frame *kf;
+  struct switch_entry_frame *ef;
+  struct switch_threads_frame *sf;
+  ASSERT(function != NULL);
+  t = palloc_get_page(PAL_ZERO);
+  if (t == NULL)
+    return NULL;
 
+  /* Initialize thread. */
+  init_thread(t, name, nice);
+  t->tid = allocate_tid();
+
+  if (!boot_process_created)
+  {
+    boot_process_created = true;
+    struct process *initial_process = malloc(sizeof(struct process));
+    if (initial_process == NULL)
+      return NULL;
+    initial_process->pid = allocate_pid();
+    initial_process->exit_status = -1;
+    initial_process->status = PROCESS_RUNNING;
+    initial_process->parent = NULL;
+    /*children init*/
+    list_init(&initial_process->children);
+    sema_init(&initial_process->wait_sema, 0);
+    lock_init(&initial_process->process_lock);
+
+    // prob dont need this stuff but for now just leaving it TODO
+    /*hash init*/
+    hash_init(&initial_process->spt, page_hash, is_page_before, NULL);
+    lock_init(&initial_process->spt_lock);
+    /* init mmap */
+    list_init(&initial_process->mmap_list);
+    lock_init(&initial_process->mmap_lock);
+    initial_process->num_mapped = 0;
+    /* init fd array*/
+    // this should init it to null pointers
+    initial_process->fdToFile = calloc(128, sizeof(struct file *));
+    if (initial_process->fdToFile == NULL)
+    {
+      thread_exit(-1);
+    }
+    thread_current()->parent_process = initial_process;
+    t->parent_process = initial_process;
+  }
+  else if (parent_proc == NULL)
+  {
+    thread_current()->parent_process = initial_process;
+    t->parent_process = initial_process;
+  }
+  else
+  {
+
+    ASSERT(parent_proc != NULL);
+    t->parent_process = parent_proc;
+    // add thread to processes list of threads
+  }
+
+  kf = alloc_frame(t, sizeof *kf);
+  kf->eip = NULL;
+  kf->function = function;
+  kf->aux = aux;
+
+  /* Stack frame for switch_entry(). */
+  ef = alloc_frame(t, sizeof *ef);
+  ef->eip = (void (*)(void))kernel_thread_entry;
+
+  /* Stack frame for switch_threads(). */
+  sf = alloc_frame(t, sizeof *sf);
+  sf->eip = switch_entry;
+  sf->ebp = 0;
+
+  return t;
+}
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument.
    Returns a pointer to the new thread's struct thread, or NULL
@@ -241,37 +320,43 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     list_push_back(&thread_current()->parent_process->children, &new_proc->elem);
     lock_release(&thread_current()->parent_process->process_lock);
   }
-  else if (!boot_process_created)
+  if (!boot_process_created)
   {
     boot_process_created = true;
-    struct process *boot_proc = malloc(sizeof(struct process));
-    if (boot_proc == NULL)
+    struct process *initial_process = malloc(sizeof(struct process));
+    if (initial_process == NULL)
       return NULL;
-    boot_proc->pid = allocate_pid();
-    boot_proc->exit_status = -1;
-    boot_proc->status = PROCESS_RUNNING;
-    boot_proc->parent = NULL;
+    initial_process->pid = allocate_pid();
+    initial_process->exit_status = -1;
+    initial_process->status = PROCESS_RUNNING;
+    initial_process->parent = NULL;
     /*children init*/
-    list_init(&boot_proc->children);
-    sema_init(&boot_proc->wait_sema, 0);
-    lock_init(&boot_proc->process_lock);
+    list_init(&initial_process->children);
+    sema_init(&initial_process->wait_sema, 0);
+    lock_init(&initial_process->process_lock);
 
-    //prob dont need this stuff but for now just leaving it TODO
+    // prob dont need this stuff but for now just leaving it TODO
     /*hash init*/
-    hash_init(&boot_proc->spt, page_hash, is_page_before, NULL);
-    lock_init(&boot_proc->spt_lock);
+    hash_init(&initial_process->spt, page_hash, is_page_before, NULL);
+    lock_init(&initial_process->spt_lock);
     /* init mmap */
-    list_init(&boot_proc->mmap_list);
-    lock_init(&boot_proc->mmap_lock);
-    boot_proc->num_mapped = 0;
+    list_init(&initial_process->mmap_list);
+    lock_init(&initial_process->mmap_lock);
+    initial_process->num_mapped = 0;
     /* init fd array*/
     // this should init it to null pointers
-    boot_proc->fdToFile = calloc(128, sizeof(struct file *));
-    if (boot_proc->fdToFile == NULL)
+    initial_process->fdToFile = calloc(128, sizeof(struct file *));
+    if (initial_process->fdToFile == NULL)
     {
       thread_exit(-1);
     }
-    thread_current()->parent_process = boot_proc;
+    thread_current()->parent_process = initial_process;
+    t->parent_process = initial_process;
+  }
+  else if (thread_current()->parent_process == NULL)
+  {
+    thread_current()->parent_process = initial_process;
+    t->parent_process = initial_process;
   }
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
@@ -307,7 +392,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
    nice, but it's not actually used. You will implement it as part of
    Project 1. */
 tid_t thread_create(const char *name, int nice, thread_func *function, void *aux)
-{ 
+{
   struct thread *t;
 
   t = do_thread_create(name, nice, function, aux);
