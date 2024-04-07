@@ -200,7 +200,7 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
   /* Initialize thread. */
   init_thread(t, name, nice);
   t->tid = allocate_tid();
-
+  t->main_thread_for_proc = false;
   if (!boot_process_created)
   {
     boot_process_created = true;
@@ -284,7 +284,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   /* Initialize thread. */
   init_thread(t, name, nice);
   t->tid = allocate_tid();
-
+  t->main_thread_for_proc = true;
   /* Parent-child structure setup */
   /* Parent-child structure setup */
   struct process *new_proc = malloc(sizeof(struct process));
@@ -554,7 +554,10 @@ void thread_exit(int status)
 #ifdef USERPROG
   thread_current()->parent_process->exit_status = status;
   // TODO FIX LATER
-  process_exit(status);
+  if (thread_current()->main_thread_for_proc)
+  {
+    process_exit(status);
+  }
 #endif
 
   do_thread_exit();

@@ -133,7 +133,7 @@ struct thread
    struct file *exec_file;
 
 #endif
-
+   bool main_thread_for_proc;
    struct process *parent_process;
 
    /* Owned by thread.c. */

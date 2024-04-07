@@ -483,6 +483,7 @@ void close(int fd)
 /*
  * Returns the file descriptor for the file
  * index of zero is fd of 2
+ * MUST BE CALLED WITH A LOCK OVER IT
  */
 int findFdForFile()
 {

@@ -522,7 +522,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT(ofs % PGSIZE == 0);
 
   struct thread *t = thread_current();
-
+  
+  lock_acquire(&t->parent_process->spt_lock);
   while (read_bytes > 0 || zero_bytes > 0)
   {
     /* Calculate how to fill this page.
@@ -548,9 +549,8 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->bytes_zero = page_zero_bytes;
     page->pagedir = t->pagedir;
     page->swap_index = -1;
-    lock_acquire(&t->parent_process->spt_lock);
     hash_insert(&t->parent_process->spt, &page->elem);
-    lock_release(&t->parent_process->spt_lock);
+    
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
@@ -558,7 +558,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     upage += PGSIZE;
   }
   file_seek(file, ofs);
-
+  lock_release(&t->parent_process->spt_lock);
   return true;
 }
 
@@ -571,6 +571,8 @@ setup_stack(void **esp)
   void *upage = ((uint8_t *)PHYS_BASE) - PGSIZE;
   struct thread *curr = thread_current();
   /* Create a page, put it in a frame, then set stack */
+  
+  lock_frame();
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -591,7 +593,6 @@ setup_stack(void **esp)
   curr->parent_process->num_stack_pages++;
   lock_release(&curr->parent_process->spt_lock);
 
-  lock_frame();
   struct frame *stack_frame = find_frame(page);
   
   if (stack_frame == NULL || stack_frame->paddr == NULL)
