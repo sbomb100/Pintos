@@ -28,7 +28,13 @@ enum
     SYS_MKDIR,                  /* Create a directory. */
     SYS_READDIR,                /* Reads a directory entry. */
     SYS_ISDIR,                  /* Tests if a fd represents a directory. */
-    SYS_INUMBER                 /* Returns the inode number for a fd. */
+    SYS_INUMBER,                /* Returns the inode number for a fd. */
+    
+    /* Project 5 multithreading. */
+    SYS_PTHREAD_CREATE,         /* Creates a user thread. */
+    SYS_PTHREAD_EXIT,           /* Terminates the calling user thread. */
+    SYS_PTHREAD_JOIN,           /* Blocks the calling thread until a requested TID exits. */
+    SYS_SBRK                    /* Changes the data segment size. */
   };
 
 #endif /* lib/syscall-nr.h */

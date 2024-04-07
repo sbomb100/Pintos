@@ -1,6 +1,7 @@
 #ifndef __LIB_USER_SYSCALL_H
 #define __LIB_USER_SYSCALL_H
 
+#include <stdint.h>
 #include <stdbool.h>
 #include <debug.h>
 
@@ -11,6 +12,10 @@ typedef int pid_t;
 /* Map region identifier. */
 typedef int mapid_t;
 #define MAP_FAILED ((mapid_t) -1)
+
+/* User thread identifier. */
+typedef int tid_t;
+#define TID_ERROR ((tid_t) -1)
 
 /* Maximum characters in a filename written by readdir(). */
 #define READDIR_MAX_LEN 14
@@ -44,5 +49,13 @@ bool mkdir (const char *dir);
 bool readdir (int fd, char name[READDIR_MAX_LEN + 1]);
 bool isdir (int fd);
 int inumber (int fd);
+
+/* User threads syscalls. */
+tid_t sys_pthread_create(void *(*start_routine)(void *), void *args);
+void sys_pthread_exit(void) NO_RETURN;
+tid_t sys_pthread_join(tid_t tid);
+
+/* User malloc syscalls. */
+void * sbrk(intptr_t increment);
 
 #endif /* lib/user/syscall.h */

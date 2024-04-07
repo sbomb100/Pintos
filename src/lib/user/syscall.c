@@ -182,3 +182,24 @@ inumber (int fd)
 {
   return syscall1 (SYS_INUMBER, fd);
 }
+
+tid_t 
+sys_pthread_create (void *(*start_routine)(void *), void *args) {
+  return syscall2 (SYS_PTHREAD_CREATE, start_routine, args);
+}
+
+void 
+sys_pthread_exit () {
+  syscall0(SYS_PTHREAD_EXIT);
+  NOT_REACHED();
+}
+
+tid_t 
+sys_pthread_join (tid_t tid) {
+  return syscall1(SYS_PTHREAD_JOIN, tid);
+}
+
+void *
+sbrk (intptr_t increment) {
+  return syscall1(SYS_SBRK, increment);
+}
