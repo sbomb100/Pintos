@@ -166,11 +166,14 @@ syscall_handler(struct intr_frame *f)
       thread_exit(-1);
       return;
     }
+    lock_acquire(&thread_current()->parent_process->mmap_lock);
     if (!munmap(args[0]))
     {
+      lock_release(&thread_current()->parent_process->mmap_lock);
       thread_exit(-1);
       return;
     }
+    lock_release(&thread_current()->parent_process->mmap_lock);
     break;
   }
   default:
@@ -561,7 +564,7 @@ mapid_t mmap(int fd, void *addr)
       return -1;
     }
   }
-
+  lock_acquire(&thread_current()->parent_process->mmap_lock);
   thread_current()->parent_process->num_mapped++;
   mapid_t id = thread_current()->parent_process->num_mapped; // race cond?
   off_t offset = 0;
@@ -599,6 +602,7 @@ mapid_t mmap(int fd, void *addr)
     addr += PGSIZE;
     offset += PGSIZE;
   }
+  lock_release(&thread_current()->parent_process->mmap_lock);
   return id;
 }
 
@@ -632,7 +636,6 @@ bool munmap(mapid_t mapping)
 
       lock_acquire(&thread_current()->parent_process->spt_lock);
       hash_delete(&thread_current()->parent_process->spt, &page->elem);
-      thread_current()->parent_process->num_mapped--;
       lock_release(&thread_current()->parent_process->spt_lock);
 
       e = list_remove(&mmapped->elem);
@@ -643,6 +646,7 @@ bool munmap(mapid_t mapping)
       e = list_next(e);
     }
   }
+  thread_current()->parent_process->num_mapped--;
   lock_release(&file_lock);
   return true;
 }

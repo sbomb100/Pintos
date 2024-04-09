@@ -135,12 +135,18 @@ int process_wait(tid_t child_tid)
 void process_exit(int status)
 {
   struct thread *cur = thread_current();
-
+  lock_acquire(&cur->parent_process->mmap_lock);
   while (cur->parent_process->num_mapped != 0)
   {
     munmap(cur->parent_process->num_mapped);
   }
-
+  lock_release(&cur->parent_process->mmap_lock);
+   /* Destroy the current process's spt entries */
+  lock_frame();
+  lock_acquire(&cur->parent_process->spt_lock);
+  hash_destroy(&cur->parent_process->spt, destroy_page);
+  lock_release(&cur->parent_process->spt_lock);
+  unlock_frame();
   /* Process Termination Message */
   char *tmp;
   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
@@ -168,11 +174,8 @@ void process_exit(int status)
         free(p);
     }
   }
-  lock_release(&cur->parent_process->process_lock);
-
   /* Cleanup semantics for orphan or child process */
   if ( cur->parent_process != NULL ) {
-    lock_acquire(&cur->parent_process->process_lock);
     if ( cur->parent_process->status == PROCESS_ORPHAN ) {
         lock_release(&cur->parent_process->process_lock);
         free(cur->parent_process);
@@ -184,14 +187,7 @@ void process_exit(int status)
         cur->parent_process->exit_status = status;
         sema_up(&cur->parent_process->wait_sema);
     }
-  }
-
-  /* Destroy the current process's spt entries */
-  lock_frame();
-  lock_acquire(&cur->parent_process->spt_lock);
-  hash_destroy(&cur->parent_process->spt, destroy_page);
-  lock_release(&cur->parent_process->spt_lock);
-  unlock_frame();
+  } 
 }
 
 
