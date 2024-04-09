@@ -1,0 +1,17 @@
+# -*- makefile -*-
+
+tests/%.output: FILESYSSOURCE = --filesys-size=2
+tests/%.output: PUTFILES = $(filter-out kernel.bin loader.bin, $^)
+
+tests/parallel_TESTS = $(addprefix tests/parallel/, \
+create-join \
+)
+
+tests/parallel/create-join_SRC = tests/parallel/create-join.c tests/lib.c \
+tests/main.c
+
+tests/parallel_PROGS = $(tests/parallel_TESTS)
+tests/parallel_PROGS += $(addprefix tests/parallel, \
+)
+
+$(foreach prog,$(tests/parallel_PROGS),$(eval $(prog)_SRC += tests/lib.c))

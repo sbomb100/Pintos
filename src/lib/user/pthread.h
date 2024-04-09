@@ -1,6 +1,8 @@
 #ifndef __LIB_USER_PTHREAD_H
 #define __LIB_USER_PTHREAD_H
 
+#include <stdbool.h>
+
 struct pthread_t;
 struct pthread_mutex_t;
 struct pthread_semaphore_t;

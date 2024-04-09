@@ -17,7 +17,7 @@ bool pthread_create(struct pthread_t * t, void *(*start_routine)(void *), void *
     tid_t tid;
     if ( (tid = sys_pthread_create(start_routine, args)) != TID_ERROR ) {
         t = {
-            tid = tid,
+            .tid = tid,
         };
         return true;
     }
