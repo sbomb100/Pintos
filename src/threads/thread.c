@@ -559,7 +559,7 @@ void thread_exit(int status)
 {
   ASSERT(!intr_context());
 
-  thread_current()->parent_process->exit_status = status;
+  
   // TODO FIX LATER
   lock_acquire(&thread_current()->parent_process->counter_lock);
 
@@ -568,6 +568,7 @@ void thread_exit(int status)
   lock_release(&thread_current()->parent_process->counter_lock);
   if (proc_exit)
   {
+    thread_current()->parent_process->exit_status = status;
     process_exit(status);
   }
 
