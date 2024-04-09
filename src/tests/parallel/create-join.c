@@ -10,9 +10,10 @@
 
 int nums[NUM_THREADS];
 
-void * worker_function(void * args) {
+static void * worker_function(void * args) {
     intptr_t i = (intptr_t) args;
     nums[i]++;
+    return NULL;
 }
 
 void

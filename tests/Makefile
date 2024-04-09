@@ -1,4 +1,4 @@
-TESTS = examples threads p1 userprog p2 vm p3 filesys p4
+TESTS = examples threads p1 userprog p2 vm p3 filesys p4 parallel p5
 
 PATH := $(shell pwd)/../src/utils:$(PATH)
 
@@ -50,6 +50,7 @@ p1: PROJECT = threads
 p2: PROJECT = userprog
 p3: PROJECT = vm
 p4: PROJECT = filesys
+p5: PROJECT = parallel
 
 # Tests that just compile the provided code.
 threads::
@@ -58,7 +59,7 @@ threads::
 	$(run-tests) TESTS=tests/threads/alarm-single
 	$(test-clean)
 	$(clean)
-userprog vm filesys::
+userprog vm filesys parallel::
 	$(mk-sandbox)
 	$(compile)
 	$(test-clean)
@@ -69,7 +70,7 @@ examples::
 	$(clean)
 
 # Tests for the reference solutions.
-p1 p2 p3 p4::
+p1 p2 p3 p4 p5::
 	$(mk-sandbox)
 	$(apply-patch)
 	$(run-tests)

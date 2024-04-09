@@ -11,14 +11,12 @@ struct pthread_mutex_t {
 
 struct pthread_semaphore_t {
     int id;
-}
+};
 
 bool pthread_create(struct pthread_t * t, void *(*start_routine)(void *), void *args) {
     tid_t tid;
     if ( (tid = sys_pthread_create(start_routine, args)) != TID_ERROR ) {
-        t = {
-            .tid = tid,
-        };
+        t->tid = tid;
         return true;
     }
     return false;
