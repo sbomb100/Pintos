@@ -1,8 +1,8 @@
 #include <malloc.h>
 #include <syscall.h>
 
-void * malloc(size_t size) {
-    return NULL;
+void * malloc(int size) {
+    return 0;
 }
 
 void free (void *ptr) {

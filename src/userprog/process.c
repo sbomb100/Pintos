@@ -159,21 +159,21 @@ void process_exit(int status)
   unlock_file();
   
   /* Mark orphanized child processes */
-  lock_acquire(&cur->parent_process->process_lock);
-  for ( struct list_elem * e = list_begin(&cur->parent_process->children); e != list_end(&cur->parent_process->children);) {
-    struct process * p = list_entry(e, struct process, elem);
-    lock_acquire(&p->process_lock);
-    if ( p->status == PROCESS_RUNNING ) {
-        p->status = PROCESS_ORPHAN;
-        lock_release(&p->process_lock);
-        e = list_next(e);
-    }
-    else {
-        lock_release(&p->process_lock);
-        e = list_remove(e);
-        free(p);
-    }
-  }
+   lock_acquire(&cur->parent_process->process_lock);
+  // for ( struct list_elem * e = list_begin(&cur->parent_process->children); e != list_end(&cur->parent_process->children);) {
+  //   struct process * p = list_entry(e, struct process, elem);
+  //   lock_acquire(&p->process_lock);
+  //   if ( p->status == PROCESS_RUNNING ) {
+  //       p->status = PROCESS_ORPHAN;
+  //       lock_release(&p->process_lock);
+  //       e = list_next(e);
+  //   }
+  //   else {
+  //       lock_release(&p->process_lock);
+  //       e = list_remove(e);
+  //       free(p);
+  //   }
+  // }
   /* Cleanup semantics for orphan or child process */
   if ( cur->parent_process != NULL ) {
     if ( cur->parent_process->status == PROCESS_ORPHAN ) {
