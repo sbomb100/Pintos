@@ -154,18 +154,18 @@ page_fault(struct intr_frame *f)
    }
    /* Pointer is good so get the page with it */
    lock_frame();
-   if (!lock_held_by_current_thread(&t->parent_process->spt_lock)){
+   if (!lock_held_by_current_thread(&t->parent_process->spt_lock))
+   {
       lock_acquire(&t->parent_process->spt_lock);
    }
-   
+
    struct spt_entry *page = get_page_from_hash(fault_addr);
-   
 
    if (page == NULL) /* Page not found */
    {
-      //uint32_t *esp = f->esp;
+      // uint32_t *esp = f->esp;
       /* if its not in stack range */
-      if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1<<23) && fault_addr >= (f->esp - 32)))
+      if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1 << 23) && fault_addr >= (f->esp - 32)))
       {
          load_extra_stack_page(fault_addr);
          lock_release(&t->parent_process->spt_lock);
@@ -219,51 +219,58 @@ exit:
    kill(f);
 }
 
-void load_swap_to_spt(struct spt_entry *page) {
-    page->pinned = true;
-    page->frame = find_frame(page);
-    
-    if (page->frame == NULL) {
-        unlock_frame();
-        thread_exit(-1);
-    }
+void load_swap_to_spt(struct spt_entry *page)
+{
+   page->pinned = true;
+   page->frame = find_frame(page);
 
-    if ( !install_page(page->vaddr, page->frame->paddr, page->writable)) {
-        unlock_frame();
-        thread_exit(-1);
-    }
+   if (page->frame == NULL)
+   {
+      unlock_frame();
+      thread_exit(-1);
+   }
 
-    swap_get(page);
+   if (!install_page(page->vaddr, page->frame->paddr, page->writable))
+   {
+      unlock_frame();
+      thread_exit(-1);
+   }
 
-    page->page_status = 3;
-    
-    page->pinned = false;
+   swap_get(page);
+
+   page->page_status = 3;
+
+   page->pinned = false;
 }
 
-void load_mmap_to_spt(struct spt_entry *page) {
-    page->pinned = true;
-    struct frame * new_frame = find_frame(page);
+void load_mmap_to_spt(struct spt_entry *page)
+{
+   page->pinned = true;
+   struct frame *new_frame = find_frame(page);
 
-    if ( new_frame == NULL ) {
-        unlock_frame();
-        thread_exit(-1);
-    }
+   if (new_frame == NULL)
+   {
+      unlock_frame();
+      thread_exit(-1);
+   }
 
-    file_seek(page->file, page->offset);
-    if (file_read(page->file, new_frame, page->bytes_read) != (int) page->bytes_read ) {
-        palloc_free_page(new_frame->page);
-        unlock_frame();
-        thread_exit(-1);
-    }
-    memset(new_frame + page->bytes_read, 0, page->bytes_zero);
+   file_seek(page->file, page->offset);
+   if (file_read(page->file, new_frame, page->bytes_read) != (int)page->bytes_read)
+   {
+      palloc_free_page(new_frame->page);
+      unlock_frame();
+      thread_exit(-1);
+   }
+   memset(new_frame + page->bytes_read, 0, page->bytes_zero);
 
-    if (!install_page(page->vaddr, new_frame->paddr, page->writable)) {
-        unlock_frame();
-        thread_exit(-1);
-    }
+   if (!install_page(page->vaddr, new_frame->paddr, page->writable))
+   {
+      unlock_frame();
+      thread_exit(-1);
+   }
 
-    page->page_status = 3;
-    page->pinned = false;
+   page->page_status = 3;
+   page->pinned = false;
 }
 
 /*
@@ -286,7 +293,7 @@ void load_file_to_spt(struct spt_entry *page)
       unlock_frame();
       thread_exit(-1);
    }
-   
+
    if (page->bytes_read != 0)
    {
       file_seek(page->file, page->offset);
@@ -329,21 +336,19 @@ void load_extra_stack_page(void *fault_addr)
    new_page->pagedir = thread_current()->pagedir;
    new_page->swap_index = -1;
 
-   hash_insert(&thread_current()->parent_process->spt, &new_page->elem);
-   thread_current()->parent_process->num_stack_pages++;
-   
    if (thread_current()->parent_process->num_stack_pages > 2048)
    {
-      
+
       lock_release(&thread_current()->parent_process->spt_lock);
       unlock_frame();
       thread_exit(-3);
    }
-   
+   hash_insert(&thread_current()->parent_process->spt, &new_page->elem);
+   thread_current()->parent_process->num_stack_pages++;
    struct frame *new_frame = find_frame(new_page);
    if (new_frame == NULL)
    {
-      
+
       lock_release(&thread_current()->parent_process->spt_lock);
       unlock_frame();
       thread_exit(-4);
