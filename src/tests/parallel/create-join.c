@@ -10,27 +10,28 @@
 
 int nums[NUM_THREADS];
 
-static void * worker_function(void * args) {
-    intptr_t i = (intptr_t) args;
-    nums[i]++;
-    return NULL;
+static void worker_function(void * args) {
+    int * i = (int *) args;
+    nums[*i]++;
 }
 
 void
 test_main(void)
 {
-    intptr_t i;
+    int i;
     for ( i = 0; i < NUM_THREADS; i++ ) {
         nums[i] = 0;
     }
 
-    pthread_t t[NUM_THREADS];
+    tid_t t[NUM_THREADS];
+
     for ( i = 0; i < NUM_THREADS; i++ ) {
-        CHECK( pthread_create(&t[i], worker_function, (void *) i), "pthread_create %zd", i);
+        t[i] = pthread_create(worker_function, &i);
+        CHECK( t[i] != TID_ERROR, "pthread_create %zd", i);
     }
 
     for ( i = 0; i < NUM_THREADS; i++ ) {
-        CHECK( pthread_join(&t[i]), "pthread_join %zd", i);
+        CHECK( pthread_join(t[i]), "pthread_join %zd", i);
     }
 
     for ( i = 0; i < NUM_THREADS; i++ ) {

@@ -1,51 +1,46 @@
 #include <pthread.h>
-#include <syscall.h>
 
-struct pthread_t_anon {
-    tid_t tid;
-};
+/* Opaque wrapper for create. */
+void start_thread(start_routine task, void *);
 
-struct pthread_mutex_t_anon {
-    int id;
-};
+tid_t pthread_create(start_routine task, void * args) {
+    return sys_pthread_create(start_thread, task, args);
+}
 
-struct pthread_semaphore_t_anon {
-    int id;
-};
+bool pthread_join(tid_t tid) {
+    return sys_pthread_join(tid);
+}
 
-bool pthread_create(pthread_t * t, void *(*start_routine)(void *), void *args) {
-    tid_t tid;
-    if ( (tid = sys_pthread_create(start_routine, args)) != TID_ERROR ) {
-        t->tid = tid;
-        return true;
-    }
+void pthread_exit(void) {
+    sys_pthread_exit();
+    NOT_REACHED();
+}
+
+void start_thread(start_routine task, void * args) {
+    task(args);
+    pthread_exit();
+}
+
+bool pthread_mutex_init(pthread_lock_t mutex UNUSED) {
     return false;
 }
 
-bool pthread_join(pthread_t * t) {
-    return sys_pthread_join(t->tid) == t->tid;
+void pthread_mutex_lock(pthread_lock_t mutex UNUSED) {
+    return;
 }
 
-bool pthread_mutex_init(pthread_mutex_t * mutex) {
+void pthread_mutex_unlock(pthread_lock_t mutex UNUSED) {
+    return;
+}
+
+bool pthread_semaphore_init(pthread_sema_t sema UNUSED) {
     return false;
 }
 
-void pthread_mutex_lock(pthread_mutex_t * mutex) {
+void pthread_semaphore_down(pthread_sema_t sema UNUSED) {
     return;
 }
 
-void pthread_mutex_unlock(pthread_mutex_t * mutex) {
-    return;
-}
-
-bool pthread_semaphore_init(pthread_semaphore_t * sema) {
-    return false;
-}
-
-void pthread_semaphore_down(pthread_semaphore_t * sema) {
-    return;
-}
-
-void pthread_semaphore_up(pthread_semaphore_t * sema) {
+void pthread_semaphore_up(pthread_sema_t sema UNUSED) {
     return;
 }

@@ -184,8 +184,8 @@ inumber (int fd)
 }
 
 tid_t 
-sys_pthread_create (void *(*start_routine)(void *), void *args) {
-  return syscall2 (SYS_PTHREAD_CREATE, start_routine, args);
+sys_pthread_create (wrapper_func wf, start_routine sr, void *args) {
+  return syscall3 (SYS_PTHREAD_CREATE, wf, sr, args);
 }
 
 void 

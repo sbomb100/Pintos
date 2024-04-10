@@ -17,6 +17,14 @@ typedef int mapid_t;
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)
 
+/* User synchronization identifiers. */
+typedef int pthread_lock_t;
+typedef int pthread_sema_t;
+
+/* Function pointer definitions. */
+typedef void (*start_routine)(void *);
+typedef void (*wrapper_func)(start_routine, void *);
+
 /* Maximum characters in a filename written by readdir(). */
 #define READDIR_MAX_LEN 14
 
@@ -51,7 +59,7 @@ bool isdir (int fd);
 int inumber (int fd);
 
 /* User threads syscalls. */
-tid_t sys_pthread_create(void *(*start_routine)(void *), void *args);
+tid_t sys_pthread_create(wrapper_func wf, start_routine sr, void *args);
 void sys_pthread_exit(void) NO_RETURN;
 tid_t sys_pthread_join(tid_t tid);
 
