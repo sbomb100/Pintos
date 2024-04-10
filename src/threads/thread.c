@@ -200,11 +200,10 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
   /* Initialize thread. */
   init_thread(t, name, nice);
   t->tid = allocate_tid();
-  t->main_thread_for_proc = false;
   if (!boot_process_created)
   {
     boot_process_created = true;
-    struct process *initial_process = malloc(sizeof(struct process));
+    initial_process = malloc(sizeof(struct process));
     if (initial_process == NULL)
       return NULL;
     initial_process->pid = allocate_pid();
@@ -215,7 +214,8 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
     list_init(&initial_process->children);
     sema_init(&initial_process->wait_sema, 0);
     lock_init(&initial_process->process_lock);
-
+    lock_init(&initial_process->counter_lock);
+    initial_process->num_threads_up = 0;
     // prob dont need this stuff but for now just leaving it TODO
     /*hash init*/
     hash_init(&initial_process->spt, page_hash, is_page_before, NULL);
@@ -244,8 +244,12 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
 
     ASSERT(parent_proc != NULL);
     t->parent_process = parent_proc;
+
     // add thread to processes list of threads
   }
+  lock_acquire(&t->parent_process->counter_lock);
+  t->parent_process->num_threads_up++;
+  lock_release(&t->parent_process->counter_lock);
 
   kf = alloc_frame(t, sizeof *kf);
   kf->eip = NULL;
@@ -284,7 +288,6 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   /* Initialize thread. */
   init_thread(t, name, nice);
   t->tid = allocate_tid();
-  t->main_thread_for_proc = true;
   /* Parent-child structure setup */
   /* Parent-child structure setup */
   struct process *new_proc = malloc(sizeof(struct process));
@@ -298,7 +301,8 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   list_init(&new_proc->children);
   sema_init(&new_proc->wait_sema, 0);
   lock_init(&new_proc->process_lock);
-
+  lock_init(&new_proc->counter_lock);
+  new_proc->num_threads_up = 0;
   /*hash init*/
   hash_init(&new_proc->spt, page_hash, is_page_before, NULL);
   lock_init(&new_proc->spt_lock);
@@ -314,6 +318,9 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     thread_exit(-1);
   }
   t->parent_process = new_proc;
+  lock_acquire(&t->parent_process->counter_lock);
+  t->parent_process->num_threads_up++;
+  lock_release(&t->parent_process->counter_lock);
   if (thread_current()->parent_process != NULL)
   {
     lock_acquire(&thread_current()->parent_process->process_lock);
@@ -323,7 +330,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   if (!boot_process_created)
   {
     boot_process_created = true;
-    struct process *initial_process = malloc(sizeof(struct process));
+    initial_process = malloc(sizeof(struct process));
     if (initial_process == NULL)
       return NULL;
     initial_process->pid = allocate_pid();
@@ -551,14 +558,19 @@ do_thread_exit(void)
 void thread_exit(int status)
 {
   ASSERT(!intr_context());
-#ifdef USERPROG
-  thread_current()->parent_process->exit_status = status;
+
+  
   // TODO FIX LATER
-  if (thread_current()->main_thread_for_proc)
+  lock_acquire(&thread_current()->parent_process->counter_lock);
+
+  thread_current()->parent_process->num_threads_up--;
+  bool proc_exit = thread_current()->parent_process->num_threads_up == 0;
+  lock_release(&thread_current()->parent_process->counter_lock);
+  if (proc_exit)
   {
+    thread_current()->parent_process->exit_status = status;
     process_exit(status);
   }
-#endif
 
   do_thread_exit();
 }
@@ -821,7 +833,7 @@ schedule(void)
   /* Schedule must be called with current CPU's ready queue lock held */
   ASSERT(spinlock_held_by_current_cpu(&get_cpu()->rq.lock));
 
-  /* Must not hold any other spinlocks, since interrupt handlers might
+  /* Must not hold any other spinlocks, since interrupt handlers might 
      attempt to acquire them, leading to deadlock since the outgoing
      thread would not be able to release them.
    */

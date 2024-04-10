@@ -34,7 +34,16 @@ enum
     SYS_PTHREAD_CREATE,         /* Creates a user thread. */
     SYS_PTHREAD_EXIT,           /* Terminates the calling user thread. */
     SYS_PTHREAD_JOIN,           /* Blocks the calling thread until a requested TID exits. */
-    SYS_SBRK                    /* Changes the data segment size. */
+    SYS_SBRK,                    /* Changes the data segment size. */
+    SYS_LOCK,
+    SYS_UNLOCK,
+    SYS_INITLOCK,
+    SYS_INITCOND,
+    SYS_COND,
+    SYS_SIGCOND,
+    SYS_INITSEMA,
+    SYS_SEMAUP,
+    SYS_SEMADOWN
   };
 
 #endif /* lib/syscall-nr.h */
