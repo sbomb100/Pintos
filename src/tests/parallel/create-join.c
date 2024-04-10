@@ -24,7 +24,7 @@ test_main(void)
         nums[i] = 0;
     }
 
-    struct pthread_t t[NUM_THREADS];
+    pthread_t t[NUM_THREADS];
     for ( i = 0; i < NUM_THREADS; i++ ) {
         CHECK( pthread_create(&t[i], worker_function, (void *) i), "pthread_create %zd", i);
     }

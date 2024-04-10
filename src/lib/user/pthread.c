@@ -1,19 +1,19 @@
 #include <pthread.h>
 #include <syscall.h>
 
-struct pthread_t {
+struct pthread_t_anon {
     tid_t tid;
 };
 
-struct pthread_mutex_t {
+struct pthread_mutex_t_anon {
     int id;
 };
 
-struct pthread_semaphore_t {
+struct pthread_semaphore_t_anon {
     int id;
 };
 
-bool pthread_create(struct pthread_t * t, void *(*start_routine)(void *), void *args) {
+bool pthread_create(pthread_t * t, void *(*start_routine)(void *), void *args) {
     tid_t tid;
     if ( (tid = sys_pthread_create(start_routine, args)) != TID_ERROR ) {
         t->tid = tid;
@@ -22,30 +22,30 @@ bool pthread_create(struct pthread_t * t, void *(*start_routine)(void *), void *
     return false;
 }
 
-bool pthread_join(struct pthread_t * t) {
+bool pthread_join(pthread_t * t) {
     return sys_pthread_join(t->tid) == t->tid;
 }
 
-bool pthread_mutex_init(struct pthread_mutex_t * mutex) {
+bool pthread_mutex_init(pthread_mutex_t * mutex) {
     return false;
 }
 
-void pthread_mutex_lock(struct pthread_mutex_t * mutex) {
+void pthread_mutex_lock(pthread_mutex_t * mutex) {
     return;
 }
 
-void pthread_mutex_unlock(struct pthread_mutex_t * mutex) {
+void pthread_mutex_unlock(pthread_mutex_t * mutex) {
     return;
 }
 
-bool pthread_semaphore_init(struct pthread_semaphore_t * sema) {
+bool pthread_semaphore_init(pthread_semaphore_t * sema) {
     return false;
 }
 
-void pthread_semaphore_down(struct pthread_semaphore_t * sema) {
+void pthread_semaphore_down(pthread_semaphore_t * sema) {
     return;
 }
 
-void pthread_semaphore_up(struct pthread_semaphore_t * sema) {
+void pthread_semaphore_up(pthread_semaphore_t * sema) {
     return;
 }
