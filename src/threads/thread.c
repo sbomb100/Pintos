@@ -303,6 +303,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   lock_init(&new_proc->process_lock);
   lock_init(&new_proc->counter_lock);
   new_proc->num_threads_up = 0;
+  new_proc->num_stack_pages = 0;
   /*hash init*/
   hash_init(&new_proc->spt, page_hash, is_page_before, NULL);
   lock_init(&new_proc->spt_lock);
@@ -573,13 +574,13 @@ void thread_exit(int status)
   }
 
   do_thread_exit();
-}
+} 
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void thread_yield(void)
 {
-  struct thread *cur = thread_current();
+  struct thread *cur = thread_current(); 
   ASSERT(!intr_context());
 
   lock_own_ready_queue();
