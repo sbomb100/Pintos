@@ -114,6 +114,7 @@ start_process(void *file_name_)
 int process_wait(tid_t child_tid)
 {
   /* Finds the child */
+  //finds a process based on its id, as this thread is run under the boot process
   struct process *cur_child = find_child((pid_t) child_tid);
 
   /* exits if no child was found */
@@ -121,11 +122,13 @@ int process_wait(tid_t child_tid)
   {
     return -1;
   }
-  
+  //remove this process from that list to show that we are already waiting on it
   lock_acquire(&thread_current()->parent_process->process_lock);
   list_remove(&cur_child->elem);
   lock_release(&thread_current()->parent_process->process_lock);
+  //signal that we are waiting on the process_exit call
   sema_down(&cur_child->wait_sema);
+  //leave
   int exit_status = cur_child->exit_status;
   free(cur_child);
   return exit_status;
@@ -135,12 +138,10 @@ int process_wait(tid_t child_tid)
 void process_exit(int status)
 {
   struct thread *cur = thread_current();
-  lock_acquire(&cur->parent_process->mmap_lock);
   while (cur->parent_process->num_mapped != 0)
   {
     munmap(cur->parent_process->num_mapped);
   }
-  lock_release(&cur->parent_process->mmap_lock);
    /* Destroy the current process's spt entries */
   lock_frame();
   lock_acquire(&cur->parent_process->spt_lock);

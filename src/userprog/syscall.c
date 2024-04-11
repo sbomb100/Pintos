@@ -166,14 +166,11 @@ syscall_handler(struct intr_frame *f)
       thread_exit(-1);
       return;
     }
-    lock_acquire(&thread_current()->parent_process->mmap_lock);
     if (!munmap(args[0]))
     {
-      lock_release(&thread_current()->parent_process->mmap_lock);
       thread_exit(-1);
       return;
     }
-    lock_release(&thread_current()->parent_process->mmap_lock);
     break;
   }
   default:
@@ -614,9 +611,12 @@ bool munmap(mapid_t mapping)
   lock_acquire(&file_lock);
   if (mapping <= 0)
   {
+    
     lock_release(&file_lock);
     return false;
   }
+  
+  lock_acquire(&thread_current()->parent_process->mmap_lock);
   struct list *map_list = &(thread_current()->parent_process->mmap_list);
   struct list_elem *e = list_begin(map_list);
   for (e = list_begin(map_list); e != list_end(map_list); e = e)
@@ -647,6 +647,7 @@ bool munmap(mapid_t mapping)
     }
   }
   thread_current()->parent_process->num_mapped--;
+  lock_release(&thread_current()->parent_process->mmap_lock);
   lock_release(&file_lock);
   return true;
 }
