@@ -209,14 +209,16 @@ do_thread_create (const char *name, int nice, thread_func *function, void *aux)
     t->tid = allocate_tid ();
 
     /* Parent-child structure setup */
-    struct child *cur_child = malloc(sizeof(struct child));
-    cur_child->tid = t->tid;
+    struct process *cur_child = malloc(sizeof(struct process));
+    cur_child->pid = t->tid;
     cur_child->exit_status = -1;
-    cur_child->has_exited = false;
+    cur_child->status = PROCESS_RUNNING;
     sema_init(&cur_child->wait_sema, 0);
+    lock_init(&cur_child->process_lock);
+    t->parent = cur_child;
+    lock_acquire(&thread_current()->children_lock);
     list_push_back(&thread_current()->children, &cur_child->elem);
-    
-
+    lock_release(&thread_current()->children_lock);
     /* Stack frame for kernel_thread(). */
     kf = alloc_frame (t, sizeof *kf);
     kf->eip = NULL;
@@ -418,10 +420,11 @@ do_thread_exit (void)
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
 void
-thread_exit (int status UNUSED)
+thread_exit (int status)
 {
   ASSERT(!intr_context ());
 #ifdef USERPROG
+  thread_current()->parent->exit_status = status;
   process_exit (status);
 #endif
 
@@ -602,8 +605,8 @@ init_thread (struct thread *t, const char *name, int nice)
   t->nice = nice;
   t->magic = THREAD_MAGIC;
   list_init(&t->children);
-  sema_init(&t->load_sema, 0);
-  t->parent = running_thread();
+  lock_init(&t->children_lock);
+  //t->parent = running_thread()->parent;
   if (cpu_can_acquire_spinlock)
     spinlock_acquire (&all_lock);
   list_push_back (&all_list, &t->allelem);

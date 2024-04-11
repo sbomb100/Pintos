@@ -8,11 +8,14 @@
 #define MAX_CACHE_SIZE 64
 
 static struct cache_block cache[MAX_CACHE_SIZE];
-// struct lock cache_lock;
+struct lock cache_lock;
+/* Number of currently allocated caches */
+static int num_cache_blocks = 0;
 
 
 
 static struct cache_block *find_cache_block (block_sector_t sector);
+static struct cache_block *is_in_cache (block_sector_t sector);
 static struct cache_block *cache_eviction (void);
 // static void write_behind (void *aux);
 // static void read_ahead (void *aux);
@@ -30,7 +33,7 @@ int cache_misses = 0;
  * Initializes the cache. 
  */
 void cache_init (void) {
-    // lock_init(&cache_lock);
+    lock_init(&cache_lock);
     for (int i = 0; i < MAX_CACHE_SIZE; i++) {
         cache[i].sector = -1;
         cache[i].dirty = false;
@@ -83,9 +86,6 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
         }
         b->num_writers++;
     } else {
-        if (b->num_writers > 0) {
-            cond_wait(&b->is_available, &b->cache_lock);
-        }
         b->num_readers++;
     }
     lock_release(&b->cache_lock);
@@ -98,20 +98,39 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
  * If there aren't any free spaces, evict.
  */
 static struct cache_block *find_cache_block (block_sector_t sector) {
-    for (int i = 0; i < MAX_CACHE_SIZE; i++) { // probably condense-able into a single loop
+    lock_acquire(&cache_lock);
+    struct cache_block *b = is_in_cache(sector);
+    if (b == NULL) { /* Cache Miss */
+        if (num_cache_blocks < MAX_CACHE_SIZE) {
+            b = &cache[num_cache_blocks];
+            num_cache_blocks++;
+
+            /* Cache block init */
+            b->sector = sector;
+            b->dirty = false;
+            b->valid = true;
+            b->num_readers = 0;
+            b->num_writers = 0;
+            b->num_pending_requests = 0;
+            lock_init(&b->cache_lock);
+            cond_init(&b->is_available);
+
+        } else {
+            b = cache_eviction();
+        }
+    }
+    b->use_bit = true;
+    lock_release(&cache_lock);
+    return b;
+}
+
+static struct cache_block *is_in_cache (block_sector_t sector) {
+    for (int i = 0; i < MAX_CACHE_SIZE; i++) {
         if (cache[i].sector == sector) {
             return &cache[i];
         }
     }
-    for (int i = 0; i < MAX_CACHE_SIZE; i++) {
-        if (!cache[i].valid) {
-            return &cache[i];
-        }
-    }
-    // evict a cache block
-    struct cache_block *evicted = cache_eviction();
-    return evicted;
-    // return &cache[0];
+    return NULL;
 }
 
 /*
@@ -121,11 +140,17 @@ static struct cache_block *cache_eviction (void) {
     struct cache_block *candidate = NULL;
     while (candidate == NULL) {
         for (int i = 0; i < MAX_CACHE_SIZE; i++) {
-            if (cache[i].num_readers == 0 && cache[i].num_writers == 0) {
+            if (!cache[i].use_bit) {
                 candidate = &cache[i];
                 break;
+            } else {
+                cache[i].use_bit = false;
             }
         }
+    }
+    if (candidate->dirty) {
+        block_write(fs_device, candidate->sector, candidate->data);
+        candidate->dirty = false;
     }
     ASSERT(candidate != NULL);
     return candidate;
@@ -143,6 +168,7 @@ void cache_put_block (struct cache_block *b) {
     } else if (b->num_readers > 0) {
         b->num_readers--;
     }
+    b->use_bit = true;
     cond_broadcast(&b->is_available, &b->cache_lock);
     lock_release(&b->cache_lock);
     
@@ -152,6 +178,7 @@ void cache_put_block (struct cache_block *b) {
  * Read cache block from disk, returns pointer to data
  */
 void * cache_read_block (struct cache_block *b) {
+    b->use_bit = true;
     return b->data;
 }
 

@@ -9,6 +9,7 @@ struct cache_block {
     block_sector_t sector;
     bool dirty; /* True if block has been modified, false otherwise */
     bool valid; /* True if block is valid, false otherwise */
+    bool use_bit; 
     int num_readers; /* Number of readers currently accessing the block */
     int num_writers; /* Number of writers currently accessing the block */
     int num_pending_requests; /* Number of pending requests for the block */

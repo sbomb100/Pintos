@@ -226,30 +226,8 @@ tid_t exec(const char *cmd_line)
 {
   if (cmd_line == NULL || !validate_pointer(cmd_line))
     return -1;
-  tid_t child_tid = process_execute(cmd_line);
-  if (child_tid == TID_ERROR)
-  {
-    return -1;
-  }
-  struct thread *cur = thread_current();
-  struct child *cur_child = NULL;
-  struct list_elem *e;
 
-  for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next(e))
-  {
-    struct child *temp = list_entry(e, struct child, elem);
-    if (temp->tid == child_tid)
-    {
-      cur_child = temp;
-      break;
-    }
-  }
-
-  if (cur_child == NULL)
-  {
-    child_tid = -1;
-  }
-  return child_tid;
+  return process_execute(cmd_line);
 }
 
 /*

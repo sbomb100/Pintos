@@ -17,12 +17,21 @@ enum thread_status
    THREAD_DYING    /* About to be destroyed. */
 };
 
+enum process_status {
+    PROCESS_RUNNING, /* Running process. */
+    PROCESS_ORPHAN,  /* Parent process exited without waiting for this. */
+    PROCESS_ABORT,   /* Looking to abort from fail load. */
+    PROCESS_EXIT,    /* Looking to exit normally. */
+};
+
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
-
 typedef int mapid_t;
 typedef int tid_t;
+typedef int pid_t;
+
 #define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
+#define PID_ERROR ((pid_t)-1) /* Error value for pid_t. */
 #define THREAD_NAME_MAX 16
 /* Thread priorities. */
 #define NICE_MIN -20   /* Highest priority. */
@@ -114,51 +123,46 @@ struct thread
    int64_t vruntime;
    int64_t vruntime_0;
    int64_t actual_runtime;
-   /*added in P2 for File Descriptors*/
-   struct file **fdToFile;
-   /*this thread's exe file*/
-   struct file *exec_file;
-
-   /* Parent-Child Relationship */
-   struct thread *parent;
-   struct list children;
-
-   /*loading child*/
-   struct semaphore load_sema;
-   bool child_successful;
 
 #ifdef USERPROG
    /* Owned by userprog/process.c. */
-   uint32_t *pagedir; /* Page directory. */
+   uint32_t *pagedir;           /* Page directory. */
+
+   struct file **fdToFile;      /* Array of 128 file descriptors. */
+   struct file *exec_file;      /* Thread's executable, to be given write access at the end of the process. */
+
+   struct process *parent;      /* The parent process of the thread. */
+   struct list children;        /* Child processes spawned by the parent. */
+   struct lock children_lock;   /* Lock for inserting/removing processes from the children list. */
 #endif
 
    /* Virtual Memory */
-   struct hash spt; //TODO THIS GOES IN PCB ---
-   struct lock spt_lock;
-   size_t num_stack_pages;
+   struct hash spt;             /* Supplemental Page Table. */
+   struct lock spt_lock;        /* Lock for inserting/removing pages from the spt. */
+   size_t num_stack_pages;      /* The total number of stack pages in the thread. Starts at 1 but can grow to 2048. */
 
-   struct list mmap_list;
-   size_t num_mapped; //------------------------
+   struct list mmap_list;       /* List of mmapped files. */
+   size_t num_mapped;           /* Number of mmapped files, serves as fd to be handed to user. */
 
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */
 };
 
-struct child
-{
-   tid_t tid;
-   int exit_status;
-   bool has_exited;
-   struct semaphore wait_sema;
-   struct list_elem elem;
+struct process {
+    pid_t pid;                      /* Process ID. */
+    int exit_status;                /* Exit status of the process. */
+    enum process_status status;     /* Process state. */
+    struct semaphore wait_sema;     /* Semaphore to signal waiting parent process. */
+    struct list_elem elem;          /* List_elem for the parent process's children list. */
+    struct lock process_lock;       /* Lock for process state, to be accessed by itself or its parent when orphanized. */
 };
 
 /* VM MMAP */
 struct mapped_item
 {
-   mapid_t id;
-   struct spt_entry* page;
-   struct list_elem elem;
+   mapid_t id;              /* mmap ID. */
+   struct spt_entry* page;  /* Page table entry of mmapped file. */
+   struct list_elem elem;   /* List_elem for the parent's mmap_list. */
 };
 
 void thread_init(void);
