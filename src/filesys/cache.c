@@ -76,7 +76,7 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
         // read the block from disk
         block_read(fs_device, sector, b->data);
         b->sector = sector;
-        cache_misses--;
+        cache_misses++;
     } else {
         cache_hits++;
     }

@@ -7,6 +7,7 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 #include "filesys/cache.h"
+#include <stdio.h>
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -19,7 +20,8 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    uint32_t unused[124];               /* Not used. */
+    bool is_dir;
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -75,7 +77,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool is_dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -92,6 +94,7 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->is_dir = is_dir;
       if (free_map_allocate (sectors, &disk_inode->start)) 
         {
           struct cache_block *cache_block = cache_get_block (sector, true);
@@ -107,6 +110,7 @@ inode_create (block_sector_t sector, off_t length)
               for (i = 0; i < sectors; i++) {
                 cache_block = cache_get_block (disk_inode->start + i, true);
                 cache_data = cache_zero_block(cache_block);
+                // memcpy(cache_data, disk_inode, BLOCK_SECTOR_SIZE);
                 cache_mark_block_dirty(cache_block);
                 cache_put_block(cache_block);
               }
@@ -127,6 +131,8 @@ inode_open (block_sector_t sector)
   struct list_elem *e;
   struct inode *inode;
 
+  // lock_acquire(&open_inodes_lock);
+
   /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e)) 
@@ -135,14 +141,18 @@ inode_open (block_sector_t sector)
       if (inode->sector == sector) 
         {
           inode_reopen (inode);
+          // lock_release(&open_inodes_lock);
           return inode; 
         }
     }
 
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
-  if (inode == NULL)
+  if (inode == NULL) {
+    // lock_release(&open_inodes_lock);
+    // printf("inode_open: malloc failed\n");
     return NULL;
+  }
 
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
@@ -150,10 +160,12 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  lock_init(&inode->inode_lock);
   struct cache_block *cache_block = cache_get_block (inode->sector, false);
   void *cache_data = cache_read_block(cache_block);
   memcpy(&inode->data, cache_data, BLOCK_SECTOR_SIZE);
   cache_put_block(cache_block);
+  // lock_release(&open_inodes_lock);
   return inode;
 }
 
@@ -195,6 +207,12 @@ inode_close (struct inode *inode)
           free_map_release (inode->sector, 1);
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length)); 
+        } else {
+          struct cache_block *cache_block = cache_get_block (inode->sector, true);
+          void *cache_data = cache_zero_block(cache_block);
+          memcpy(cache_data, &inode->data, BLOCK_SECTOR_SIZE);
+          cache_mark_block_dirty(cache_block);
+          cache_put_block(cache_block);
         }
 
       free (inode); 
@@ -379,4 +397,21 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+bool inode_is_dir (const struct inode * inode) {
+  // return inode->is_dir;
+  struct cache_block *cache_block = cache_get_block (inode->sector, false);
+  void *cache_data = cache_read_block(cache_block);
+  struct inode_disk *disk_inode = (struct inode_disk *) cache_data;
+  cache_put_block(cache_block);
+  return disk_inode->is_dir;
+}
+
+void inode_lock(struct inode *inode) {
+  lock_acquire(&inode->inode_lock);
+}
+
+void inode_unlock(struct inode *inode) {
+  lock_release(&inode->inode_lock);
 }

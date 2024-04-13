@@ -3,6 +3,9 @@
 #include "threads/malloc.h"
 #include "userprog/exception.h"
 #include "threads/vaddr.h"
+#include "filesys/inode.h"
+#include "filesys/filesys.h"
+#include "filesys/directory.h"
 
 #include "threads/cpu.h"
 struct lock file_lock;
@@ -241,7 +244,7 @@ bool create(const char *file, unsigned initial_size)
     thread_exit(-1);
 
   lock_file();
-  int ret = filesys_create(file, initial_size);
+  int ret = filesys_create(file, initial_size, false);
   unlock_file();
 
   return ret;
@@ -289,15 +292,20 @@ int open(const char *file)
   if (fp == NULL)
     thread_exit(0);
 
-  int fd = findFdForFile();
-  if (fd == -1)
+  if (inode_is_dir(file_get_inode(fp)))
   {
-    file_close(fp);
-    thread_exit(-1);
+    return -1;
+  } else {
+    int fd = findFdForFile();
+    if (fd == -1)
+    {
+      file_close(fp);
+      thread_exit(-1);
+    }
+    thread_current()->fdToFile[fd - 2] = fp;
+    return fd;
   }
-  thread_current()->fdToFile[fd - 2] = fp;
-
-  return fd;
+  
 }
 
 /*
@@ -707,8 +715,8 @@ bool put_mmap_in_list(struct spt_entry *page)
 /*
  * Changes the current working directory of the process to dir, which may be relative or absolute. Returns true if successful, false on failure. 
  */
-bool chdir (const char *dir UNUSED) {
-  return false;
+bool chdir (const char *dir) {
+  return filesys_chdir(dir);
 }
 
 /*
@@ -716,8 +724,12 @@ bool chdir (const char *dir UNUSED) {
  * Fails if dir already exists or if any directory name in dir, besides the last, does not already exist.
  * That is, mkdir("/a/b/c") succeeds only if "/a/b" already exists and "/a/b/c" does not. 
  */
-bool mkdir (const char *dir UNUSED) {
-  return false;
+bool mkdir (const char *dir) {
+  if (dir == NULL || !validate_pointer(dir))
+  {
+    return false;
+  }
+  return filesys_create(dir, 0, true);
 }
 
 /*
@@ -733,14 +745,22 @@ bool mkdir (const char *dir UNUSED) {
  * READDIR_MAX_LEN is defined in "lib/user/syscall.h".
  * If your file system supports longer file names than the basic file system, you should increase this value from the default of 14. 
  */
-bool readdir (int fd UNUSED, char *name UNUSED) {
+bool readdir (int fd, char *name) {
+  // get dir from fd
   return false;
+  
+
 }
 
 /* 
  * Returns true if fd represents a directory, false if it represents an ordinary file. 
  */
-bool isdir (int fd UNUSED) {
+bool isdir (int fd) {
+  // if (fd < 2 || fd > 1025)
+  // {
+  //   return false;
+  // }
+  // return filesys_isdir(fd);
   return false;
 }
 

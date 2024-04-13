@@ -13,6 +13,7 @@
 #include "threads/spinlock.h"
 #include "threads/vaddr.h"
 #include "filesys/filesys.h"
+#include "filesys/directory.h"
 #include "threads/scheduler.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -82,10 +83,11 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
   sched_init (&bcpu->rq);
   spinlock_init (&bcpu->rq.lock);
-  /* SET UP FILE DESCRIPTOR ARRAY*/
   
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
+  initial_thread->status = THREAD_RUNNING;
+  initial_thread->cwd = NULL;
   init_boot_thread (initial_thread, bcpu);
 }
 
@@ -102,6 +104,7 @@ thread_init_on_ap (void)
   sched_init (&cpu->rq);
   spinlock_init (&cpu->rq.lock);
   struct thread *cur_thread = running_thread ();
+  cur_thread->cwd = NULL;
   init_boot_thread (cur_thread, cpu);
 }
 
@@ -216,6 +219,12 @@ do_thread_create (const char *name, int nice, thread_func *function, void *aux)
     sema_init(&cur_child->wait_sema, 0);
     lock_init(&cur_child->process_lock);
     t->parent = cur_child;
+    if (thread_current()->cwd != NULL) {
+      cur_child->cwd = dir_reopen(thread_current()->cwd);
+    } else {
+      cur_child->cwd = NULL;
+    }
+
     lock_acquire(&thread_current()->children_lock);
     list_push_back(&thread_current()->children, &cur_child->elem);
     lock_release(&thread_current()->children_lock);

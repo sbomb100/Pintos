@@ -144,6 +144,8 @@ struct thread
    struct list mmap_list;       /* List of mmapped files. */
    size_t num_mapped;           /* Number of mmapped files, serves as fd to be handed to user. */
 
+   struct dir *cwd;             /* Current working directory. */
+
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */
 };
@@ -155,6 +157,7 @@ struct process {
     struct semaphore wait_sema;     /* Semaphore to signal waiting parent process. */
     struct list_elem elem;          /* List_elem for the parent process's children list. */
     struct lock process_lock;       /* Lock for process state, to be accessed by itself or its parent when orphanized. */
+    struct dir *cwd;                /* Current working directory. */
 };
 
 /* VM MMAP */
