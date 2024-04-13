@@ -25,8 +25,8 @@ off_t inode_length (const struct inode *);
 // get inumber 
 //get parent
 //set parent
-//lock
-//unlock
+void lock_inode(struct inode *);
+void unlock_inode(struct inode *);
 
 //inode alloc
 //inode free

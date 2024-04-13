@@ -127,6 +127,8 @@ inode_open (block_sector_t sector)
   struct list_elem *e;
   struct inode *inode;
 
+  lock_acquire(&open_inodes_lock);
+
   /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e)) 
@@ -134,15 +136,19 @@ inode_open (block_sector_t sector)
       inode = list_entry (e, struct inode, elem);
       if (inode->sector == sector) 
         {
-          inode_reopen (inode);
+          // inode_reopen (inode);
+          inode->open_cnt++;
+          lock_release(&open_inodes_lock);
           return inode; 
         }
     }
 
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
-  if (inode == NULL)
+  if (inode == NULL) {
+    lock_release(&open_inodes_lock);
     return NULL;
+  }
 
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
@@ -154,6 +160,7 @@ inode_open (block_sector_t sector)
   void *cache_data = cache_read_block(cache_block);
   memcpy(&inode->data, cache_data, BLOCK_SECTOR_SIZE);
   cache_put_block(cache_block);
+  lock_release(&open_inodes_lock);
   return inode;
 }
 
@@ -161,8 +168,10 @@ inode_open (block_sector_t sector)
 struct inode *
 inode_reopen (struct inode *inode)
 {
+  lock_acquire(&open_inodes_lock);
   if (inode != NULL)
     inode->open_cnt++;
+  lock_release(&open_inodes_lock);
   return inode;
 }
 
@@ -183,6 +192,8 @@ inode_close (struct inode *inode)
   if (inode == NULL)
     return;
 
+  lock_acquire(&open_inodes_lock);
+
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
     {
@@ -199,6 +210,7 @@ inode_close (struct inode *inode)
 
       free (inode); 
     }
+  lock_release(&open_inodes_lock);
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -218,7 +230,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-  uint8_t *bounce = NULL;
+  // uint8_t *bounce = NULL;
 
   while (size > 0) 
     {
@@ -267,7 +279,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       offset += chunk_size;
       bytes_read += chunk_size;
     }
-  free (bounce);
+  // free (bounce);
 
   return bytes_read;
 }
@@ -303,6 +315,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       int chunk_size = size < min_left ? size : min_left;
       if (chunk_size <= 0)
         break;
+
+      // try to read ahead
+      off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
+      if (size == 0 && next_sector > offset && next_sector < inode->data.length && byte_to_sector(inode, next_sector)) {
+        // void send_read_ahead_request(block_sector_t sector);
+        send_read_ahead_request(next_sector);
+      }
 
       if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
         {
@@ -379,4 +398,14 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+void
+lock_inode(struct inode *inode) {
+  lock_acquire(&inode->inode_lock);
+}
+
+void
+unlock_inode(struct inode *inode) {
+  lock_release(&inode->inode_lock);
 }
