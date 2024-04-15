@@ -1,6 +1,7 @@
 #ifndef FILESYS_FILE_H
 #define FILESYS_FILE_H
 
+#include <stdbool.h> //added. is it okay?
 #include "filesys/off_t.h"
 
 struct inode;
@@ -27,6 +28,7 @@ off_t file_tell (struct file *);
 off_t file_length (struct file *);
 
 //is dir
+bool file_is_dir (struct file *file);
 //get number
 
 #endif /* filesys/file.h */
