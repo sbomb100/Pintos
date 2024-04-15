@@ -177,7 +177,7 @@ syscall_handler(struct intr_frame *f)
     break;
   }
   case SYS_CHDIR:
-  printf("chdir\n");
+  // printf("chdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -186,7 +186,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)chdir((const char *)args[0]);
     break;
   case SYS_MKDIR:
-  printf("mkdir\n");
+  // printf("mkdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -195,7 +195,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)mkdir((const char *)args[0]);
     break;
   case SYS_READDIR:
-  printf("readdir\n");
+  // printf("readdir\n");
     if (!parse_arguments(f, &args[0], 2))
     {
       thread_exit(-1);
@@ -204,7 +204,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)readdir(args[0], (char *)args[1]);
     break;
   case SYS_ISDIR:
-  printf("isdir\n");
+  // printf("isdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -213,7 +213,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)isdir(args[0]);
     break;
   case SYS_INUMBER:
-  printf("inumber\n");
+  // printf("inumber\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -289,6 +289,7 @@ int open(const char *file)
   struct file *fp = filesys_open(file);
   if (fp == NULL)
   {
+    // inode_close(file_get_inode(fp));
     unlock_file();
     return -1;
   }
@@ -790,6 +791,7 @@ bool readdir (int fd, char *name) {
   {
     return true;
   }
+  // inode_close(dir_get_inode(dir));
   return false;
   printf("readdir\n");
   return false;

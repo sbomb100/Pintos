@@ -140,8 +140,9 @@ inode_open (block_sector_t sector)
       inode = list_entry (e, struct inode, elem);
       if (inode->sector == sector) 
         {
-          inode_reopen (inode);
+          // printf("inode open count: %d\n", inode->open_cnt);
           lock_release(&open_inodes_lock);
+          inode_reopen (inode);
           return inode; 
         }
     }
@@ -172,9 +173,13 @@ inode_open (block_sector_t sector)
 struct inode *
 inode_reopen (struct inode *inode)
 {
-  //lock_acquire(&open_inodes_lock);
+  // lock_acquire(&open_inodes_lock);
   if (inode != NULL)
     inode->open_cnt++;
+
+  // if (inode->open_cnt == 24 || inode->open_cnt == 25) {
+  //   debug_backtrace();
+  // }
   //lock_release(&open_inodes_lock);
   return inode;
 }
@@ -344,26 +349,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
         }
       else 
         {
-          /* We need a bounce buffer. */
-          // if (bounce == NULL) 
-          //   {
-          //     bounce = malloc (BLOCK_SECTOR_SIZE);
-          //     if (bounce == NULL)
-          //       break;
-          //   }
-
-          // /* If the sector contains data before or after the chunk
-          //    we're writing, then we need to read in the sector
-          //    first.  Otherwise we start with a sector of all zeros. */
-          // if (sector_ofs > 0 || chunk_size < sector_left) {
-          //   struct cache_block *cache_block = cache_get_block (sector_idx, false);
-          //   void *cache_data = cache_read_block(cache_block);
-          //   memcpy (bounce, cache_data, BLOCK_SECTOR_SIZE);
-          //   cache_put_block(cache_block);
-          // }
-          // else {
-          //   memset (bounce, 0, BLOCK_SECTOR_SIZE);
-          // memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
           struct cache_block *cache_block = cache_get_block (sector_idx, true);
           // void *cache_data = cache_zero_block(cache_block);
           void *cache_data = cache_read_block(cache_block);
@@ -371,7 +356,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
           memcpy(cache_data + sector_ofs, buffer + bytes_written, chunk_size);
           cache_mark_block_dirty(cache_block);
           cache_put_block(cache_block);
-          // }
         }
       /* Advance. */
       size -= chunk_size;

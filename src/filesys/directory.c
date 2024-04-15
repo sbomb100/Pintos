@@ -41,6 +41,7 @@ dir_create (block_sector_t sector, block_sector_t parent, size_t entry_cnt)
     strlcpy(e[1].name, "..", sizeof(e[1].name));
     e[1].inode_sector = parent;
     inode_write_at(dir->inode, &e[1], sizeof(e[1]), sizeof(e[0]));
+    // inode_close(dir->inode);
     dir_close(dir);
   }
   return success;
@@ -140,7 +141,7 @@ lookup (const struct dir *dir, const char *name,
       last_name = name_copy;
     }
 
-    if (e.in_use && (!strcmp (last_name, last_entry) || !strcmp(name, e.name))) // TODO: a really janky fix, improve if there's time (or as needed)
+    if (e.in_use && (!strcmp (last_name, last_entry) || !strcmp(name, e.name)))
       {
         if (ep != NULL)
           *ep = e;
@@ -177,7 +178,7 @@ dir_lookup (const struct dir *dir, const char *name,
     inode_unlock(dir->inode);
     return true;
   }
-  
+
   if (lookup (dir, name, &e, NULL)) {
     // printf("dir_lookup: %s\n", e.name);
     *inode = inode_open (e.inode_sector);
@@ -266,20 +267,21 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  if (inode_is_dir(inode) && (inode_get_open_cnt(inode) > 1 && !dir_is_empty(dir_open(inode)))) {
-    // printf("directory is open\n");
+  if (inode_is_dir(inode) && (inode_get_open_cnt(inode) > 1)) {
+    // printf("directory has %d open files\n", inode_get_open_cnt(inode));
     goto done;
   }
 
-  // if (inode_is_dir(inode) && !dir_is_empty(dir_open(inode))) {
-  //   printf("directory is not empty\n");
-  //   goto done;
-  // }
+  if (inode_is_dir(inode) && !dir_is_empty(dir_open(inode))) {
+    // printf("directory is not empty\n");
+    goto done;
+  }
 
   /* Erase directory entry. */
   e.in_use = false;
-  if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
+  if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) {
     goto done;
+  }
 
   /* Remove inode. */
   inode_remove (inode);
@@ -287,7 +289,6 @@ dir_remove (struct dir *dir, const char *name)
 
  done:
   inode_close (inode);
-  // printf("directory's open count: %d\n", inode_get_open_cnt(dir->inode));
   inode_unlock(dir->inode);
   return success;
 }
@@ -323,6 +324,9 @@ dir_is_empty (struct dir *dir)
   off_t ofs;
 
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e; ofs += sizeof e) {
+    if (strcmp(e.name, ".") == 0 || strcmp(e.name, "..") == 0) {
+      continue;
+    }
     if (e.in_use) {
       return false;
     }

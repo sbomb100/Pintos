@@ -50,11 +50,11 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size, bool is_dir) 
 {
-  printf("creating file with name %s that is a directory: %d\n", name, is_dir);
+  // printf("creating file with name %s that is a directory: %d\n", name, is_dir);
   block_sector_t inode_sector = 0;
   char *name_copy = malloc(strlen(name) + 1);
   if (name_copy == NULL) {
-    printf("name_copy is null\n");
+    // printf("name_copy is null\n");
     return false;
   }
   strlcpy(name_copy, name, strlen(name) + 1);
@@ -78,7 +78,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 
   dir_close(dir);
   free(name_copy);
-  printf("create success: %d\n", success);
+  // printf("create success: %d\n", success);
   return success;
 
 
@@ -261,6 +261,7 @@ struct dir *filesys_get_dir (const char *name) {
       dir_close(dir);
       return NULL;
     }
+    dir_close(dir);
     dir = dir_open(cur_inode);
     token = next_token;
     next_token = strtok_r(NULL, "/", &save_ptr);
