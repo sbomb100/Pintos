@@ -50,14 +50,15 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size, bool is_dir) 
 {
+  printf("creating file with name %s that is a directory: %d\n", name, is_dir);
   block_sector_t inode_sector = 0;
   char *name_copy = malloc(strlen(name) + 1);
   if (name_copy == NULL) {
+    printf("name_copy is null\n");
     return false;
   }
   strlcpy(name_copy, name, strlen(name) + 1);
   struct dir *dir = filesys_get_dir(name);
-
   bool success = (dir != NULL && free_map_allocate(1, &inode_sector));
   if (success) {
     struct inode *cur_inode;
@@ -77,6 +78,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 
   dir_close(dir);
   free(name_copy);
+  printf("create success: %d\n", success);
   return success;
 
 
@@ -88,7 +90,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   //   free_map_release (inode_sector, 1);
   // dir_close (dir);
   // free(name_copy);
-
+  
   return success;
 }
 
@@ -114,6 +116,7 @@ filesys_open (const char *name)
 
 
   if (dir != NULL) {
+    // printf("dir exists\n");
     dir_lookup(dir, name_copy, &cur_inode);
   }
 
@@ -135,17 +138,6 @@ filesys_open (const char *name)
     // printf("we should be getting here\n");
     return file_open(cur_inode);
   }
-
-  // return file_open(cur_inode);
-
-  // struct dir *dir = dir_open_root ();
-  // struct inode *inode = NULL;
-
-  // if (dir != NULL)
-  //   dir_lookup (dir, name, &inode);
-  // dir_close (dir);
-
-  // return file_open (inode);
 }
 
 /* Deletes the file named NAME.
@@ -155,11 +147,19 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_root ();
-  bool success = dir != NULL && dir_remove (dir, name);
-  dir_close (dir); 
-
+  struct dir *dir = filesys_get_dir(name);
+  //char *name_copy = malloc(strlen(name) + 1);
+  //if (name_copy == NULL) {
+  //  return false;
+  //}
+  //strlcpy(name_copy, name, strlen(name) + 1);
+  
+  bool success = dir != NULL && dir_remove(dir, name);
+  dir_close(dir);
+  //free(name_copy);
+  // printf("remove success: %d\n", success);
   return success;
+
 }
 
 /* Formats the file system. */
@@ -198,6 +198,7 @@ bool filesys_chdir (const char *name) {
     dir_close(cur->cwd);
   }
   cur->cwd = dir_open(cur_inode);
+  dir_close(cur_dir);
 
   // print the current working directory (for testing, delete later)
   // struct dir *dir = cur->cwd;
@@ -237,6 +238,7 @@ struct dir *filesys_get_dir (const char *name) {
 
 
   if (name_copy[0] == '/' || thread_current()->cwd == NULL) {
+    // printf("this is an absolute path\n");
     dir = dir_open_root();
   } else {
     struct thread *cur = thread_current();

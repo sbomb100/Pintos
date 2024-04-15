@@ -127,14 +127,29 @@ lookup (const struct dir *dir, const char *name,
       last_entry = e.name;
     }
 
-    if (e.in_use && (!strcmp (name, last_entry) || !strcmp(name, e.name))) // TODO: a really janky fix, improve if there's time (or as needed)
+    // does the same to name
+    char *name_copy = malloc(strlen(name) + 1);
+    if (name_copy == NULL) {
+      return false;
+    }
+    strlcpy(name_copy, name, strlen(name) + 1);
+    char *last_name = strrchr(name_copy, '/');
+    if (last_name != NULL) {
+      last_name++;
+    } else {
+      last_name = name_copy;
+    }
+
+    if (e.in_use && (!strcmp (last_name, last_entry) || !strcmp(name, e.name))) // TODO: a really janky fix, improve if there's time (or as needed)
       {
         if (ep != NULL)
           *ep = e;
         if (ofsp != NULL)
           *ofsp = ofs;
+        free(name_copy);
         return true;
       } 
+      free(name_copy);
        }
   return false;
 }
@@ -153,11 +168,24 @@ dir_lookup (const struct dir *dir, const char *name,
   ASSERT (name != NULL);
 
   inode_lock(dir->inode);
+
+  // printf("dir_lookup: %s\n", name);
+
+  // if just "/", return root
+  if (strcmp(name, "/") == 0) {
+    *inode = inode_open(ROOT_DIR_SECTOR);
+    inode_unlock(dir->inode);
+    return true;
+  }
+  
   if (lookup (dir, name, &e, NULL)) {
+    // printf("dir_lookup: %s\n", e.name);
     *inode = inode_open (e.inode_sector);
   }
-  else
+  else {
+    // printf("setting inode to NULL\n");
     *inode = NULL;
+  }
   inode_unlock(dir->inode);
   return *inode != NULL;
 }
@@ -214,6 +242,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
 bool
 dir_remove (struct dir *dir, const char *name) 
 {
+  // printf("removing %s\n", name);
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
@@ -237,9 +266,15 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  if (inode_is_dir(inode) && !dir_is_empty(dir_open(inode))) {
+  if (inode_is_dir(inode) && (inode_get_open_cnt(inode) > 1 && !dir_is_empty(dir_open(inode)))) {
+    // printf("directory is open\n");
     goto done;
   }
+
+  // if (inode_is_dir(inode) && !dir_is_empty(dir_open(inode))) {
+  //   printf("directory is not empty\n");
+  //   goto done;
+  // }
 
   /* Erase directory entry. */
   e.in_use = false;
@@ -252,7 +287,8 @@ dir_remove (struct dir *dir, const char *name)
 
  done:
   inode_close (inode);
-  // inode_unlock(dir->inode);
+  // printf("directory's open count: %d\n", inode_get_open_cnt(dir->inode));
+  inode_unlock(dir->inode);
   return success;
 }
 

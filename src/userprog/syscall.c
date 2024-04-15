@@ -177,6 +177,7 @@ syscall_handler(struct intr_frame *f)
     break;
   }
   case SYS_CHDIR:
+  printf("chdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -185,6 +186,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)chdir((const char *)args[0]);
     break;
   case SYS_MKDIR:
+  printf("mkdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -193,6 +195,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)mkdir((const char *)args[0]);
     break;
   case SYS_READDIR:
+  printf("readdir\n");
     if (!parse_arguments(f, &args[0], 2))
     {
       thread_exit(-1);
@@ -201,6 +204,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)readdir(args[0], (char *)args[1]);
     break;
   case SYS_ISDIR:
+  printf("isdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -209,6 +213,7 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)isdir(args[0]);
     break;
   case SYS_INUMBER:
+  printf("inumber\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -294,7 +299,20 @@ int open(const char *file)
 
   if (inode_is_dir(file_get_inode(fp)))
   {
-    return -1;
+    struct dir *dir = dir_open(inode_reopen(file_get_inode(fp)));
+    if (dir == NULL)
+    {
+      file_close(fp);
+      thread_exit(-1);
+    }
+    int fd = findFdForFile();
+    if (fd == -1)
+    {
+      file_close(fp);
+      thread_exit(-1);
+    }
+    thread_current()->fdToFile[fd - 2] = fp;
+    return fd;
   } else {
     int fd = findFdForFile();
     if (fd == -1)
@@ -450,8 +468,7 @@ int write(int fd, const void *buffer, unsigned size)
   if (buffer == NULL || !validate_pointer(buffer))
     thread_exit(-1);
   if (fd < 1 || fd > 1025)
-    return -1;
-  
+    return -1; 
   int ret = -1;
   if (fd == 1)
   {
@@ -462,8 +479,13 @@ int write(int fd, const void *buffer, unsigned size)
   {
 
     struct file *fileDes = thread_current()->fdToFile[fd - 2];
-    if (fileDes != NULL)
+
+    // check if isdir
+    if (fileDes != NULL && inode_is_dir(file_get_inode(fileDes)))
     {
+      lock_release(&file_lock);
+      return -1;
+    } else {
       ret = file_write(fileDes, buffer, size);
       if (ret == 0)
       {
@@ -746,7 +768,30 @@ bool mkdir (const char *dir) {
  * If your file system supports longer file names than the basic file system, you should increase this value from the default of 14. 
  */
 bool readdir (int fd, char *name) {
-  // get dir from fd
+  if (fd < 2 || fd > 1025)
+  {
+    return false;
+  }
+  struct file *file = thread_current()->fdToFile[fd - 2];
+  if (file == NULL)
+  {
+    return false;
+  }
+  if (!inode_is_dir(file_get_inode(file)))
+  {
+    return false;
+  }
+  struct dir *dir = dir_open(inode_reopen(file_get_inode(file)));
+  if (dir == NULL)
+  {
+    return false;
+  }
+  if (dir_readdir(dir, name))
+  {
+    return true;
+  }
+  return false;
+  printf("readdir\n");
   return false;
   
 
@@ -756,19 +801,44 @@ bool readdir (int fd, char *name) {
  * Returns true if fd represents a directory, false if it represents an ordinary file. 
  */
 bool isdir (int fd) {
-  // if (fd < 2 || fd > 1025)
-  // {
-  //   return false;
-  // }
-  // return filesys_isdir(fd);
+  if (fd < 2 || fd > 1025)
+  {
+    return false;
+  }
+  struct file *file = thread_current()->fdToFile[fd - 2];
+  if (file == NULL)
+  {
+    return false;
+  }
+  if (inode_is_dir(file_get_inode(file)))
+  {
+    return true;
+  }
   return false;
+  
 }
 
 /*
  * Returns the inode number of the inode associated with fd, which may represent an ordinary file or a directory.
  *
- * An inode number persistently identifies a file or directory. It is unique during the file's existence. In Pintos, the sector number of the inode is suitable for use as an inode number. 
+ * An inode number persistently identifies a file or directory. It is unique during the file's existence.
+ * In Pintos, the sector number of the inode is suitable for use as an inode number. 
  */
-int inumber (int fd UNUSED) {
-  return false;
+int inumber (int fd) {
+  if (fd < 2 || fd > 1025)
+  {
+    return -1;
+  }
+  struct file *file = thread_current()->fdToFile[fd - 2];
+  if (file == NULL)
+  {
+    return -1;
+  }
+  struct inode *inode = file_get_inode(file);
+  if (inode == NULL)
+  {
+    return -1;
+  }
+  int inumber = inode_get_inumber(inode);
+  return inumber;
 }
