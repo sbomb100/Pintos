@@ -320,10 +320,10 @@ inode_open (block_sector_t sector)//done
   inode->deny_write_cnt = 0;
   inode->removed = false;
   lock_init(&inode->inode_lock);
-  struct cache_block *cache_block = cache_get_block (inode->sector, false);
-  void *cache_data = cache_read_block(cache_block);
-  memcpy(&inode->data, cache_data, BLOCK_SECTOR_SIZE);
-  cache_put_block(cache_block);
+  // struct cache_block *cache_block = cache_get_block (inode->sector, false);
+  // void *cache_data = cache_read_block(cache_block);
+  // memcpy(&inode->data, cache_data, BLOCK_SECTOR_SIZE);
+  // cache_put_block(cache_block);
   lock_release(&open_inodes_lock);
   return inode;
 }
@@ -357,7 +357,7 @@ inode_close (struct inode *inode) //TODO
 
   lock_acquire(&inode->inode_lock);
 
-  lock_acquire(&open_inodes_lock); //needed? test
+  //lock_acquire(&open_inodes_lock); //needed? test
 
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
@@ -571,6 +571,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     return 0;
   }
 
+  // // try to read ahead
+  //     off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
+  //     if (size == 0 && next_sector > offset && next_sector < inode->data.length && byte_to_sector(inode, next_sector)) {
+  //       // void send_read_ahead_request(block_sector_t sector);
+  //       send_read_ahead_request(next_sector);
+  //     }
+
   //fetch the is_directory status
   // cache_block = cache_get_block(inode->sector, true);
   // is_directory = ( (struct inode_disk *)cache_block->data)->is_directory;
@@ -609,6 +616,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       memcpy(cache_block->data + sector_ofs, buffer + bytes_written, chunk_size);
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
+
+        // // try to read ahead
+  //     off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
+  //     if (size == 0 && next_sector > offset && next_sector < inode->data.length && byte_to_sector(inode, next_sector)) {
+  //       // void send_read_ahead_request(block_sector_t sector);
+  //       send_read_ahead_request(next_sector);
+  //     }
 
       // if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
       //   {
