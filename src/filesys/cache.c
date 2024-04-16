@@ -2,13 +2,14 @@
 #include "filesys/filesys.h"
 #include "devices/timer.h"
 #include "threads/thread.h"
+#include "threads/malloc.h"
 #include <string.h>
 #include <stdio.h>
 
 #define MAX_CACHE_SIZE 64
 
 static struct cache_block cache[MAX_CACHE_SIZE];
-struct lock cache_lock;
+struct lock all_cache_lock;
 /* Number of currently allocated caches */
 static int num_cache_blocks = 0;
 
@@ -17,8 +18,13 @@ static int num_cache_blocks = 0;
 static struct cache_block *find_cache_block (block_sector_t sector);
 static struct cache_block *is_in_cache (block_sector_t sector);
 static struct cache_block *cache_eviction (void);
-// static void write_behind (void *aux);
-// static void read_ahead (void *aux);
+static void write_behind (void *aux);
+static void read_ahead (void *aux);
+
+struct read_ahead_sector {
+    block_sector_t sector;
+    struct list_elem elem;
+};
 
 /* Read ahead daemon support */
 struct condition read_ahead_cond;
@@ -33,7 +39,7 @@ int cache_misses = 0;
  * Initializes the cache. 
  */
 void cache_init (void) {
-    lock_init(&cache_lock);
+    lock_init(&all_cache_lock);
     for (int i = 0; i < MAX_CACHE_SIZE; i++) {
         cache[i].sector = -1;
         cache[i].dirty = false;
@@ -46,8 +52,9 @@ void cache_init (void) {
     }
     list_init(&read_ahead_list);
     lock_init(&read_ahead_lock);
-    // thread_create("write_behind", NICE_DEFAULT, write_behind, NULL);
-    // thread_create("read_ahead", NICE_DEFAULT, read_ahead, NULL);
+    cond_init(&read_ahead_cond);
+    thread_create("write_behind", NICE_DEFAULT, write_behind, NULL);
+    thread_create("read_ahead", NICE_DEFAULT, read_ahead, NULL);
 }
 
 /* 
@@ -64,8 +71,8 @@ void cache_shutdown(void) {
  * Acquires a cache block for the given sector.
  */
 struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
-    
     struct cache_block *b = find_cache_block(sector);
+    lock_acquire(&all_cache_lock);
     lock_acquire(&b->cache_lock);
     if (b->sector != sector) {
         // if the block is dirty, write it back to disk
@@ -89,6 +96,7 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
         b->num_readers++;
     }
     lock_release(&b->cache_lock);
+    lock_release(&all_cache_lock);
     return b;
 
 }
@@ -98,29 +106,27 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
  * If there aren't any free spaces, evict.
  */
 static struct cache_block *find_cache_block (block_sector_t sector) {
-    lock_acquire(&cache_lock);
+    lock_acquire(&all_cache_lock);
     struct cache_block *b = is_in_cache(sector);
     if (b == NULL) { /* Cache Miss */
         if (num_cache_blocks < MAX_CACHE_SIZE) {
             b = &cache[num_cache_blocks];
             num_cache_blocks++;
 
-            /* Cache block init */
-            b->sector = sector;
-            b->dirty = false;
-            b->valid = true;
-            b->num_readers = 0;
-            b->num_writers = 0;
-            b->num_pending_requests = 0;
-            lock_init(&b->cache_lock);
-            cond_init(&b->is_available);
+            // /* Cache block init */
+            // b->sector = sector;
+            // b->dirty = false;
+            // b->valid = true;
+            // b->num_readers = 0;
+            // b->num_writers = 0;
+            // b->num_pending_requests = 0;
 
         } else {
             b = cache_eviction();
         }
     }
     b->use_bit = true;
-    lock_release(&cache_lock);
+    lock_release(&all_cache_lock);
     return b;
 }
 
@@ -201,37 +207,54 @@ void cache_mark_block_dirty(struct cache_block *b) {
     lock_release(&b->cache_lock);
 }
 
-/*
- * Looks for a buffer in the cache. If one cannot be found, evict?
- */
-// static struct cache_block * find_cache_block (block_sector_t sector) {
-//     return NULL;
-// }
-
 void flush_cache(void) {
     for (int i = 0; i < MAX_CACHE_SIZE; i++) {
-        struct cache_block *cache = &cache[i];
-        // will it try to lock an already existing lock?
+        struct cache_block *b = &cache[i];
+        lock_acquire(&b->cache_lock);
+        if (b->dirty) {
+            block_write(fs_device, b->sector, b->data);
+            b->dirty = false;
+        }
+        lock_release(&b->cache_lock);
+
     }
 }
 
 /* 
  * Writes dirty blocks to disk on a regular interval asynchronously.
  */
-// static void write_behind (void *aux UNUSED) {
-//     for (;;) {
-//         timer_sleep(30000); /* Sleeps for 30000 ticks. Adjust as necessary. */
-//         flush_cache();
-//     }
-// }
+static void write_behind (void *aux UNUSED) {
+    for (;;) {
+        timer_sleep(100); /* Sleeps for 30000 ticks. Adjust as necessary. */
+        flush_cache();
+    }
+}
 
-// static void read_ahead (void *aux UNUSED) {
-//     for (;;) {
-//         // struct cache_block *cache = NULL;
-//         // if (list_empty(&read_ahead_list)) {
-//         //     cond_wait(&read_ahead_cond, &read_ahead_lock);
-//         // }
-//         // cache = list_entry(list_pop_front(&read_ahead_list), struct cache_block, read_ahead_elem);
-//         // block_read(fs_device, cache->sector, cache->data);
-//     }
-// }
+
+void send_read_ahead_request(block_sector_t ahead_sector) {
+    struct read_ahead_sector *ras = malloc(sizeof(struct read_ahead_sector));
+    if (ras == NULL) {
+        return;
+    }
+    ras->sector = ahead_sector;
+
+    lock_acquire(&read_ahead_lock);
+    list_push_back(&read_ahead_list, &ras->elem);
+    cond_signal(&read_ahead_cond, &read_ahead_lock);
+    lock_release(&read_ahead_lock);
+}
+
+
+static void read_ahead (void *aux UNUSED) {
+    for (;;) {
+        lock_acquire(&read_ahead_lock);
+        while (list_empty(&read_ahead_list)) {
+            cond_wait(&read_ahead_cond, &read_ahead_lock);
+        }
+        struct read_ahead_sector *ras = list_entry(list_pop_front(&read_ahead_list), struct read_ahead_sector, elem);
+        lock_release(&read_ahead_lock);
+        struct cache_block *b = cache_get_block(ras->sector, false);
+        cache_put_block(b);
+        free(ras);
+    }
+}

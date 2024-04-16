@@ -27,8 +27,8 @@ static off_t update_length (struct inode *inode, off_t offset);
 // get inumber 
 //get parent
 //set parent
-//lock
-//unlock
+void lock_inode(struct inode *);
+void unlock_inode(struct inode *);
 
 //inode alloc
 //inode free

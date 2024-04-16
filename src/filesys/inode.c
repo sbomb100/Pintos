@@ -291,6 +291,8 @@ inode_open (block_sector_t sector)//done
   struct list_elem *e;
   struct inode *inode;
 
+  
+
   lock_acquire (&open_inodes_lock);
   /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes); e = list_next (e)) 
@@ -318,9 +320,10 @@ inode_open (block_sector_t sector)//done
   inode->deny_write_cnt = 0;
   inode->removed = false;
   lock_init(&inode->inode_lock);
-
-  
-
+  struct cache_block *cache_block = cache_get_block (inode->sector, false);
+  void *cache_data = cache_read_block(cache_block);
+  memcpy(&inode->data, cache_data, BLOCK_SECTOR_SIZE);
+  cache_put_block(cache_block);
   lock_release(&open_inodes_lock);
   return inode;
 }
@@ -353,6 +356,8 @@ inode_close (struct inode *inode) //TODO
      return;
 
   lock_acquire(&inode->inode_lock);
+
+  lock_acquire(&open_inodes_lock); //needed? test
 
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
@@ -596,6 +601,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       if (chunk_size <= 0)
         break;
 
+        
+
       cache_block = cache_get_block(sector, false);
       // if(offset %1 == 0)
       //   printf("sector_ofs: %d\n", sector_ofs);
@@ -699,4 +706,14 @@ inode_is_directory (struct inode *inode){
   is_directory = inode->data->is_directory;
   cache_put_block (cache_block);
   return is_directory;
+}
+
+void
+lock_inode(struct inode *inode) {
+  lock_acquire(&inode->inode_lock);
+}
+
+void
+unlock_inode(struct inode *inode) {
+  lock_release(&inode->inode_lock);
 }

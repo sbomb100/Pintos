@@ -19,6 +19,9 @@ struct cache_block {
     struct list_elem read_ahead_elem;
 };
 
+
+void send_read_ahead_request(block_sector_t sector);
+
 /* Intializes the cache */
 void cache_init(void);
 /* Either grant exclusive or shared access */
