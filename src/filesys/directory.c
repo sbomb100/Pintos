@@ -177,7 +177,7 @@ dir_lookup (const struct dir *dir, const char *name,
   if (strcmp(name, "/") == 0) {
     *inode = inode_open(ROOT_DIR_SECTOR);
     // inode_unlock(dir->inode);
-    unlock_inode(dir->inode);
+    // unlock_inode(dir->inode);
     return true;
   }
 
@@ -260,7 +260,7 @@ dir_remove (struct dir *dir, const char *name)
   }
 
   // inode_lock(dir->inode);
-  lock_inode(dir->inode);
+  // lock_inode(dir->inode);
 
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
@@ -294,7 +294,7 @@ dir_remove (struct dir *dir, const char *name)
  done:
   inode_close (inode);
   // inode_unlock(dir->inode);
-  unlock_inode(dir->inode);
+  // unlock_inode(dir->inode);
   return success;
 }
 
