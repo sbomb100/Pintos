@@ -175,6 +175,16 @@ do_format (void)
 }
 
 bool filesys_chdir (const char *name) {
+
+  if (strcmp(name, "/") == 0) {
+    struct thread *cur = thread_current();
+    if (cur->cwd != NULL) {
+      dir_close(cur->cwd);
+    }
+    cur->cwd = dir_open_root();
+    return true;
+  }
+
   struct dir *cur_dir = filesys_get_dir(name);
 
   char *name_copy = malloc(strlen(name) + 1);
