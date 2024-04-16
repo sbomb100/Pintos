@@ -28,7 +28,7 @@ bool
 free_map_allocate (size_t cnt, block_sector_t *sectorp)
 {
   block_sector_t sector = bitmap_scan_and_flip (free_map, 0, cnt, false);
-  // if (sector != BITMAP_ERROR
+  // if (sector != BITMAP_ERROR     //can cause infinite recursion
   //     && free_map_file != NULL
   //     && !bitmap_write (free_map, free_map_file))
   //   {
@@ -64,7 +64,9 @@ free_map_open (void)
 void
 free_map_close (void) 
 {
-  bitmap_write (free_map, free_map_file);
+  //bitmap_write (free_map, free_map_file);  
+  if (!bitmap_write (free_map, free_map_file))
+    PANIC ("can't write free map");
   file_close (free_map_file);
 }
 
