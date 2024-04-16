@@ -71,19 +71,20 @@ void cache_shutdown(void) {
  * Acquires a cache block for the given sector.
  */
 struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
-    struct cache_block *b = find_cache_block(sector);
     lock_acquire(&all_cache_lock);
+    struct cache_block *b = find_cache_block(sector);
     lock_acquire(&b->cache_lock);
     if (b->sector != sector) {
         // if the block is dirty, write it back to disk
         if (b->dirty) {
             block_write(fs_device, b->sector, b->data);
             b->dirty = false;
+            b->valid = false;
         }
         // read the block from disk
         block_read(fs_device, sector, b->data);
         b->sector = sector;
-        cache_misses--;
+        cache_misses++;
     } else {
         cache_hits++;
     }
@@ -106,7 +107,7 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
  * If there aren't any free spaces, evict.
  */
 static struct cache_block *find_cache_block (block_sector_t sector) {
-    lock_acquire(&all_cache_lock);
+    // lock_acquire(&all_cache_lock);
     struct cache_block *b = is_in_cache(sector);
     if (b == NULL) { /* Cache Miss */
         if (num_cache_blocks < MAX_CACHE_SIZE) {
@@ -126,7 +127,7 @@ static struct cache_block *find_cache_block (block_sector_t sector) {
         }
     }
     b->use_bit = true;
-    lock_release(&all_cache_lock);
+    // lock_release(&all_cache_lock);
     return b;
 }
 
@@ -184,7 +185,13 @@ void cache_put_block (struct cache_block *b) {
  * Read cache block from disk, returns pointer to data
  */
 void * cache_read_block (struct cache_block *b) {
+    lock_acquire(&b->cache_lock);
     b->use_bit = true;
+    if (!b->valid) {
+        block_read(fs_device, b->sector, b->data);
+        b->valid = true;
+    }
+    lock_release(&b->cache_lock);
     return b->data;
 }
 
@@ -194,6 +201,7 @@ void * cache_read_block (struct cache_block *b) {
 void * cache_zero_block (struct cache_block *b) {
     lock_acquire(&b->cache_lock);
     memset(b->data, 0, BLOCK_SECTOR_SIZE);
+    b->valid = true;
     lock_release(&b->cache_lock);
     return b->data;
 }
@@ -225,7 +233,7 @@ void flush_cache(void) {
  */
 static void write_behind (void *aux UNUSED) {
     for (;;) {
-        timer_sleep(100); /* Sleeps for 30000 ticks. Adjust as necessary. */
+        timer_sleep(1000);
         flush_cache();
     }
 }
