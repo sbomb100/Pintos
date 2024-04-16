@@ -168,14 +168,16 @@ dir_lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  inode_lock(dir->inode);
+  // inode_lock(dir->inode);
+  // lock_inode(dir->inode);
 
   // printf("dir_lookup: %s\n", name);
 
   // if just "/", return root
   if (strcmp(name, "/") == 0) {
     *inode = inode_open(ROOT_DIR_SECTOR);
-    inode_unlock(dir->inode);
+    // inode_unlock(dir->inode);
+    unlock_inode(dir->inode);
     return true;
   }
 
@@ -187,7 +189,8 @@ dir_lookup (const struct dir *dir, const char *name,
     // printf("setting inode to NULL\n");
     *inode = NULL;
   }
-  inode_unlock(dir->inode);
+  // inode_unlock(dir->inode);
+  // lock_inode(dir->inode);
   return *inode != NULL;
 }
 
@@ -256,7 +259,8 @@ dir_remove (struct dir *dir, const char *name)
     return false;
   }
 
-  inode_lock(dir->inode);
+  // inode_lock(dir->inode);
+  lock_inode(dir->inode);
 
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
@@ -289,7 +293,8 @@ dir_remove (struct dir *dir, const char *name)
 
  done:
   inode_close (inode);
-  inode_unlock(dir->inode);
+  // inode_unlock(dir->inode);
+  unlock_inode(dir->inode);
   return success;
 }
 
@@ -301,18 +306,21 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
   struct inode *inode = dir->inode;
-  inode_lock(inode);
+  // inode_lock(inode);
+  lock_inode(inode);
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
   {
     dir->pos += sizeof e;
     if (e.in_use && strcmp(e.name, ".") && strcmp(e.name, ".."))
       {
         strlcpy (name, e.name, NAME_MAX + 1);
-        inode_unlock(inode);
+        // inode_unlock(inode);
+        unlock_inode(inode);
         return true;
       } 
   }
-  inode_unlock(inode);
+  // inode_unlock(inode);
+  unlock_inode(inode);
   return false;
 }
 
