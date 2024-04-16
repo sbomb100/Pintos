@@ -298,7 +298,7 @@ int open(const char *file)
   if (fp == NULL)
     thread_exit(0);
 
-  if (inode_is_dir(file_get_inode(fp)))
+  if (inode_is_directory(file_get_inode(fp)))
   {
     struct dir *dir = dir_open(inode_reopen(file_get_inode(fp)));
     if (dir == NULL)
@@ -482,7 +482,7 @@ int write(int fd, const void *buffer, unsigned size)
     struct file *fileDes = thread_current()->fdToFile[fd - 2];
 
     // check if isdir
-    if (fileDes != NULL && inode_is_dir(file_get_inode(fileDes)))
+    if (fileDes != NULL && inode_is_directory(file_get_inode(fileDes)))
     {
       lock_release(&file_lock);
       return -1;
@@ -778,7 +778,7 @@ bool readdir (int fd, char *name) {
   {
     return false;
   }
-  if (!inode_is_dir(file_get_inode(file)))
+  if (!inode_is_directory(file_get_inode(file)))
   {
     return false;
   }
@@ -812,7 +812,7 @@ bool isdir (int fd) {
   {
     return false;
   }
-  if (inode_is_dir(file_get_inode(file)))
+  if (inode_is_directory(file_get_inode(file)))
   {
     return true;
   }

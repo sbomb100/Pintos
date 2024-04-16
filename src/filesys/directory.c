@@ -267,12 +267,12 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  if (inode_is_dir(inode) && (inode_get_open_cnt(inode) > 1)) {
+  if (inode_is_directory(inode) && (inode_get_open_cnt(inode) > 1)) {
     // printf("directory has %d open files\n", inode_get_open_cnt(inode));
     goto done;
   }
 
-  if (inode_is_dir(inode) && !dir_is_empty(dir_open(inode))) {
+  if (inode_is_directory(inode) && !dir_is_empty(dir_open(inode))) {
     // printf("directory is not empty\n");
     goto done;
   }

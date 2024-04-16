@@ -395,7 +395,7 @@ inode_length (const struct inode *inode)
 }
 
 
-bool inode_is_dir (const struct inode * inode) {
+bool inode_is_directory (const struct inode * inode) {
   // return inode->is_dir;
   struct cache_block *cache_block = cache_get_block (inode->sector, false);
   void *cache_data = cache_read_block(cache_block);

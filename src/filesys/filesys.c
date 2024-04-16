@@ -128,7 +128,7 @@ filesys_open (const char *name)
     return NULL;
   }
 
-  if (inode_is_dir(cur_inode)) {
+  if (inode_is_directory(cur_inode)) {
     // printf("we shouldn't be getting here\n");
     struct dir *dir = dir_open(cur_inode);
     dir_lookup(dir, ".", &cur_inode);
@@ -189,7 +189,7 @@ bool filesys_chdir (const char *name) {
     dir_lookup(cur_dir, name, &cur_inode);
   }
 
-  if (cur_inode == NULL || !inode_is_dir(cur_inode)) {
+  if (cur_inode == NULL || !inode_is_directory(cur_inode)) {
     return false;
   }
 
@@ -257,7 +257,7 @@ struct dir *filesys_get_dir (const char *name) {
       dir_close(dir);
       return NULL;
     }
-    if (!inode_is_dir(cur_inode)) {
+    if (!inode_is_directory(cur_inode)) {
       dir_close(dir);
       return NULL;
     }
