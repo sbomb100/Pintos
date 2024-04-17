@@ -98,6 +98,7 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
     }
     lock_release(&b->cache_lock);
     lock_release(&all_cache_lock);
+    ASSERT(b != NULL);
     return b;
 
 }

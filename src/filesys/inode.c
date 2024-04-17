@@ -33,7 +33,7 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    int is_directory;                   /* 1 = directory, 0 = file */
+    bool is_directory;                   /* 1 = directory, 0 = file */
     block_sector_t sectors[INODE_BLOCK_CNT];               
   };
 
@@ -251,12 +251,10 @@ inode_create (block_sector_t sector, off_t length, bool is_directory) //done
       disk_inode->is_directory = is_directory;
 
       struct cache_block *cache_block = cache_get_block(sector, true);
-      if (cache_block != NULL) {
-            memcpy(cache_block->data, disk_inode, sizeof *disk_inode); // write contents of disk inode into cache
-            cache_mark_block_dirty(cache_block);
-            cache_put_block(cache_block);
-            success = true;
-       }
+      memcpy(cache_block->data, disk_inode, sizeof *disk_inode); // write contents of disk inode into cache
+      cache_mark_block_dirty(cache_block);
+      cache_put_block(cache_block);
+      success = true;
       free (disk_inode);
     }
   return success;
@@ -577,7 +575,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
         
 
-      cache_block = cache_get_block(sector, false);
+      cache_block = cache_get_block(sector, true);
       // if(offset %1 == 0)
       //   printf("sector_ofs: %d\n", sector_ofs);
       memcpy(cache_block->data + sector_ofs, buffer + bytes_written, chunk_size);
@@ -684,11 +682,15 @@ inode_length (struct inode *inode)//done? //is it correct to modify inode->data?
 
 bool
 inode_is_directory (struct inode *inode){
-  struct cache_block *cache_block = cache_get_block (inode->sector, false);
-  void *cache_data = cache_read_block(cache_block);
-  struct inode_disk *disk_inode = (struct inode_disk *) cache_data;
-  cache_put_block(cache_block);
-  return disk_inode->is_directory;
+  struct cache_block *cache_block;
+  bool is_directory;
+  
+  cache_block = cache_get_block (inode->sector, true);
+  inode->data = (struct inode_disk *) cache_block->data;
+  is_directory = inode->data->is_directory;
+  cache_put_block (cache_block);
+  return is_directory;
+
 
 }
 
