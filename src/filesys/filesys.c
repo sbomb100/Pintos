@@ -99,7 +99,11 @@ filesys_open (const char *name)
 {
 
   if (strcmp(name, "/") == 0) {
-    return file_open(inode_open(ROOT_DIR_SECTOR));
+    printf("opening root directory\n");
+    // return file_open(inode_open(ROOT_DIR_SECTOR));
+    struct inode *cur_inode = inode_open(ROOT_DIR_SECTOR);
+    ASSERT(inode_is_directory(cur_inode));
+    return file_open(cur_inode);
   }
 
   if (name == NULL) {

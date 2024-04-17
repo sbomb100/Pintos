@@ -27,7 +27,7 @@ int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
-int findFdForFile(void);
+// int findFdForFile(void);
 void lock_file(void);
 void unlock_file(void);
 

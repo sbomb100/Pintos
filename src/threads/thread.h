@@ -154,6 +154,7 @@ struct thread
 
 struct file_descriptor {
     int fd;                     /* File descriptor. */
+    bool is_dir;                 /* 1 if the file is a directory, 0 otherwise. */
     struct file *file;          /* File pointer. */
     struct dir *dir;            /* Directory pointer. */
     struct list_elem elem;      /* List_elem for the thread's fdToFile list. */

@@ -8,6 +8,7 @@
 #include "filesys/directory.h"
 #include "userprog/process.h"
 #include "threads/cpu.h"
+#include <string.h>
 struct lock file_lock;
 
 static void syscall_handler(struct intr_frame *);
@@ -299,33 +300,33 @@ int open(const char *file)
   if (fp == NULL)
     thread_exit(0);
 
-  
+  // printf("printing inode sector: %d\n", inode_get_inumber(inode));
   struct file_descriptor *fd = malloc(sizeof(struct file_descriptor));
-  if (fd != NULL) {
-    if (inode_is_directory(inode))
-    {
-      // printf("is dir in open\n");
-      fd->dir = dir_open(inode);
-      fd->file = NULL;
-    }
-    else
-    {
-      // printf("is file in open\n");
-      fd->file = fp;
-      fd->dir = NULL;
-    }
-    if (fd->file != NULL || fd->dir != NULL)
-    {
-      fd->fd = thread_current()->fd;
-      thread_current()->fd++;
-      list_push_back(&thread_current()->fdToFile, &fd->elem);
-      return fd->fd;
-    }
-    else
-    {
-      free(fd);
-      inode_close(inode);
-    }
+  if (inode_is_directory(inode))
+  {
+    // printf("is dir in open\n");
+    fd->dir = dir_open(inode);
+    fd->file = NULL;
+    fd->is_dir = true;
+  }
+  else
+  {
+    // printf("is file in open\n");
+    fd->file = fp;
+    fd->dir = NULL;
+    fd->is_dir = false;
+  }
+  if (fd->file != NULL || fd->dir != NULL)
+  {
+    fd->fd = thread_current()->fd;
+    thread_current()->fd++;
+    list_push_back(&thread_current()->fdToFile, &fd->elem);
+    return fd->fd;
+  }
+  else
+  {
+    free(fd);
+    inode_close(inode);
   }
 
   return -1;
@@ -517,7 +518,7 @@ int write(int fd, const void *buffer, unsigned size)
     }
     ret = file_write(file, buffer, size);
 
-    
+
     
   }
   lock_release(&file_lock);
@@ -820,20 +821,21 @@ bool readdir (int fd, char *name) {
   {
     return false;
   }
-  // printf("fd is %d in syscall\n", fd);
+  // if root directory
+  printf("fd is %d in syscall\n", fd);
   // struct file *file = thread_current()->fdToFile[fd - 2];
   struct file_descriptor *fd2 = find_fd(fd);
   if (fd2 == NULL)
   {
-    // printf("fd2 is null\n");
+    printf("fd2 is null\n");
     return false;
   }
-  struct dir *dir = fd2->dir;
-  if (dir == NULL)
+  if (!fd2->is_dir)
   {
+    printf("not a dir\n");
     return false;
   }
-  if (dir_readdir(dir, name))
+  if (dir_readdir(fd2->dir, name))
   {
     return true;
   }

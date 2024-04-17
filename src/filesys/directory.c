@@ -29,8 +29,10 @@ dir_create (block_sector_t sector, block_sector_t parent, size_t entry_cnt)
 {
   // printf("calling dir_create");
   // return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
-  // entry_cnt += 2;
   bool success = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  struct inode *inode = inode_open(sector);
+  ASSERT(inode_is_directory(inode));
+  inode_close(inode);
   if (success) {
     struct dir *dir = dir_open(inode_open(sector));
     struct dir_entry e[2];
@@ -46,6 +48,8 @@ dir_create (block_sector_t sector, block_sector_t parent, size_t entry_cnt)
     // inode_close(dir->inode);
     dir_close(dir);
   }
+  // assert that directory is a directory
+  
   return success;
 }
 
@@ -305,6 +309,7 @@ dir_remove (struct dir *dir, const char *name)
 bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
+  // printf("dir_readdir\n");
   // printf("readdir\n");
   struct dir_entry e;
   struct inode *inode = dir->inode;
@@ -321,14 +326,12 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
     }
     if (e.in_use)
       {
-        // printf("found %s\n", e.name);
         strlcpy (name, e.name, NAME_MAX + 1);
         // inode_unlock(inode);
         unlock_inode(inode);
         return true;
       } 
   }
-  // printf("no more entries\n");
   // inode_unlock(inode);
   unlock_inode(inode);
   return false;

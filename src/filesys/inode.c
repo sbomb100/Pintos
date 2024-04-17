@@ -257,27 +257,6 @@ inode_create (block_sector_t sector, off_t length, bool is_directory) //done
             cache_put_block(cache_block);
             success = true;
        }
-      // if (free_map_allocate (sectors, &disk_inode->start)) 
-      //   {
-      //     struct cache_block *cache_block = cache_get_block (sector, true);
-      //     void *cache_data = cache_zero_block(cache_block);
-      //     memcpy(cache_data, disk_inode, BLOCK_SECTOR_SIZE);
-      //     cache_mark_block_dirty(cache_block);
-      //     cache_put_block(cache_block);
-      //     if (sectors > 0) 
-      //       {
-      //       //   static char zeros[BLOCK_SECTOR_SIZE];
-      //         size_t i;
-              
-      //         for (i = 0; i < sectors; i++) {
-      //           cache_block = cache_get_block (disk_inode->start + i, true);
-      //           cache_data = cache_zero_block(cache_block);
-      //           cache_mark_block_dirty(cache_block);
-      //           cache_put_block(cache_block);
-      //         }
-      //       }
-      //     success = true; 
-      //   } 
       free (disk_inode);
     }
   return success;
@@ -291,7 +270,7 @@ inode_open (block_sector_t sector)//done
 {
   struct list_elem *e;
   struct inode *inode;
-
+  // printf("looking to open sector: %d\n", sector);
   
 
   lock_acquire (&open_inodes_lock);
@@ -559,12 +538,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     return 0;
   }
 
-  // // try to read ahead
-  //     off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
-  //     if (size == 0 && next_sector > offset && next_sector < inode->data.length && byte_to_sector(inode, next_sector)) {
-  //       // void send_read_ahead_request(block_sector_t sector);
-  //       send_read_ahead_request(next_sector);
-  //     }
+  // check if it can read ahead
+  off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
+  if (size == 0 && next_sector > offset && next_sector < length && (byte_to_sector(inode, next_sector, is_directory) != 0)) {
+    // void send_read_ahead_request(block_sector_t sector);
+    send_read_ahead_request(next_sector);
+  }
 
   //fetch the is_directory status
   // cache_block = cache_get_block(inode->sector, true);
