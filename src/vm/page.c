@@ -29,8 +29,9 @@ bool is_page_before (const struct hash_elem *elem1, const struct hash_elem *elem
 void destroy_page (struct hash_elem *elem1, void *aux UNUSED)
 {
   struct spt_entry *page = hash_entry (elem1, struct spt_entry, elem);
+
   if ( page->frame != NULL && page == page->frame->page ) {
-    page->frame->page = NULL;
+    free_frame(page->frame);
   }
   if ( page->swap_index != -1 ) {
     swap_free(page);

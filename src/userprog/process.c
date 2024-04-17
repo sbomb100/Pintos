@@ -143,11 +143,11 @@ void process_exit(int status)
     munmap(cur->parent_process->num_mapped);
   }
    /* Destroy the current process's spt entries */
-  lock_frame();
+  
   lock_acquire(&cur->parent_process->spt_lock);
   hash_destroy(&cur->parent_process->spt, destroy_page);
   lock_release(&cur->parent_process->spt_lock);
-  unlock_frame();
+
   /* Process Termination Message */
   char *tmp;
   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
@@ -569,7 +569,7 @@ setup_stack(void **esp)
   struct thread *curr = thread_current();
   /* Create a page, put it in a frame, then set stack */
   
-  lock_frame();
+  
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -590,13 +590,15 @@ setup_stack(void **esp)
   curr->parent_process->num_stack_pages++;
   lock_release(&curr->parent_process->spt_lock);
 
+  lock_frame();
   struct frame *stack_frame = find_frame(page);
-  
+  unlock_frame();
+
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
     printf("NO FRAME 604\n");
     free(page);
-    unlock_frame();
+    
     thread_exit(-1);
   }
 
@@ -610,7 +612,6 @@ setup_stack(void **esp)
   {
     free(page);
   }
-  unlock_frame();
   return success;
 }
 
