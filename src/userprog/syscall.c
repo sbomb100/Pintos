@@ -822,7 +822,7 @@ bool readdir (int fd, char *name) {
     return false;
   }
   // if root directory
-  printf("fd is %d in syscall\n", fd);
+  //printf("fd is %d in syscall\n", fd);
   // struct file *file = thread_current()->fdToFile[fd - 2];
   struct file_descriptor *fd2 = find_fd(fd);
   if (fd2 == NULL)
