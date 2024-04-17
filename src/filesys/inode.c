@@ -79,33 +79,33 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
   if (sector_idx >= INODE_DIRECT_CNT)
     sector_idx = INODE_DIRECT_CNT;
   
-  //use the idx on the inode sector array
+  /* Use the idx on the inode sector array */
   cache_block = cache_get_block(inode->sector, true);
   inode->data = (struct inode_disk *) cache_block->data;
-  block_sector_t next_sector = inode->data->sectors[sector_idx]; //next_sector is the sector we are heading to - may be datablock or doubl indirect
+  block_sector_t next_sector = inode->data->sectors[sector_idx]; /* next_sector is the sector we are heading to - may be datablock or doubl indirect */
   cache_put_block(cache_block);
 
-  /*if next sector = 0, this block has not been allocated. We will allocate it*/
+  /* If next sector = 0, this block has not been allocated. We will allocate it */
   if(next_sector == 0){
 
-    if (!free_map_allocate (1, &next_sector)){ //get a free block. this will become the destination block.
-      /*Entering this if statement means allocation failed.*/
+    if (!free_map_allocate (1, &next_sector)){ /* Get a free block. this will become the destination block. */
+      /* Entering this if statement means allocation failed. */
       if (!is_directory){
         lock_release (&inode->inode_lock);
       }
-      return 0; //fail
+      return 0;
 
     }
 
-    /*record in the inode the new block we just allocated*/
+    /* record in the inode the new block we just allocated */
     cache_block = cache_get_block (inode->sector, true);
     inode->data = (struct inode_disk *) cache_block->data;       
-    inode->data->sectors[sector_idx] = next_sector; //record the info to newly allocated block
+    inode->data->sectors[sector_idx] = next_sector; /* record the info to newly allocated block */
     cache_mark_block_dirty(cache_block);
     cache_put_block(cache_block);
 
-    /*zero out the newly allocated block*/
-    bool exclusive = sector_idx >= INODE_DIRECT_CNT; //if inode
+    /* zero out the newly allocated block */
+    bool exclusive = sector_idx >= INODE_DIRECT_CNT;
     cache_block = cache_get_block (next_sector, exclusive);
     cache_zero_block(cache_block);
     cache_mark_block_dirty(cache_block);
@@ -113,9 +113,8 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
     allocated = true;
   }
 
-  /*if the sector we are looking for is direct, process it and return*/
+  /* if the sector we are looking for is direct, process it and return */
   if(sector_idx < INODE_DIRECT_CNT){ 
-    //printf("byte_to_sector direct\n");
     if(allocated){
       cache_put_block(cache_block);
     }
@@ -125,74 +124,73 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
     return next_sector;
 
   }
-  else{ //sector is not in direct. Look in the doubly indirect
-    block_sector_t dub_indir_sector = next_sector; //doubly indirect sector
+  else{ /* sector is not in direct. Look in the doubly indirect */
+    block_sector_t dub_indir_sector = next_sector; /* doubly indirect sector */
     block_sector_t *dub_indir_data;
-    size_t dub_indir_sector_idx = (pos - INODE_DIRECT_BYTES) / INODE_DOUB_INDIRECT_BYTES; //change it to indirect bytes 
-    // printf("byte_to_sector indirect idx: %d\n", sector_idx);
+    size_t dub_indir_sector_idx = (pos - INODE_DIRECT_BYTES) / INODE_DOUB_INDIRECT_BYTES; /* change it to indirect bytes */
     if(!allocated){
       cache_block = cache_get_block(dub_indir_sector, true);
     }
 
     dub_indir_data = (block_sector_t *) cache_block->data;
-    next_sector = dub_indir_data[dub_indir_sector_idx]; //get the indir block sector pointed to by the index of doubly indirect block
+    next_sector = dub_indir_data[dub_indir_sector_idx]; /* get the indir block sector pointed to by the index of doubly indirect block */
     cache_put_block(cache_block);
 
-    /*the needed indir block is not present. allocate*/
+    /* the needed indir block is not present. allocate */
     if(next_sector == 0){ 
 
-      if (!free_map_allocate (1, &next_sector)){ //get a free block. this will become the destination block.
-        /*Entering this if statement means allocation failed.*/
+      if (!free_map_allocate (1, &next_sector)){ /* get a free block. this will become the destination block. */
+        /* Entering this if statement means allocation failed. */
         if (!is_directory){
           lock_release (&inode->inode_lock);
         }
-        return 0; //fail
+        return 0;
       }
 
-      /*Assign the newly fetched block to the doubly indir list*/
+      /* Assign the newly fetched block to the doubly indir list */
       cache_block = cache_get_block(dub_indir_sector, true);
       dub_indir_data = (block_sector_t *) cache_block->data;
       dub_indir_data[dub_indir_sector_idx] = next_sector;
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
 
-      /*zero out the newly installed indir sector*/
+      /* zero out the newly installed indir sector */
       cache_block = cache_get_block(next_sector, true);
       cache_zero_block(cache_block);
       cache_mark_block_dirty(cache_block);
 
     }
-    /*needed indir block is present*/
+    /* needed indir block is present */
     else{
       cache_block = cache_get_block(next_sector, true);
     }
 
-    block_sector_t indir_sector = next_sector; //indirect sector
+    block_sector_t indir_sector = next_sector; /* indirect sector */
     block_sector_t *indir_data = (block_sector_t *) cache_block->data;
-    /*calcualte the idx to use in the indir sector*/
-    size_t indir_sector_idx = ((pos - INODE_DIRECT_BYTES) % INODE_DOUB_INDIRECT_BYTES ) / BLOCK_SECTOR_SIZE;  //double check this?? I think its right
+    /* calcualte the idx to use in the indir sector */
+    size_t indir_sector_idx = ((pos - INODE_DIRECT_BYTES) % INODE_DOUB_INDIRECT_BYTES ) / BLOCK_SECTOR_SIZE;  //TODO double check this?? I think its right
     next_sector = indir_data[indir_sector_idx];
     cache_put_block(cache_block);
 
-    /*if the direct block we want to get does not exist. allocate*/
+    /* if the direct block we want to get does not exist. allocate */
     if(next_sector == 0){ 
 
-      if (!free_map_allocate (1, &next_sector)){ //get a free block. this will become the destination block.
-        /*Entering this if statement means allocation failed.*/
+      if (!free_map_allocate (1, &next_sector)){ /* get a free block. this will become the destination block. */
+        /* Entering this if statement means allocation failed. */
         if (!is_directory){
           lock_release (&inode->inode_lock);
         }
-        return 0; //fail
+        return 0;
       }
 
-      /*Assign the newly fetched block to indir block*/
+      /* Assign the newly fetched block to indir block */
       cache_block = cache_get_block(indir_sector, true);
       indir_data = (block_sector_t *) cache_block->data;
       indir_data[indir_sector_idx] = next_sector;
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
 
-      /*zero out the newly installed block*/
+      /* zero out the newly installed block */
       cache_block = cache_get_block(next_sector, true);
       cache_zero_block(cache_block);
       cache_mark_block_dirty(cache_block);
@@ -231,7 +229,7 @@ inode_init (void) //done
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length, bool is_directory) //done
+inode_create (block_sector_t sector, off_t length, bool is_directory)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -245,13 +243,12 @@ inode_create (block_sector_t sector, off_t length, bool is_directory) //done
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-      // size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
       disk_inode->is_directory = is_directory;
 
       struct cache_block *cache_block = cache_get_block(sector, true);
-      memcpy(cache_block->data, disk_inode, sizeof *disk_inode); // write contents of disk inode into cache
+      memcpy(cache_block->data, disk_inode, sizeof *disk_inode); /* write contents of disk inode into cache */
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
       success = true;
@@ -298,10 +295,6 @@ inode_open (block_sector_t sector)//done
   inode->deny_write_cnt = 0;
   inode->removed = false;
   lock_init(&inode->inode_lock);
-  // struct cache_block *cache_block = cache_get_block (inode->sector, false);
-  // void *cache_data = cache_read_block(cache_block);
-  // memcpy(&inode->data, cache_data, BLOCK_SECTOR_SIZE);
-  // cache_put_block(cache_block);
   lock_release(&open_inodes_lock);
   return inode;
 }
@@ -328,14 +321,12 @@ inode_get_inumber (const struct inode *inode) //done
    If this was the last reference to INODE, frees its memory.
    If INODE was also a removed inode, frees its blocks. */
 void
-inode_close (struct inode *inode) //TODO 
+inode_close (struct inode *inode)
 {
   if (inode == NULL)
      return;
 
   lock_acquire(&inode->inode_lock);
-
-  //lock_acquire(&open_inodes_lock); //needed? test
 
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
@@ -343,7 +334,7 @@ inode_close (struct inode *inode) //TODO
     list_remove (&inode->elem);
     lock_release(&inode->inode_lock);
 
-    /*remove & dealloc the blocks if removed*/
+    /* remove & dealloc the blocks if removed */
     if (inode->removed){
 
       struct cache_block *cache_block = cache_get_block(inode->sector, true);
@@ -356,7 +347,7 @@ inode_close (struct inode *inode) //TODO
       }
       free_map_release(inode->sector, 1);
 
-      block_sector_t dub_indir_sector = inode->data->sectors[INODE_DIRECT_CNT]; //sectors[123] is location that holds the dub indir sector num
+      block_sector_t dub_indir_sector = inode->data->sectors[INODE_DIRECT_CNT]; /* sectors[123] is location that holds the dub indir sector num */
       cache_put_block(cache_block);
 
       if(dub_indir_sector != 0){
@@ -367,7 +358,7 @@ inode_close (struct inode *inode) //TODO
           cache_put_block(cache_block);
 
           if(indir_sector != 0){
-            /*traverse through indirect sector's indexes and free allocated blocks*/
+            /* traverse through indirect sector's indexes and free allocated blocks */
             for(size_t indir_idx = 0; indir_idx < INODE_INDIRECT_SECTOR_CNT; indir_idx++){
               cache_block = cache_get_block(indir_sector, true);
               block_sector_t *indir_data = (block_sector_t *) cache_block->data;
@@ -397,7 +388,7 @@ inode_close (struct inode *inode) //TODO
 /* Marks INODE to be deleted when it is closed by the last caller who
    has it open. */
 void
-inode_remove (struct inode *inode) //done
+inode_remove (struct inode *inode)
 {
   ASSERT (inode != NULL);
   inode->removed = true;
@@ -407,14 +398,11 @@ inode_remove (struct inode *inode) //done
    Returns the number of bytes actually read, which may be less
    than SIZE if an error occurs or end of file is reached. */
 off_t
-inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) //done
+inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
-  //printf("inode_read_at size: %d\n", size);
-  // printf("inode_read_at offset: %d\n", offset);
-  if(size < 0){
+  if(size < 0) {
     return 0;
   }
-
 
   struct cache_block *cache_block;
   uint8_t *buffer = buffer_;
@@ -423,7 +411,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) //d
   bool is_directory;
   block_sector_t sector;
 
-  if(offset >= length){
+  if(offset >= length) {
     return 0;
   }
 
@@ -452,33 +440,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) //d
       cache_block = cache_get_block(sector, false);
       memcpy(buffer + bytes_read, cache_block->data + sector_ofs, chunk_size);
       cache_put_block(cache_block);
-
-
-      // if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
-      //   {
-      //     /* Read full sector directly into caller's buffer. */
-      //     struct cache_block *cache_block = cache_get_block (sector_idx, false);
-      //     void *cache_data = cache_read_block(cache_block);
-      //     memcpy(buffer + bytes_read, cache_data, BLOCK_SECTOR_SIZE);
-      //     cache_mark_block_dirty(cache_block);
-      //     cache_put_block(cache_block);
-      //   }
-      // else 
-      //   {
-      //     /* Read sector into bounce buffer, then partially copy
-      //        into caller's buffer. */
-      //     // if (bounce == NULL) 
-      //     //   {
-      //     //     bounce = malloc (BLOCK_SECTOR_SIZE);
-      //     //     if (bounce == NULL)
-      //     //       break;
-      //     //   }
-      //     struct cache_block *cache_block = cache_get_block (sector_idx, false);
-      //     void *cache_data = cache_read_block(cache_block);
-      //     memcpy(buffer + bytes_read, cache_data + sector_ofs, chunk_size);
-      //     cache_mark_block_dirty(cache_block);
-      //     cache_put_block(cache_block);
-      //   }
       
       /* Advance. */
       size -= chunk_size;
@@ -518,7 +479,7 @@ update_length (struct inode *inode, off_t offset)
    growth is not yet implemented.) */
 off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
-                off_t offset) //TODO
+                off_t offset)
 {
   //printf("inode_write_at size: %d\n", size);
   struct cache_block *cache_block;
@@ -551,13 +512,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   while (size > 0) 
     {
-      // if(offset %1 == 0)
-      //   printf("offset: %d\n", offset);
-      
       sector = byte_to_sector (inode, offset, is_directory);
 
-      // if(offset %1 == 0)
-      //   printf("sector: %d\n", sector);
       if(sector == 0){
         break;
       }       
@@ -573,75 +529,21 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       if (chunk_size <= 0)
         break;
 
-        
-
       cache_block = cache_get_block(sector, true);
-      // if(offset %1 == 0)
-      //   printf("sector_ofs: %d\n", sector_ofs);
       memcpy(cache_block->data + sector_ofs, buffer + bytes_written, chunk_size);
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
- 
 
-      // if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
-      //   {
-      //     /* Write full sector directly to disk. */
-      //     struct cache_block *cache_block = cache_get_block (sector_idx, true);
-      //     void *cache_data = cache_zero_block(cache_block);
-      //     memcpy(cache_data, buffer + bytes_written, BLOCK_SECTOR_SIZE);
-      //     cache_mark_block_dirty(cache_block);
-      //     cache_put_block(cache_block);
-      //   }
-      // else 
-      //   {
-      //     /* We need a bounce buffer. */
-      //     // if (bounce == NULL) 
-      //     //   {
-      //     //     bounce = malloc (BLOCK_SECTOR_SIZE);
-      //     //     if (bounce == NULL)
-      //     //       break;
-      //     //   }
-
-      //     // /* If the sector contains data before or after the chunk
-      //     //    we're writing, then we need to read in the sector
-      //     //    first.  Otherwise we start with a sector of all zeros. */
-      //     // if (sector_ofs > 0 || chunk_size < sector_left) {
-      //     //   struct cache_block *cache_block = cache_get_block (sector_idx, false);
-      //     //   void *cache_data = cache_read_block(cache_block);
-      //     //   memcpy (bounce, cache_data, BLOCK_SECTOR_SIZE);
-      //     //   cache_put_block(cache_block);
-      //     // }
-      //     // else {
-      //     //   memset (bounce, 0, BLOCK_SECTOR_SIZE);
-      //     // memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
-      //     struct cache_block *cache_block = cache_get_block (sector_idx, true);
-      //     // void *cache_data = cache_zero_block(cache_block);
-      //     void *cache_data = cache_read_block(cache_block);
-      //     // memcpy(cache_data, bounce, BLOCK_SECTOR_SIZE);
-      //     memcpy(cache_data + sector_ofs, buffer + bytes_written, chunk_size);
-      //     cache_mark_block_dirty(cache_block);
-      //     cache_put_block(cache_block);
-      //     // }
-      //   }
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
       bytes_written += chunk_size;
     }
 
-  // free (bounce);
   length = update_length(inode, offset);
   if(length == -1){
-    printf("I just put this here to stop compiler warnings. length may be used in future for read ahead.");
+    printf("Stop compiler warnings");
   }
-  
-  //       // try to read ahead
-  // off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
-  // if (size == 0 && next_sector > offset && next_sector < length && (byte_to_sector(inode, next_sector, is_directory) != 0)) {
-  //   // void send_read_ahead_request(block_sector_t sector);
-  //   send_read_ahead_request(next_sector);
-  // }
-
 
   return bytes_written;
 }

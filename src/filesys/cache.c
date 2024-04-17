@@ -30,11 +30,6 @@ struct read_ahead_sector {
 struct condition read_ahead_cond;
 struct lock read_ahead_lock;
 struct list read_ahead_list;
-
-// testing variables
-int cache_hits = 0;
-int cache_misses = 0;
-
 /* 
  * Initializes the cache. 
  */
@@ -62,9 +57,6 @@ void cache_init (void) {
  */
 void cache_shutdown(void) {
     flush_cache();
-    printf("Cache hits: %d\n", cache_hits);
-    printf("Cache misses: %d\n", cache_misses);
-    // among other things...
 }
 
 /*
@@ -84,9 +76,6 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
         // read the block from disk
         block_read(fs_device, sector, b->data);
         b->sector = sector;
-        cache_misses++;
-    } else {
-        cache_hits++;
     }
     if (exclusive) {
         if (b->num_readers > 0 || b->num_writers > 0) {
@@ -108,21 +97,11 @@ struct cache_block * cache_get_block (block_sector_t sector, bool exclusive) {
  * If there aren't any free spaces, evict.
  */
 static struct cache_block *find_cache_block (block_sector_t sector) {
-    // lock_acquire(&all_cache_lock);
     struct cache_block *b = is_in_cache(sector);
     if (b == NULL) { /* Cache Miss */
         if (num_cache_blocks < MAX_CACHE_SIZE) {
             b = &cache[num_cache_blocks];
             num_cache_blocks++;
-
-            // /* Cache block init */
-            // b->sector = sector;
-            // b->dirty = false;
-            // b->valid = true;
-            // b->num_readers = 0;
-            // b->num_writers = 0;
-            // b->num_pending_requests = 0;
-
         } else {
             b = cache_eviction();
         }
@@ -169,7 +148,6 @@ static struct cache_block *cache_eviction (void) {
  * Release access to cache block.
  */
 void cache_put_block (struct cache_block *b) {
-    // ASSERT(b->valid);
     lock_acquire(&b->cache_lock);
     if (b->num_writers > 0) {
         b->num_writers--;

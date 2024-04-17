@@ -74,16 +74,6 @@ start_process(void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  // thread_current()->fdToFile = malloc(128 * sizeof(struct file *));
-  // if (thread_current()->fdToFile == NULL)
-  // {
-  //   thread_exit(-1);
-  // }
-
-  // for (int i = 0; i < 128; i++)
-  // {
-  //   thread_current()->fdToFile[i] = NULL;
-  // }
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
