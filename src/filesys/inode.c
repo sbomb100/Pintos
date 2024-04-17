@@ -446,26 +446,17 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) //d
   bool is_directory;
   block_sector_t sector;
 
-  if(offset > length){
+  if(offset >= length){
     return 0;
   }
-
-  //fetch the is_directory status
-  // cache_block = cache_get_block(inode->sector, true);
-  // is_directory = ( (struct inode_disk *)cache_block->data)->is_directory;
-  // cache_put_block(cache_block);
 
   is_directory = inode_is_directory(inode);
 
   while (size > 0) 
     {
       /* Disk sector to read, starting byte offset within sector. */
-      // block_sector_t sector_idx = byte_to_sector (inode, offset, is_directory);
-      // if(offset %400 == 0)
-      //   printf("offset: %d\n", offset);
       sector = byte_to_sector (inode, offset, is_directory);
-      // if(offset %400 == 0)
-      //   printf("sector: %d\n", sector);
+
       if(sector == 0){
         break;
       }
@@ -517,7 +508,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) //d
       offset += chunk_size;
       bytes_read += chunk_size;
     }
-  // free (bounce);
 
   return bytes_read;
 }
@@ -715,14 +705,12 @@ inode_length (struct inode *inode)//done? //is it correct to modify inode->data?
 
 bool
 inode_is_directory (struct inode *inode){
-  struct cache_block *cache_block;
-  bool is_directory;
-  
-  cache_block = cache_get_block (inode->sector, true);
-  inode->data = (struct inode_disk *) cache_block->data;
-  is_directory = inode->data->is_directory;
-  cache_put_block (cache_block);
-  return is_directory;
+  struct cache_block *cache_block = cache_get_block (inode->sector, false);
+  void *cache_data = cache_read_block(cache_block);
+  struct inode_disk *disk_inode = (struct inode_disk *) cache_data;
+  cache_put_block(cache_block);
+  return disk_inode->is_directory;
+
 }
 
 int inode_get_open_cnt (struct inode *inode) {

@@ -24,4 +24,5 @@ bool filesys_isdir (int fd);
 int filesys_inumber (int fd);
 
 struct dir *filesys_get_dir (const char *name);
+char *get_name(const char *path);
 #endif /* filesys/filesys.h */

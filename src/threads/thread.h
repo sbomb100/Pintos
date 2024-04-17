@@ -128,8 +128,10 @@ struct thread
    /* Owned by userprog/process.c. */
    uint32_t *pagedir;           /* Page directory. */
 
-   struct file **fdToFile;      /* Array of 128 file descriptors. */
+   // struct file **fdToFile;      /* Array of 128 file descriptors. */
+   struct list fdToFile;        /* List of file descriptors. */
    struct file *exec_file;      /* Thread's executable, to be given write access at the end of the process. */
+   int fd;                      /* File descriptor for the process. */
 
    struct process *parent;      /* The parent process of the thread. */
    struct list children;        /* Child processes spawned by the parent. */
@@ -150,6 +152,13 @@ struct thread
    unsigned magic; /* Detects stack overflow. */
 };
 
+struct file_descriptor {
+    int fd;                     /* File descriptor. */
+    struct file *file;          /* File pointer. */
+    struct dir *dir;            /* Directory pointer. */
+    struct list_elem elem;      /* List_elem for the thread's fdToFile list. */
+};
+
 struct process {
     pid_t pid;                      /* Process ID. */
     int exit_status;                /* Exit status of the process. */
@@ -158,6 +167,7 @@ struct process {
     struct list_elem elem;          /* List_elem for the parent process's children list. */
     struct lock process_lock;       /* Lock for process state, to be accessed by itself or its parent when orphanized. */
     struct dir *cwd;                /* Current working directory. */
+    int fd;                         /* File descriptor for the process. */ 
 };
 
 /* VM MMAP */

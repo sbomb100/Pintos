@@ -52,12 +52,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 {
   // printf("creating file with name %s that is a directory: %d\n", name, is_dir);
   block_sector_t inode_sector = 0;
-  char *name_copy = malloc(strlen(name) + 1);
-  if (name_copy == NULL) {
-    // printf("name_copy is null\n");
-    return false;
-  }
-  strlcpy(name_copy, name, strlen(name) + 1);
+  char *name_copy = get_name(name);
   struct dir *dir = filesys_get_dir(name);
   bool success = (dir != NULL && free_map_allocate(1, &inode_sector));
   if (success) {
@@ -102,21 +97,21 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 struct file *
 filesys_open (const char *name)
 {
+
+  if (strcmp(name, "/") == 0) {
+    return file_open(inode_open(ROOT_DIR_SECTOR));
+  }
+
   if (name == NULL) {
     return NULL;
   }
-  char* name_copy = malloc(strlen(name) + 1);
-  if (name_copy == NULL) {
-    return NULL;
-  }
-  strlcpy(name_copy, name, strlen(name) + 1);
+  char* name_copy = get_name(name);
 
   struct dir *dir = filesys_get_dir(name);
   struct inode *cur_inode = NULL;
 
 
   if (dir != NULL) {
-    // printf("dir exists\n");
     dir_lookup(dir, name_copy, &cur_inode);
   }
 
@@ -124,18 +119,18 @@ filesys_open (const char *name)
   free(name_copy);
 
   if (cur_inode == NULL) {
-    // printf("we really shouldn't be getting here\n");
+    // printf("cur_inode is null in filesys open\n");
     return NULL;
   }
 
   if (inode_is_directory(cur_inode)) {
-    // printf("we shouldn't be getting here\n");
+    // printf("inode is a directory\n");
     struct dir *dir = dir_open(cur_inode);
     dir_lookup(dir, ".", &cur_inode);
     dir_close(dir);
     return file_open(cur_inode);
   } else {
-    // printf("we should be getting here\n");
+    // printf("we are opening a file\n");
     return file_open(cur_inode);
   }
 }
@@ -148,15 +143,11 @@ bool
 filesys_remove (const char *name) 
 {
   struct dir *dir = filesys_get_dir(name);
-  //char *name_copy = malloc(strlen(name) + 1);
-  //if (name_copy == NULL) {
-  //  return false;
-  //}
-  //strlcpy(name_copy, name, strlen(name) + 1);
+  char *name_copy = get_name(name);
   
-  bool success = dir != NULL && dir_remove(dir, name);
+  bool success = dir != NULL && dir_remove(dir, name_copy);
   dir_close(dir);
-  //free(name_copy);
+  free(name_copy);
   // printf("remove success: %d\n", success);
   return success;
 
@@ -187,19 +178,16 @@ bool filesys_chdir (const char *name) {
 
   struct dir *cur_dir = filesys_get_dir(name);
 
-  char *name_copy = malloc(strlen(name) + 1);
-  if (name_copy == NULL) {
-    return false;
-  }
-  strlcpy(name_copy, name, strlen(name) + 1);
+  char *name_copy = get_name(name);
 
   struct inode *cur_inode = NULL;
 
   if (cur_dir != NULL) {
-    dir_lookup(cur_dir, name, &cur_inode);
+    dir_lookup(cur_dir, name_copy, &cur_inode);
   }
 
   if (cur_inode == NULL || !inode_is_directory(cur_inode)) {
+    free(name_copy);
     return false;
   }
 
@@ -209,23 +197,7 @@ bool filesys_chdir (const char *name) {
   }
   cur->cwd = dir_open(cur_inode);
   dir_close(cur_dir);
-
-  // print the current working directory (for testing, delete later)
-  // struct dir *dir = cur->cwd;
-  // char name_buf[NAME_MAX + 1];
-  // char *token, *save_ptr;
-  // token = strtok_r(name_copy, "/", &save_ptr);
-  // if (token) {
-  //   strlcpy(name_buf, token, strlen(token) + 1);
-  // }
-  // while (token != NULL) {
-  //   token = strtok_r(NULL, "/", &save_ptr);
-  //   if (token) {
-  //     strlcpy(name_buf, token, strlen(token) + 1);
-  //   }
-  // }
-  // printf("%s\n", name_buf);
-
+  free(name_copy);
   return true;
 
 }
@@ -262,6 +234,10 @@ struct dir *filesys_get_dir (const char *name) {
   }
 
   while (next_token != NULL) {
+    if (strlen(token) == 0) {
+      token = next_token;
+      next_token = strtok_r(NULL, "/", &save_ptr);
+    }
     struct inode *cur_inode;
     if (!dir_lookup(dir, token, &cur_inode)) {
       dir_close(dir);
@@ -282,4 +258,18 @@ struct dir *filesys_get_dir (const char *name) {
 
   return dir;
   
+}
+
+char *get_name(const char *path) {
+  char *name_copy = malloc(strlen(path) + 1);
+  strlcpy(name_copy, path, strlen(path) + 1);
+  char *token, *save_ptr;
+  char *prev_token = "";
+  for (token = strtok_r(name_copy, "/", &save_ptr); token != NULL; token = strtok_r (NULL, "/", &save_ptr)) {
+    prev_token = token;
+  }
+  char *file_name = malloc(strlen(prev_token) + 1);
+  strlcpy(file_name, prev_token, strlen(prev_token) + 1);
+  free(name_copy);
+  return file_name;
 }

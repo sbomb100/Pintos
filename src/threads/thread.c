@@ -408,7 +408,7 @@ static void
 do_thread_exit (void)
 {
   struct thread * cur = thread_current ();
-  free(cur->fdToFile);
+  // free(cur->fdToFile);
 
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
@@ -615,7 +615,8 @@ init_thread (struct thread *t, const char *name, int nice)
   t->magic = THREAD_MAGIC;
   list_init(&t->children);
   lock_init(&t->children_lock);
-  //t->parent = running_thread()->parent;
+  t->fd = 2;
+  list_init(&t->fdToFile);
   if (cpu_can_acquire_spinlock)
     spinlock_acquire (&all_lock);
   list_push_back (&all_list, &t->allelem);

@@ -5,6 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir 
@@ -26,6 +27,7 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, block_sector_t parent, size_t entry_cnt)
 {
+  // printf("calling dir_create");
   // return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
   // entry_cnt += 2;
   bool success = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
@@ -121,27 +123,21 @@ lookup (const struct dir *dir, const char *name,
        ofs += sizeof e) {
 
     /* e.name is the full path, so this culls it down to just the file name. */
-    char *last_entry = strrchr(e.name, '/');
-    if (last_entry != NULL) {
-      last_entry++;
-    } else {
-      last_entry = e.name;
-    }
+    // char *last_entry = strrchr(e.name, '/');
+    // if (last_entry != NULL) {
+    //   last_entry++;
+    // } else {
+    //   last_entry = e.name;
+    // }
 
     // does the same to name
-    char *name_copy = malloc(strlen(name) + 1);
-    if (name_copy == NULL) {
-      return false;
-    }
-    strlcpy(name_copy, name, strlen(name) + 1);
-    char *last_name = strrchr(name_copy, '/');
-    if (last_name != NULL) {
-      last_name++;
-    } else {
-      last_name = name_copy;
-    }
+    char *name_copy = get_name(name);
 
-    if (e.in_use && (!strcmp (last_name, last_entry) || !strcmp(name, e.name)))
+    // printf("lookup: %s\n", e.name);
+    // printf("not the copy: %s\n", name);
+    // printf("actual name: %s\n", name_copy);
+
+    if (e.in_use && !strcmp (name, e.name))
       {
         if (ep != NULL)
           *ep = e;
@@ -256,6 +252,7 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (name != NULL);
 
   if (strcmp (name, ".") == 0 || strcmp (name, "..") == 0) {
+    // printf("cannot remove . or ..\n");
     return false;
   }
 
@@ -263,15 +260,18 @@ dir_remove (struct dir *dir, const char *name)
   // lock_inode(dir->inode);
 
   /* Find directory entry. */
-  if (!lookup (dir, name, &e, &ofs))
+  if (!lookup (dir, name, &e, &ofs)) {
+    // printf("llookup failed\n");
     goto done;
-
+  }
   /* Open inode. */
   inode = inode_open (e.inode_sector);
-  if (inode == NULL)
+  if (inode == NULL) {
+    // printf("inode_open failed\n");
     goto done;
+  }
 
-  if (inode_is_directory(inode) && (inode_get_open_cnt(inode) > 1)) {
+  if (inode_is_directory(inode) && (inode_get_open_cnt(inode) > 2)) {
     // printf("directory has %d open files\n", inode_get_open_cnt(inode));
     goto done;
   }
@@ -284,6 +284,7 @@ dir_remove (struct dir *dir, const char *name)
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) {
+    printf("inode_write_at failed\n");
     goto done;
   }
 
@@ -304,21 +305,30 @@ dir_remove (struct dir *dir, const char *name)
 bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
+  // printf("readdir\n");
   struct dir_entry e;
   struct inode *inode = dir->inode;
   // inode_lock(inode);
   lock_inode(inode);
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
   {
+    // printf("old pos: %d\n", dir->pos);
     dir->pos += sizeof e;
-    if (e.in_use && strcmp(e.name, ".") && strcmp(e.name, ".."))
+    // printf("new pos: %d\n", dir->pos);
+    if (strcmp(e.name, ".") == 0 || strcmp(e.name, "..") == 0) {
+      // printf("skipping %s\n", e.name);
+      continue;
+    }
+    if (e.in_use)
       {
+        // printf("found %s\n", e.name);
         strlcpy (name, e.name, NAME_MAX + 1);
         // inode_unlock(inode);
         unlock_inode(inode);
         return true;
       } 
   }
+  // printf("no more entries\n");
   // inode_unlock(inode);
   unlock_inode(inode);
   return false;

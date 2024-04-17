@@ -6,11 +6,12 @@
 #include "filesys/inode.h"
 #include "filesys/filesys.h"
 #include "filesys/directory.h"
-
+#include "userprog/process.h"
 #include "threads/cpu.h"
 struct lock file_lock;
 
 static void syscall_handler(struct intr_frame *);
+static struct file_descriptor *find_fd(int fd);
 
 void lock_file()
 {
@@ -213,7 +214,6 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)isdir(args[0]);
     break;
   case SYS_INUMBER:
-  // printf("inumber\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -279,7 +279,7 @@ bool remove(const char *file)
  */
 int open(const char *file)
 {
-  // 
+  // printf("trying to open %s\n", file);
   if (file == NULL || !validate_pointer(file))
   {
     thread_exit(-1);
@@ -293,37 +293,42 @@ int open(const char *file)
     unlock_file();
     return -1;
   }
+  struct inode *inode = file_get_inode(fp);
   unlock_file();
 
   if (fp == NULL)
     thread_exit(0);
 
-  if (inode_is_directory(file_get_inode(fp)))
-  {
-    struct dir *dir = dir_open(inode_reopen(file_get_inode(fp)));
-    if (dir == NULL)
+  
+  struct file_descriptor *fd = malloc(sizeof(struct file_descriptor));
+  if (fd != NULL) {
+    if (inode_is_directory(inode))
     {
-      file_close(fp);
-      thread_exit(-1);
+      // printf("is dir in open\n");
+      fd->dir = dir_open(inode);
+      fd->file = NULL;
     }
-    int fd = findFdForFile();
-    if (fd == -1)
+    else
     {
-      file_close(fp);
-      thread_exit(-1);
+      // printf("is file in open\n");
+      fd->file = fp;
+      fd->dir = NULL;
     }
-    thread_current()->fdToFile[fd - 2] = fp;
-    return fd;
-  } else {
-    int fd = findFdForFile();
-    if (fd == -1)
+    if (fd->file != NULL || fd->dir != NULL)
     {
-      file_close(fp);
-      thread_exit(-1);
+      fd->fd = thread_current()->fd;
+      thread_current()->fd++;
+      list_push_back(&thread_current()->fdToFile, &fd->elem);
+      return fd->fd;
     }
-    thread_current()->fdToFile[fd - 2] = fp;
-    return fd;
+    else
+    {
+      free(fd);
+      inode_close(inode);
+    }
   }
+
+  return -1;
   
 }
 
@@ -333,8 +338,21 @@ int open(const char *file)
 int filesize(int fd)
 {
   lock_acquire(&file_lock);
-  struct file *filePtr = thread_current()->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
+  {
+    lock_release(&file_lock);
+    return -1;
+  }
+  struct file *filePtr = fd2->file;
+  if (filePtr == NULL)
+  {
+    lock_release(&file_lock);
+    return -1;
+  }
   int length = file_length(filePtr);
+  // struct file *filePtr = thread_current()->fdToFile[fd - 2];
+  // int length = file_length(filePtr);
   lock_release(&file_lock);
   return length;
 }
@@ -344,7 +362,13 @@ int filesize(int fd)
  */
 int read(int fd, void *buffer, unsigned size, void* esp)
 {
-  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->fdToFile[fd - 2] == NULL)
+  if (fd < 0 || fd == 1 || fd > 1025)
+  {
+    return -1;
+  }
+
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
   {
     return -1;
   }
@@ -405,7 +429,8 @@ int read(int fd, void *buffer, unsigned size, void* esp)
   }
 
   /* fd is not 0, so read it */
-  struct file *filePtr = thread_current()->fdToFile[fd - 2];
+  // struct file *filePtr = thread_current()->fdToFile[fd - 2];
+  struct file *filePtr = fd2->file;
   if (filePtr == NULL)
     return -1;
 
@@ -478,22 +503,22 @@ int write(int fd, const void *buffer, unsigned size)
   }
   else
   {
-
-    struct file *fileDes = thread_current()->fdToFile[fd - 2];
-
-    // check if isdir
-    if (fileDes != NULL && inode_is_directory(file_get_inode(fileDes)))
+    struct file_descriptor *fd2 = find_fd(fd);
+    if (fd2 == NULL)
     {
       lock_release(&file_lock);
       return -1;
-    } else {
-      ret = file_write(fileDes, buffer, size);
-      if (ret == 0)
-      {
-        file_seek(fileDes, 0);
-        ret = file_write(fileDes, buffer, size);
-      }
     }
+    struct file *file = fd2->file;
+    if (file == NULL)
+    {
+      lock_release(&file_lock);
+      return -1;
+    }
+    ret = file_write(file, buffer, size);
+
+    
+    
   }
   lock_release(&file_lock);
   return ret;
@@ -507,12 +532,20 @@ int write(int fd, const void *buffer, unsigned size)
 void seek(int fd, unsigned position)
 {
   lock_file();
-  struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  // struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
+  {
+    unlock_file();
+    return;
+  }
+  struct file *fileDes = fd2->file;
 
   if (fileDes == NULL)
     return;
 
-  file_seek(thread_current()->fdToFile[fd - 2], position);
+  file_seek(fileDes, position);
+  // file_seek(thread_current()->fdToFile[fd - 2], position);
   unlock_file();
 }
 /*
@@ -521,7 +554,14 @@ void seek(int fd, unsigned position)
 unsigned tell(int fd)
 {
   lock_acquire(&file_lock);
-  struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  // struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
+  {
+    lock_release(&file_lock);
+    return -1;
+  }
+  struct file *fileDes = fd2->file;
   if (fileDes == NULL)
     return -1;
 
@@ -539,32 +579,33 @@ void close(int fd)
   if (fd < 2 || fd > 1025)
     return;
 
-  struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  // struct file *fileDes = thread_current()->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
+  {
+    lock_release(&file_lock);
+    return;
+  }
+  struct file *fileDes = fd2->file;
   if (fileDes == NULL)
     return;
 
   /* Closing file using file sys function */
   file_close(fileDes);
-  thread_current()->fdToFile[fd - 2] = NULL;
-  lock_release(&file_lock);
-}
-
-/* 
- * Returns the file descriptor for the file
- * index of zero is fd of 2
- */
-int findFdForFile()
-{
-  struct file **fdArray = thread_current()->fdToFile;
-
-  for (int i = 0; i < 128; i++)
+  // thread_current()->fdToFile[fd - 2] = NULL;
+  // remove from list and free
+  struct list_elem *e;
+  for (e = list_begin(&thread_current()->fdToFile); e != list_end(&thread_current()->fdToFile); e = list_next(e))
   {
-    if (fdArray[i] == NULL)
+    struct file_descriptor *fd3 = list_entry(e, struct file_descriptor, elem);
+    if (fd3 == fd2)
     {
-      return i + 2;
+      list_remove(e);
+      free(fd2);
+      break;
     }
   }
-  return -1;
+  lock_release(&file_lock);
 }
 
 /*
@@ -596,11 +637,17 @@ mapid_t mmap(int fd, void *addr)
   {
     return -1;
   }
-  struct thread *curr = thread_current();
   lock_acquire(&file_lock);
 
   /* Open File */
-  struct file *file = curr->fdToFile[fd - 2];
+  // struct file *file = curr->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
+  {
+    lock_release(&file_lock);
+    return -1;
+  }
+  struct file *file = fd2->file;
   if (file == NULL)
   {
     lock_release(&file_lock);
@@ -773,16 +820,15 @@ bool readdir (int fd, char *name) {
   {
     return false;
   }
-  struct file *file = thread_current()->fdToFile[fd - 2];
-  if (file == NULL)
+  // printf("fd is %d in syscall\n", fd);
+  // struct file *file = thread_current()->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
   {
+    // printf("fd2 is null\n");
     return false;
   }
-  if (!inode_is_directory(file_get_inode(file)))
-  {
-    return false;
-  }
-  struct dir *dir = dir_open(inode_reopen(file_get_inode(file)));
+  struct dir *dir = fd2->dir;
   if (dir == NULL)
   {
     return false;
@@ -792,8 +838,6 @@ bool readdir (int fd, char *name) {
     return true;
   }
   // inode_close(dir_get_inode(dir));
-  return false;
-  printf("readdir\n");
   return false;
   
 
@@ -805,14 +849,31 @@ bool readdir (int fd, char *name) {
 bool isdir (int fd) {
   if (fd < 2 || fd > 1025)
   {
+    // printf("fd is %d\n", fd);
     return false;
   }
-  struct file *file = thread_current()->fdToFile[fd - 2];
+  if (fd == 3)
+    return true;
+  // struct file *file = thread_current()->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
+  {
+    // printf("fd2 is null\n");
+    return false;
+  }
+  struct file *file = fd2->file;
   if (file == NULL)
   {
+    // printf("file is null\n");
     return false;
   }
-  if (inode_is_directory(file_get_inode(file)))
+  struct inode *inode = file_get_inode(file);
+  if (inode == NULL)
+  {
+    // printf("inode is null\n");
+    return false;
+  }
+  if (inode_is_directory(inode))
   {
     return true;
   }
@@ -831,7 +892,13 @@ int inumber (int fd) {
   {
     return -1;
   }
-  struct file *file = thread_current()->fdToFile[fd - 2];
+  // struct file *file = thread_current()->fdToFile[fd - 2];
+  struct file_descriptor *fd2 = find_fd(fd);
+  if (fd2 == NULL)
+  {
+    return -1;
+  }
+  struct file *file = fd2->file;
   if (file == NULL)
   {
     return -1;
@@ -843,4 +910,19 @@ int inumber (int fd) {
   }
   int inumber = inode_get_inumber(inode);
   return inumber;
+}
+
+
+static struct file_descriptor *find_fd(int fd) {
+  struct thread *t = thread_current();
+  struct list_elem *e;
+  for (e = list_begin(&t->fdToFile); e != list_end(&t->fdToFile); e = list_next(e))
+  {
+    struct file_descriptor *fileDes = list_entry(e, struct file_descriptor, elem);
+    if (fileDes->fd == fd)
+    {
+      return fileDes;
+    }
+  }
+  return NULL;
 }
