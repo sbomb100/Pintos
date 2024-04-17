@@ -525,8 +525,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
   // uint8_t *bounce = NULL;
+  cache_block = cache_get_block(inode->sector, true);
+  struct inode_disk * idisk = (struct inode_disk *) cache_block->data;
+  bool is_directory = idisk->is_directory;
+  //printf("inode_write at is_directory: %d\n", is_directory);
+  cache_put_block(cache_block);
   off_t length = inode_length(inode);
-  bool is_directory;
+  //bool is_directory;
   block_sector_t sector;
 
   if (inode->deny_write_cnt)
@@ -535,6 +540,9 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if(size <= 0){
     return 0;
   }
+  
+  ASSERT(is_directory == inode_is_directory(inode));
+  is_directory = inode_is_directory(inode);
 
   // check if it can read ahead
   off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
@@ -543,11 +551,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     send_read_ahead_request(next_sector);
   }
 
+  ASSERT(is_directory == inode_is_directory(inode));
+
   //fetch the is_directory status
   // cache_block = cache_get_block(inode->sector, true);
   // is_directory = ( (struct inode_disk *)cache_block->data)->is_directory;
   // cache_put_block(cache_block);
-  is_directory = inode_is_directory(inode);
+
 
   while (size > 0) 
     {
@@ -556,6 +566,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       
       sector = byte_to_sector (inode, offset, is_directory);
 
+      ASSERT(is_directory == inode_is_directory(inode));
       // if(offset %1 == 0)
       //   printf("sector: %d\n", sector);
       if(sector == 0){
@@ -582,7 +593,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
  
-
+       ASSERT(is_directory == inode_is_directory(inode));
       // if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
       //   {
       //     /* Write full sector directly to disk. */
@@ -629,11 +640,14 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       bytes_written += chunk_size;
     }
 
+     ASSERT(is_directory == inode_is_directory(inode));
+
   // free (bounce);
   length = update_length(inode, offset);
   if(length == -1){
     printf("I just put this here to stop compiler warnings. length may be used in future for read ahead.");
   }
+  ASSERT(is_directory == inode_is_directory(inode));
   
   //       // try to read ahead
   // off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
@@ -673,7 +687,7 @@ off_t
 inode_length (struct inode *inode)//done? //is it correct to modify inode->data?
 {
   struct cache_block *cache_block = cache_get_block(inode->sector, true);
-  inode->data = cache_read_block(cache_block);
+  inode->data = cache_block->data;
   off_t length = inode->data->length;
   cache_put_block(cache_block);
 
@@ -688,6 +702,8 @@ inode_is_directory (struct inode *inode){
   cache_block = cache_get_block (inode->sector, true);
   inode->data = (struct inode_disk *) cache_block->data;
   is_directory = inode->data->is_directory;
+  // if(is_directory != 0)
+  //   printf("is_directory: %d\n", inode->data->is_directory);
   cache_put_block (cache_block);
   return is_directory;
 
