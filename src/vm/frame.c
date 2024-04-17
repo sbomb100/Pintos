@@ -125,6 +125,7 @@ struct frame *evict(void)
             }
         }
     }
+     ASSERT(lock_held_by_current_thread(&frame_table_lock));
     if (candidate == NULL)
     {
         /* 2nd run. Unless all the pages are pinned, this should find a candidate. */
