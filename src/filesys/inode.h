@@ -21,7 +21,7 @@ void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (struct inode *);
 bool inode_is_directory (struct inode *);
-static off_t update_length (struct inode *inode, off_t offset);
+// static off_t update_length (struct inode *inode, off_t offset);
 int inode_get_open_cnt (struct inode *);
 struct inode *inode_get_parent (struct inode *);
 //set parent

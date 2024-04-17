@@ -7,6 +7,7 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 #include "filesys/cache.h"
+#include <stdio.h>
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -80,7 +81,7 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
   
   //use the idx on the inode sector array
   cache_block = cache_get_block(inode->sector, true);
-  inode->data = cache_block->data;
+  inode->data = (struct inode_disk *) cache_block->data;
   block_sector_t next_sector = inode->data->sectors[sector_idx]; //next_sector is the sector we are heading to - may be datablock or doubl indirect
   cache_put_block(cache_block);
 
@@ -133,7 +134,7 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
       cache_block = cache_get_block(dub_indir_sector, true);
     }
 
-    dub_indir_data = cache_block->data;
+    dub_indir_data = (block_sector_t *) cache_block->data;
     next_sector = dub_indir_data[dub_indir_sector_idx]; //get the indir block sector pointed to by the index of doubly indirect block
     cache_put_block(cache_block);
 
@@ -150,7 +151,7 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
 
       /*Assign the newly fetched block to the doubly indir list*/
       cache_block = cache_get_block(dub_indir_sector, true);
-      dub_indir_data = cache_block->data;
+      dub_indir_data = (block_sector_t *) cache_block->data;
       dub_indir_data[dub_indir_sector_idx] = next_sector;
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
@@ -167,7 +168,7 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
     }
 
     block_sector_t indir_sector = next_sector; //indirect sector
-    block_sector_t *indir_data = cache_block->data;
+    block_sector_t *indir_data = (block_sector_t *) cache_block->data;
     /*calcualte the idx to use in the indir sector*/
     size_t indir_sector_idx = ((pos - INODE_DIRECT_BYTES) % INODE_DOUB_INDIRECT_BYTES ) / BLOCK_SECTOR_SIZE;  //double check this?? I think its right
     next_sector = indir_data[indir_sector_idx];
@@ -186,7 +187,7 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
 
       /*Assign the newly fetched block to indir block*/
       cache_block = cache_get_block(indir_sector, true);
-      indir_data = cache_block->data;
+      indir_data = (block_sector_t *) cache_block->data;
       indir_data[indir_sector_idx] = next_sector;
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
@@ -369,7 +370,7 @@ inode_close (struct inode *inode) //TODO
     if (inode->removed){
 
       struct cache_block *cache_block = cache_get_block(inode->sector, true);
-      inode->data = cache_block->data;
+      inode->data = (struct inode_disk *) cache_block->data;
       for(size_t i = 0; i < INODE_DIRECT_CNT; i++){
         block_sector_t direct_sector = inode->data->sectors[i];
         if(direct_sector != 0){
@@ -384,7 +385,7 @@ inode_close (struct inode *inode) //TODO
       if(dub_indir_sector != 0){
         for(size_t dub_indir_idx = 0; dub_indir_idx < INODE_INDIRECT_SECTOR_CNT; dub_indir_idx++){
           cache_block = cache_get_block(dub_indir_sector, true);
-          block_sector_t *dub_indir_data = cache_block->data;
+          block_sector_t *dub_indir_data = (block_sector_t *) cache_block->data;
           block_sector_t indir_sector = dub_indir_data[dub_indir_idx];
           cache_put_block(cache_block);
 
@@ -392,7 +393,7 @@ inode_close (struct inode *inode) //TODO
             /*traverse through indirect sector's indexes and free allocated blocks*/
             for(size_t indir_idx = 0; indir_idx < INODE_INDIRECT_SECTOR_CNT; indir_idx++){
               cache_block = cache_get_block(indir_sector, true);
-              block_sector_t *indir_data = cache_block->data;
+              block_sector_t *indir_data = (block_sector_t *) cache_block->data;
               block_sector_t direct = indir_data[indir_idx];
               cache_put_block(cache_block);
               if(direct != 0){
@@ -441,10 +442,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) //d
   struct cache_block *cache_block;
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-  uint8_t *bounce = NULL;
   off_t length = inode_length(inode);
   bool is_directory;
-  off_t offset_p;
   block_sector_t sector;
 
   if(offset > length){
@@ -561,7 +560,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   // uint8_t *bounce = NULL;
   off_t length = inode_length(inode);
   bool is_directory;
-  off_t offset_p;
   block_sector_t sector;
 
   if (inode->deny_write_cnt)
@@ -616,13 +614,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       memcpy(cache_block->data + sector_ofs, buffer + bytes_written, chunk_size);
       cache_mark_block_dirty(cache_block);
       cache_put_block(cache_block);
-
-        // // try to read ahead
-  //     off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
-  //     if (size == 0 && next_sector > offset && next_sector < inode->data.length && byte_to_sector(inode, next_sector)) {
-  //       // void send_read_ahead_request(block_sector_t sector);
-  //       send_read_ahead_request(next_sector);
-  //     }
+ 
 
       // if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
       //   {
@@ -669,8 +661,19 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       offset += chunk_size;
       bytes_written += chunk_size;
     }
+
   // free (bounce);
   length = update_length(inode, offset);
+  if(length == -1){
+    printf("I just put this here to stop compiler warnings. length may be used in future for read ahead.");
+  }
+  
+  //       // try to read ahead
+  // off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
+  // if (size == 0 && next_sector > offset && next_sector < length && (byte_to_sector(inode, next_sector, is_directory) != 0)) {
+  //   // void send_read_ahead_request(block_sector_t sector);
+  //   send_read_ahead_request(next_sector);
+  // }
 
 
   return bytes_written;
