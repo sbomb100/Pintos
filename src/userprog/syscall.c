@@ -179,7 +179,6 @@ syscall_handler(struct intr_frame *f)
     break;
   }
   case SYS_CHDIR:
-  // printf("chdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -188,7 +187,6 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)chdir((const char *)args[0]);
     break;
   case SYS_MKDIR:
-  // printf("mkdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -197,7 +195,6 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)mkdir((const char *)args[0]);
     break;
   case SYS_READDIR:
-  // printf("readdir\n");
     if (!parse_arguments(f, &args[0], 2))
     {
       thread_exit(-1);
@@ -206,7 +203,6 @@ syscall_handler(struct intr_frame *f)
     f->eax = (uint32_t)readdir(args[0], (char *)args[1]);
     break;
   case SYS_ISDIR:
-  // printf("isdir\n");
     if (!parse_arguments(f, &args[0], 1))
     {
       thread_exit(-1);
@@ -290,7 +286,6 @@ int open(const char *file)
   struct file *fp = filesys_open(file);
   if (fp == NULL)
   {
-    // inode_close(file_get_inode(fp));
     unlock_file();
     return -1;
   }
@@ -352,8 +347,6 @@ int filesize(int fd)
     return -1;
   }
   int length = file_length(filePtr);
-  // struct file *filePtr = thread_current()->fdToFile[fd - 2];
-  // int length = file_length(filePtr);
   lock_release(&file_lock);
   return length;
 }
@@ -430,7 +423,6 @@ int read(int fd, void *buffer, unsigned size, void* esp)
   }
 
   /* fd is not 0, so read it */
-  // struct file *filePtr = thread_current()->fdToFile[fd - 2];
   struct file *filePtr = fd2->file;
   if (filePtr == NULL)
     return -1;
@@ -533,7 +525,6 @@ int write(int fd, const void *buffer, unsigned size)
 void seek(int fd, unsigned position)
 {
   lock_file();
-  // struct file *fileDes = thread_current()->fdToFile[fd - 2];
   struct file_descriptor *fd2 = find_fd(fd);
   if (fd2 == NULL)
   {
@@ -546,7 +537,6 @@ void seek(int fd, unsigned position)
     return;
 
   file_seek(fileDes, position);
-  // file_seek(thread_current()->fdToFile[fd - 2], position);
   unlock_file();
 }
 /*
@@ -593,8 +583,6 @@ void close(int fd)
 
   /* Closing file using file sys function */
   file_close(fileDes);
-  // thread_current()->fdToFile[fd - 2] = NULL;
-  // remove from list and free
   struct list_elem *e;
   for (e = list_begin(&thread_current()->fdToFile); e != list_end(&thread_current()->fdToFile); e = list_next(e))
   {
@@ -641,7 +629,6 @@ mapid_t mmap(int fd, void *addr)
   lock_acquire(&file_lock);
 
   /* Open File */
-  // struct file *file = curr->fdToFile[fd - 2];
   struct file_descriptor *fd2 = find_fd(fd);
   if (fd2 == NULL)
   {
@@ -822,12 +809,13 @@ bool readdir (int fd, char *name) {
     return false;
   }
   // if root directory
-  //printf("fd is %d in syscall\n", fd);
-  // struct file *file = thread_current()->fdToFile[fd - 2];
+  // printf("fd is %d in syscall_readdir\n", fd);
   struct file_descriptor *fd2 = find_fd(fd);
+  // printf("file descriptors dir: %d\n", fd2->is_dir);
+  // printf("the file is %p\n", fd2->file);
   if (fd2 == NULL)
   {
-    printf("fd2 is null\n");
+    // printf("fd2 is null\n");
     return false;
   }
   if (!fd2->is_dir)
@@ -837,9 +825,10 @@ bool readdir (int fd, char *name) {
   }
   if (dir_readdir(fd2->dir, name))
   {
+    // printf("readdir success\n");
     return true;
   }
-  // inode_close(dir_get_inode(dir));
+  // printf("readdir failed\n");
   return false;
   
 
@@ -894,7 +883,6 @@ int inumber (int fd) {
   {
     return -1;
   }
-  // struct file *file = thread_current()->fdToFile[fd - 2];
   struct file_descriptor *fd2 = find_fd(fd);
   if (fd2 == NULL)
   {

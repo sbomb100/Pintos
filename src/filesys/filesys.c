@@ -75,18 +75,6 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   free(name_copy);
   // printf("create success: %d\n", success);
   return success;
-
-
-  // bool success = (dir != NULL
-  //                 && free_map_allocate (1, &inode_sector)
-  //                 && inode_create (inode_sector, initial_size, is_dir)
-  //                 && dir_add (dir, name, inode_sector));
-  // if (!success && inode_sector != 0) 
-  //   free_map_release (inode_sector, 1);
-  // dir_close (dir);
-  // free(name_copy);
-  
-  return success;
 }
 
 /* Opens the file with the given NAME.
@@ -99,8 +87,8 @@ filesys_open (const char *name)
 {
 
   if (strcmp(name, "/") == 0) {
-    printf("opening root directory\n");
-    // return file_open(inode_open(ROOT_DIR_SECTOR));
+    // printf("opening root directory\n");
+    return file_open(inode_open(ROOT_DIR_SECTOR));
     struct inode *cur_inode = inode_open(ROOT_DIR_SECTOR);
     ASSERT(inode_is_directory(cur_inode));
     return file_open(cur_inode);
