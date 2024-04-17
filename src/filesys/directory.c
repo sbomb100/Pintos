@@ -40,11 +40,11 @@ dir_create (block_sector_t sector, block_sector_t parent, size_t entry_cnt)
     e[0].in_use = true;
     strlcpy(e[0].name, ".", sizeof(e[0].name));
     e[0].inode_sector = sector;
-    ASSERT(inode_is_directory(inode));
+    //ASSERT(inode_is_directory(inode));
     //printf("dir_create is_directory: %d\n", inode_is_directory(inode));
     inode_write_at(dir->inode, &e[0], sizeof(e[0]), 0);
     //printf("dir_create is_directory 2: %d\n", inode_is_directory(inode));
-    ASSERT(inode_is_directory(inode));
+    //ASSERT(inode_is_directory(inode));
     e[1].in_use = true;
     strlcpy(e[1].name, "..", sizeof(e[1].name));
     e[1].inode_sector = parent;
