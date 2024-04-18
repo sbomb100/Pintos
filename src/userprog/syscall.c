@@ -888,18 +888,13 @@ int inumber (int fd) {
   {
     return -1;
   }
-  struct file *file = fd2->file;
-  if (file == NULL)
+  if (fd2->is_dir)
   {
-    return -1;
+    struct inode *inode = dir_get_inode(fd2->dir);
+    return inode_get_inumber(inode);
   }
-  struct inode *inode = file_get_inode(file);
-  if (inode == NULL)
-  {
-    return -1;
-  }
-  int inumber = inode_get_inumber(inode);
-  return inumber;
+  struct inode *inode = file_get_inode(fd2->file);
+  return inode_get_inumber(inode);
 }
 
 
