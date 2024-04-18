@@ -757,8 +757,9 @@ tid_t pthread_create(wrapper_func wf, start_routine sr, void * args) {
     aux->args = args;
 
     struct process * pcb = thread_current()->pcb;
-    pcb->threads[pcb->num_threads_up++]= *make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux);
+    pcb->threads[pcb->num_threads_up++] = *make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux);
     tid_t tid = pcb->threads[pcb->num_threads_up - 1].tid;
+    //printf("create %p %d\n", &pcb->threads[pcb->num_threads_up - 1].join_sema, pcb->threads[pcb->num_threads_up - 1].tid);
     return tid;
 }
 
@@ -767,7 +768,9 @@ bool pthread_join(tid_t tid) {
     for ( int i = 0; i < MAX_THREADS; i++ ) {
         struct thread * t = &pcb->threads[i];
         if ( t->tid == tid ) {
+            //printf("join %p %d\n", &t->join_sema, tid);
             sema_down(&t->join_sema);
+            bitmap_reset(t->pcb->used_threads, t->bit_index);
             return true;
         }
     }
@@ -777,7 +780,7 @@ bool pthread_join(tid_t tid) {
 /* Exits thread and */
 void pthread_exit() {
     struct thread * t = thread_current();
-    bitmap_reset(t->pcb->used_threads, t->bit_index);
-    sema_up(&t->join_sema);
+    //printf("exit %p %d\n", &t->join_sema, t->tid);
+    sema_up(&t->join_sema); //TODO: why is sema always the same 2?
     thread_exit(0);
 }
