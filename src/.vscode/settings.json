@@ -3,6 +3,7 @@
         "stdbool.h": "c",
         "filesys.h": "c",
         "syscall.h": "c",
-        "interrupt.h": "c"
+        "interrupt.h": "c",
+        "numbers": "c"
     }
 }

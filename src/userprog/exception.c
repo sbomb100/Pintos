@@ -153,11 +153,11 @@ page_fault(struct intr_frame *f)
       goto exit;
    }
    /* Pointer is good so get the page with it */
-   lock_frame();
-   if (!lock_held_by_current_thread(&t->pcb->spt_lock))
-   {
+   
+   //if (!lock_held_by_current_thread(&t->parent_process->spt_lock))
+   //{
       lock_acquire(&t->pcb->spt_lock);
-   }
+   //}
 
    struct spt_entry *page = get_page_from_hash(fault_addr);
 
@@ -222,17 +222,16 @@ exit:
 void load_swap_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
+   lock_frame();
    page->frame = find_frame(page);
-
+   unlock_frame();
    if (page->frame == NULL)
    {
-      unlock_frame();
       thread_exit(-1);
    }
 
    if (!install_page(page->vaddr, page->frame->paddr, page->writable))
    {
-      unlock_frame();
       thread_exit(-1);
    }
 
@@ -246,11 +245,11 @@ void load_swap_to_spt(struct spt_entry *page)
 void load_mmap_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
+   lock_frame();
    struct frame *new_frame = find_frame(page);
-
+   unlock_frame();
    if (new_frame == NULL)
    {
-      unlock_frame();
       thread_exit(-1);
    }
 
@@ -258,14 +257,13 @@ void load_mmap_to_spt(struct spt_entry *page)
    if (file_read(page->file, new_frame, page->bytes_read) != (int)page->bytes_read)
    {
       palloc_free_page(new_frame->page);
-      unlock_frame();
+
       thread_exit(-1);
    }
    memset(new_frame + page->bytes_read, 0, page->bytes_zero);
 
    if (!install_page(page->vaddr, new_frame->paddr, page->writable))
    {
-      unlock_frame();
       thread_exit(-1);
    }
 
@@ -279,18 +277,17 @@ void load_mmap_to_spt(struct spt_entry *page)
 void load_file_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
+   lock_frame();
    struct frame *new_frame = find_frame(page);
-
+   unlock_frame();
    if (new_frame == NULL)
    {
-      unlock_frame();
       thread_exit(-1);
       return;
    }
 
    if (!install_page(page->vaddr, new_frame->paddr, page->writable))
    {
-      unlock_frame();
       thread_exit(-1);
    }
 
@@ -299,7 +296,6 @@ void load_file_to_spt(struct spt_entry *page)
       file_seek(page->file, page->offset);
       if (file_read(page->file, new_frame->paddr, page->bytes_read) != (int)page->bytes_read)
       {
-         unlock_frame();
          palloc_free_page(new_frame->page);
          thread_exit(-1);
       }
@@ -321,7 +317,6 @@ void load_extra_stack_page(void *fault_addr)
    struct spt_entry *new_page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
    if (new_page == NULL)
    {
-      unlock_frame();
       thread_exit(-2);
    }
    /* Creates a new page */
@@ -344,7 +339,11 @@ void load_extra_stack_page(void *fault_addr)
    }
    hash_insert(&thread_current()->pcb->spt, &new_page->elem);
    thread_current()->pcb->num_stack_pages++;
+   hash_insert(&thread_current()->pcb->spt, &new_page->elem);
+   thread_current()->pcb->num_stack_pages++;
+   lock_frame();
    struct frame *new_frame = find_frame(new_page);
+   unlock_frame();
    if (new_frame == NULL)
    {
 
@@ -356,7 +355,6 @@ void load_extra_stack_page(void *fault_addr)
    /* Install */
    if (!install_page(new_page->vaddr, new_frame->paddr, new_page->writable))
    {
-      unlock_frame();
       PANIC("Error growing stack page!");
    }
 }

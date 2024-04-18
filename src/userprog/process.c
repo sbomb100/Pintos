@@ -582,7 +582,7 @@ setup_stack(void **esp)
   void * upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
   /* Create a page, put it in a frame, then set stack */
   
-  lock_frame();
+  
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -603,13 +603,15 @@ setup_stack(void **esp)
   curr->pcb->num_stack_pages++;
   lock_release(&curr->pcb->spt_lock);
 
+  lock_frame();
   struct frame *stack_frame = find_frame(page);
-  
+  unlock_frame();
+
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
     printf("NO FRAME 604\n");
     free(page);
-    unlock_frame();
+    
     thread_exit(-1);
   }
 
@@ -623,7 +625,6 @@ setup_stack(void **esp)
   {
     free(page);
   }
-  unlock_frame();
   return success;
 }
 
