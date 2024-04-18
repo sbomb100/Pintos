@@ -11,7 +11,7 @@ bool pthread_join(tid_t tid) {
     return sys_pthread_join(tid);
 }
 
-void pthread_exit(void) {
+void pthread_exit() {
     sys_pthread_exit();
     NOT_REACHED();
 }

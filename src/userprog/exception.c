@@ -154,9 +154,9 @@ page_fault(struct intr_frame *f)
    }
    /* Pointer is good so get the page with it */
    lock_frame();
-   if (!lock_held_by_current_thread(&t->parent_process->spt_lock))
+   if (!lock_held_by_current_thread(&t->pcb->spt_lock))
    {
-      lock_acquire(&t->parent_process->spt_lock);
+      lock_acquire(&t->pcb->spt_lock);
    }
 
    struct spt_entry *page = get_page_from_hash(fault_addr);
@@ -168,12 +168,12 @@ page_fault(struct intr_frame *f)
       if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1 << 23) && fault_addr >= (f->esp - 32)))
       {
          load_extra_stack_page(fault_addr);
-         lock_release(&t->parent_process->spt_lock);
+         lock_release(&t->pcb->spt_lock);
          unlock_frame();
       }
       else
       {
-         lock_release(&t->parent_process->spt_lock);
+         lock_release(&t->pcb->spt_lock);
          unlock_frame();
          thread_exit(-1);
       }
@@ -182,27 +182,27 @@ page_fault(struct intr_frame *f)
    if (page->page_status == 2) /* in filesys */
    {
       load_file_to_spt(page);
-      lock_release(&t->parent_process->spt_lock);
+      lock_release(&t->pcb->spt_lock);
       unlock_frame();
       return;
    }
    if (page->page_status == 1) /* in swap table */
    {
       load_swap_to_spt(page);
-      lock_release(&t->parent_process->spt_lock);
+      lock_release(&t->pcb->spt_lock);
       unlock_frame();
       return;
    }
    if (page->page_status == 0) /* mmapped file */
    {
       load_mmap_to_spt(page);
-      lock_release(&t->parent_process->spt_lock);
+      lock_release(&t->pcb->spt_lock);
       unlock_frame();
       return;
    }
-   lock_release(&t->parent_process->spt_lock);
+   lock_release(&t->pcb->spt_lock);
    unlock_frame();
-   if (pagedir_get_page(t->pagedir, fault_addr) == NULL)
+   if (pagedir_get_page(t->pcb->pagedir, fault_addr) == NULL)
    {
       goto exit;
    }
@@ -333,23 +333,22 @@ void load_extra_stack_page(void *fault_addr)
    new_page->file = NULL;
    new_page->offset = 0;
    new_page->bytes_read = 0;
-   new_page->pagedir = thread_current()->pagedir;
+   new_page->pagedir = thread_current()->pcb->pagedir;
    new_page->swap_index = -1;
 
-   if (thread_current()->parent_process->num_stack_pages > 2048)
+   if (thread_current()->pcb->num_stack_pages > 2048)
    {
-
-      lock_release(&thread_current()->parent_process->spt_lock);
+      lock_release(&thread_current()->pcb->spt_lock);
       unlock_frame();
       thread_exit(-3);
    }
-   hash_insert(&thread_current()->parent_process->spt, &new_page->elem);
-   thread_current()->parent_process->num_stack_pages++;
+   hash_insert(&thread_current()->pcb->spt, &new_page->elem);
+   thread_current()->pcb->num_stack_pages++;
    struct frame *new_frame = find_frame(new_page);
    if (new_frame == NULL)
    {
 
-      lock_release(&thread_current()->parent_process->spt_lock);
+      lock_release(&thread_current()->pcb->spt_lock);
       unlock_frame();
       thread_exit(-4);
    }

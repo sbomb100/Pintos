@@ -4,10 +4,12 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <bitmap.h>
 #include "filesys/file.h"
 #include "threads/synch.h"
 #include "lib/kernel/hash.h"
 #include "vm/page.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -31,9 +33,15 @@ typedef int mapid_t;
 typedef int tid_t;
 typedef int pid_t;
 
+/* Function pointer definitions. */
+typedef void (*start_routine)(void *);
+typedef void (*wrapper_func)(start_routine, void *);
+
 #define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
 #define PID_ERROR ((pid_t)-1) /* Error value for pid_t. */
 #define THREAD_NAME_MAX 16
+#define MAX_THREADS 32
+
 /* Thread priorities. */
 #define NICE_MIN -20   /* Highest priority. */
 #define NICE_DEFAULT 0 /* Default priority. */
@@ -128,15 +136,15 @@ struct thread
 
 #ifdef USERPROG
    /* Owned by userprog/process.c. */
-   uint32_t *pagedir; /* Page directory. */
-
    struct file *exec_file;
-
+   struct process *pcb;
 #endif
-   struct process *parent_process;
  
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */
+
+   size_t bit_index;                /* Index returned from bitmap query. */
+   struct semaphore join_sema;      /* Semaphore used to join threads to main. */
 };
 
 struct process
@@ -152,6 +160,7 @@ struct process
    struct file **fdToFile;
 
    /*VM STUFF*/
+   uint32_t * pagedir;
    struct hash spt;
    struct lock spt_lock;
    size_t num_stack_pages;
@@ -163,7 +172,11 @@ struct process
    struct process *parent;
    struct list children;
    struct lock counter_lock;
-   int num_threads_up;
+   size_t num_threads_up;
+
+   struct thread * main_thread;
+   struct thread * threads;
+   struct bitmap * used_threads;
 };
 
 /* VM MMAP */
@@ -182,6 +195,7 @@ void thread_print_stats(void);
 
 typedef void thread_func(void *aux);
 tid_t thread_create(const char *name, int priority, thread_func *, void *);
+struct thread *make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux);
 
 void thread_block(struct spinlock *);
 void thread_unblock(struct thread *);

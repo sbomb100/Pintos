@@ -194,7 +194,7 @@ sys_pthread_exit () {
   NOT_REACHED();
 }
 
-tid_t 
+bool 
 sys_pthread_join (tid_t tid) {
   return syscall1(SYS_PTHREAD_JOIN, tid);
 }

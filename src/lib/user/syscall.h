@@ -61,7 +61,7 @@ int inumber (int fd);
 /* User threads syscalls. */
 tid_t sys_pthread_create(wrapper_func wf, start_routine sr, void *args);
 void sys_pthread_exit(void) NO_RETURN;
-tid_t sys_pthread_join(tid_t tid);
+bool sys_pthread_join(tid_t tid);
 
 /* User malloc syscalls. */
 void * sbrk(intptr_t increment);

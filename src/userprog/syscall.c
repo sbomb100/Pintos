@@ -173,6 +173,29 @@ syscall_handler(struct intr_frame *f)
     }
     break;
   }
+  case SYS_PTHREAD_CREATE:
+  {
+    if ( !parse_arguments(f, &args[0], 3)) {
+        thread_exit(-1);
+        return;
+    }
+    f->eax = sys_pthread_create((wrapper_func) args[0], (start_routine) args[1], (void *) args[2]);
+    break;
+  }
+  case SYS_PTHREAD_EXIT:
+  {
+    sys_pthread_exit();
+    break;
+  }
+  case SYS_PTHREAD_JOIN:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    f->eax = sys_pthread_join((tid_t) args[0]);
+    break;
+  }
   default:
     thread_exit(-1);
   }
@@ -255,7 +278,7 @@ int open(const char *file)
     file_close(fp);
     thread_exit(-1);
   }
-  thread_current()->parent_process->fdToFile[fd - 2] = fp;
+  thread_current()->pcb->fdToFile[fd - 2] = fp;
 
   return fd;
 }
@@ -266,7 +289,7 @@ int open(const char *file)
 int filesize(int fd)
 {
   lock_acquire(&file_lock);
-  struct file *filePtr = thread_current()->parent_process->fdToFile[fd - 2];
+  struct file *filePtr = thread_current()->pcb->fdToFile[fd - 2];
   int length = file_length(filePtr);
   lock_release(&file_lock);
   return length;
@@ -277,7 +300,7 @@ int filesize(int fd)
  */
 int read(int fd, void *buffer, unsigned size, void *esp)
 {
-  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->parent_process->fdToFile[fd - 2] == NULL)
+  if (fd < 0 || fd == 1 || fd > 1025 || thread_current()->pcb->fdToFile[fd - 2] == NULL)
   {
     return -1;
   }
@@ -341,7 +364,7 @@ int read(int fd, void *buffer, unsigned size, void *esp)
   }
 
   /* fd is not 0, so read it */
-  struct file *filePtr = thread_current()->parent_process->fdToFile[fd - 2];
+  struct file *filePtr = thread_current()->pcb->fdToFile[fd - 2];
   if (filePtr == NULL)
     return -1;
 
@@ -415,7 +438,7 @@ int write(int fd, const void *buffer, unsigned size)
   else
   {
 
-    struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
+    struct file *fileDes = thread_current()->pcb->fdToFile[fd - 2];
     if (fileDes != NULL)
     {
       ret = file_write(fileDes, buffer, size);
@@ -438,12 +461,12 @@ int write(int fd, const void *buffer, unsigned size)
 void seek(int fd, unsigned position)
 {
   lock_file();
-  struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->pcb->fdToFile[fd - 2];
 
   if (fileDes == NULL)
     return;
 
-  file_seek(thread_current()->parent_process->fdToFile[fd - 2], position);
+  file_seek(thread_current()->pcb->fdToFile[fd - 2], position);
   unlock_file();
 }
 /*
@@ -452,7 +475,7 @@ void seek(int fd, unsigned position)
 unsigned tell(int fd)
 {
   lock_acquire(&file_lock);
-  struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->pcb->fdToFile[fd - 2];
   if (fileDes == NULL)
     return -1;
 
@@ -470,13 +493,13 @@ void close(int fd)
   if (fd < 2 || fd > 1025)
     return;
 
-  struct file *fileDes = thread_current()->parent_process->fdToFile[fd - 2];
+  struct file *fileDes = thread_current()->pcb->fdToFile[fd - 2];
   if (fileDes == NULL)
     return;
 
   /* Closing file using file sys function */
   file_close(fileDes);
-  thread_current()->parent_process->fdToFile[fd - 2] = NULL;
+  thread_current()->pcb->fdToFile[fd - 2] = NULL;
   lock_release(&file_lock);
 }
 
@@ -487,7 +510,7 @@ void close(int fd)
  */
 int findFdForFile()
 {
-  struct file **fdArray = thread_current()->parent_process->fdToFile;
+  struct file **fdArray = thread_current()->pcb->fdToFile;
 
   for (int i = 0; i < 128; i++)
   {
@@ -508,7 +531,7 @@ bool validate_pointer(const void *givenPointer)
   if (!is_user_vaddr(givenPointer))
     return false;
 
-  void *point = (void *)pagedir_get_page(thread_current()->pagedir, givenPointer);
+  void *point = (void *)pagedir_get_page(thread_current()->pcb->pagedir, givenPointer);
   if (point == NULL)
     return false;
 
@@ -532,7 +555,7 @@ mapid_t mmap(int fd, void *addr)
   lock_acquire(&file_lock);
 
   /* Open File */
-  struct file *file = curr->parent_process->fdToFile[fd - 2];
+  struct file *file = curr->pcb->fdToFile[fd - 2];
   if (file == NULL)
   {
     lock_release(&file_lock);
@@ -561,9 +584,9 @@ mapid_t mmap(int fd, void *addr)
       return -1;
     }
   }
-  lock_acquire(&thread_current()->parent_process->mmap_lock);
-  thread_current()->parent_process->num_mapped++;
-  mapid_t id = thread_current()->parent_process->num_mapped; // race cond?
+  lock_acquire(&thread_current()->pcb->mmap_lock);
+  thread_current()->pcb->num_mapped++;
+  mapid_t id = thread_current()->pcb->num_mapped; // race cond?
   off_t offset = 0;
   uint32_t read_bytes = length_of_file;
 
@@ -583,11 +606,11 @@ mapid_t mmap(int fd, void *addr)
     page->bytes_zero = PGSIZE - page_read_bytes;
     page->writable = true;
     page->page_status = 2;
-    page->pagedir = thread_current()->pagedir;
+    page->pagedir = thread_current()->pcb->pagedir;
 
-    lock_acquire(&thread_current()->parent_process->spt_lock);
-    hash_insert(&thread_current()->parent_process->spt, &page->elem);
-    lock_release(&thread_current()->parent_process->spt_lock);
+    lock_acquire(&thread_current()->pcb->spt_lock);
+    hash_insert(&thread_current()->pcb->spt, &page->elem);
+    lock_release(&thread_current()->pcb->spt_lock);
 
     if (put_mmap_in_list(page) == false)
     {
@@ -599,7 +622,7 @@ mapid_t mmap(int fd, void *addr)
     addr += PGSIZE;
     offset += PGSIZE;
   }
-  lock_release(&thread_current()->parent_process->mmap_lock);
+  lock_release(&thread_current()->pcb->mmap_lock);
   return id;
 }
 
@@ -616,8 +639,8 @@ bool munmap(mapid_t mapping)
     return false;
   }
   
-  lock_acquire(&thread_current()->parent_process->mmap_lock);
-  struct list *map_list = &(thread_current()->parent_process->mmap_list);
+  lock_acquire(&thread_current()->pcb->mmap_lock);
+  struct list *map_list = &(thread_current()->pcb->mmap_list);
   struct list_elem *e = list_begin(map_list);
   for (e = list_begin(map_list); e != list_end(map_list); e = e)
   {
@@ -629,14 +652,14 @@ bool munmap(mapid_t mapping)
       struct spt_entry *page = mmapped->page;
       file_seek(page->file, 0);
 
-      if (pagedir_is_dirty(thread_current()->pagedir, page->vaddr))
+      if (pagedir_is_dirty(thread_current()->pcb->pagedir, page->vaddr))
       {
         file_write_at(page->file, page->vaddr, page->bytes_read, page->offset);
       }
 
-      lock_acquire(&thread_current()->parent_process->spt_lock);
-      hash_delete(&thread_current()->parent_process->spt, &page->elem);
-      lock_release(&thread_current()->parent_process->spt_lock);
+      lock_acquire(&thread_current()->pcb->spt_lock);
+      hash_delete(&thread_current()->pcb->spt, &page->elem);
+      lock_release(&thread_current()->pcb->spt_lock);
 
       e = list_remove(&mmapped->elem);
       free(mmapped);
@@ -646,8 +669,8 @@ bool munmap(mapid_t mapping)
       e = list_next(e);
     }
   }
-  thread_current()->parent_process->num_mapped--;
-  lock_release(&thread_current()->parent_process->mmap_lock);
+  thread_current()->pcb->num_mapped--;
+  lock_release(&thread_current()->pcb->mmap_lock);
   lock_release(&file_lock);
   return true;
 }
@@ -667,7 +690,19 @@ bool put_mmap_in_list(struct spt_entry *page)
 
   struct thread *t = thread_current();
   mmapped->page = page;
-  mmapped->id = t->parent_process->num_mapped;
-  list_push_back(&t->parent_process->mmap_list, &mmapped->elem);
+  mmapped->id = t->pcb->num_mapped;
+  list_push_back(&t->pcb->mmap_list, &mmapped->elem);
   return true;
+}
+
+tid_t sys_pthread_create(wrapper_func wf, start_routine sr, void *args) {
+    return pthread_create(wf, sr, args);
+}
+
+void sys_pthread_exit() {
+    pthread_exit();
+}
+
+bool sys_pthread_join(tid_t tid) {
+    return pthread_join(tid);
 }

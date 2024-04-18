@@ -59,7 +59,6 @@ static tid_t allocate_tid(void);
 static pid_t allocate_pid(void);
 
 static struct thread *do_thread_create(const char *, int, thread_func *, void *);
-static struct thread *make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux);
 static void init_boot_thread(struct thread *boot_thread, struct cpu *cpu);
 static void init_thread(struct thread *t, const char *name, int nice);
 static void lock_own_ready_queue(void);
@@ -117,7 +116,7 @@ void thread_start_idle_thread(void)
 
   /* Create the idle thread. */
   // change to MAKE_THREAD_FOR_PROCESS
-  struct thread *idle_thread = make_thread_for_proc(idle_name, NICE_MAX, idle, thread_current()->parent_process, NULL);
+  struct thread *idle_thread = make_thread_for_proc(idle_name, NICE_MAX, idle, thread_current()->pcb, NULL);
   ASSERT(idle_thread);
   idle_thread->cpu = get_cpu();
   get_cpu()->rq.idle_thread = idle_thread;
@@ -134,7 +133,7 @@ void thread_tick(void)
   if (t == get_cpu()->rq.idle_thread)
     get_cpu()->idle_ticks++;
 #ifdef USERPROG
-  else if (t->pagedir != NULL)
+  else if (t->pcb != NULL && t->pcb->pagedir != NULL)
     get_cpu()->user_ticks++;
 #endif
   else
@@ -185,7 +184,8 @@ wake_up_new_thread(struct thread *t)
   sched_unblock(&t->cpu->rq, t, 1);
   spinlock_release(&t->cpu->rq.lock);
 }
-static struct thread *
+
+struct thread *
 make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux)
 {
   struct thread *t;
@@ -231,25 +231,25 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
     {
       thread_exit(-1);
     }
-    thread_current()->parent_process = initial_process;
-    t->parent_process = initial_process;
+    thread_current()->pcb = initial_process;
+    t->pcb = initial_process;
   }
   else if (parent_proc == NULL)
   {
-    thread_current()->parent_process = initial_process;
-    t->parent_process = initial_process;
+    thread_current()->pcb = initial_process;
+    t->pcb = initial_process;
   }
   else
   {
 
     ASSERT(parent_proc != NULL);
-    t->parent_process = parent_proc;
+    t->pcb = parent_proc;
 
     // add thread to processes list of threads
   }
-  lock_acquire(&t->parent_process->counter_lock);
-  t->parent_process->num_threads_up++;
-  lock_release(&t->parent_process->counter_lock);
+  lock_acquire(&t->pcb->counter_lock);
+  //t->pcb->num_threads_up++;
+  lock_release(&t->pcb->counter_lock);
 
   kf = alloc_frame(t, sizeof *kf);
   kf->eip = NULL;
@@ -296,7 +296,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   new_proc->pid = allocate_pid();
   new_proc->exit_status = -1;
   new_proc->status = PROCESS_RUNNING;
-  new_proc->parent = thread_current()->parent_process;
+  new_proc->parent = thread_current()->pcb;
   /*children init*/
   list_init(&new_proc->children);
   sema_init(&new_proc->wait_sema, 0);
@@ -314,19 +314,22 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   /* init fd array*/
   // this should init it to null pointers
   new_proc->fdToFile = calloc(128, sizeof(struct file *));
+  new_proc->main_thread = t;
+  new_proc->threads = calloc(MAX_THREADS, sizeof(struct thread));
+  new_proc->used_threads = bitmap_create(MAX_THREADS);
   if (new_proc->fdToFile == NULL)
   {
     thread_exit(-1);
   }
-  t->parent_process = new_proc;
-  lock_acquire(&t->parent_process->counter_lock);
-  t->parent_process->num_threads_up++;
-  lock_release(&t->parent_process->counter_lock);
-  if (thread_current()->parent_process != NULL)
+  t->pcb = new_proc;
+  lock_acquire(&t->pcb->counter_lock);
+  t->pcb->num_threads_up++;
+  lock_release(&t->pcb->counter_lock);
+  if (thread_current()->pcb != NULL)
   {
-    lock_acquire(&thread_current()->parent_process->process_lock);
-    list_push_back(&thread_current()->parent_process->children, &new_proc->elem);
-    lock_release(&thread_current()->parent_process->process_lock);
+    lock_acquire(&thread_current()->pcb->process_lock);
+    list_push_back(&thread_current()->pcb->children, &new_proc->elem);
+    lock_release(&thread_current()->pcb->process_lock);
   }
   if (!boot_process_created)
   {
@@ -358,13 +361,13 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     {
       thread_exit(-1);
     }
-    thread_current()->parent_process = initial_process;
-    t->parent_process = initial_process;
+    thread_current()->pcb = initial_process;
+    t->pcb = initial_process;
   }
-  else if (thread_current()->parent_process == NULL)
+  else if (thread_current()->pcb == NULL)
   {
-    thread_current()->parent_process = initial_process;
-    t->parent_process = initial_process;
+    thread_current()->pcb = initial_process;
+    t->pcb = initial_process;
   }
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
@@ -410,7 +413,7 @@ tid_t thread_create(const char *name, int nice, thread_func *function, void *aux
   /* Must save tid here - 't' could already be freed when we return
      from wake_up_new_thread */
   // ITS RETURNING THE PID OF THE PARENT PROCESS BECAUSE WE NEED THE PID FOR FIND CHILD IN PROCESS EXEC
-  tid_t tid = t->parent_process->pid;
+  tid_t tid = t->pcb->pid;
 
   /* Add to ready queue. */
   wake_up_new_thread(t);
@@ -560,16 +563,10 @@ void thread_exit(int status)
 {
   ASSERT(!intr_context());
 
-  
-  // TODO FIX LATER
-  lock_acquire(&thread_current()->parent_process->counter_lock);
-
-  thread_current()->parent_process->num_threads_up--;
-  bool proc_exit = thread_current()->parent_process->num_threads_up == 0;
-  lock_release(&thread_current()->parent_process->counter_lock);
-  if (proc_exit)
+  struct thread * t = thread_current();  
+  if (t == t->pcb->main_thread)
   {
-    thread_current()->parent_process->exit_status = status;
+    thread_current()->pcb->exit_status = status;
     process_exit(status);
   }
 
@@ -745,6 +742,7 @@ init_thread(struct thread *t, const char *name, int nice)
   t->stack = (uint8_t *)t + PGSIZE;
   t->nice = nice;
   t->magic = THREAD_MAGIC;
+  sema_init(&t->join_sema, 0);
   // t->parent = running_thread()->parent;
   if (cpu_can_acquire_spinlock)
     spinlock_acquire(&all_lock);

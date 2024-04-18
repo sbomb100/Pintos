@@ -42,4 +42,10 @@ bool put_mmap_in_list(struct spt_entry *);
 //readdr
 //isdir
 //inumber?
+
+/* P5 Functions. */
+tid_t sys_pthread_create(wrapper_func wf, start_routine sr, void *args);
+void sys_pthread_exit(void);
+bool sys_pthread_join(tid_t tid);
+
 #endif /* userprog/syscall.h */
