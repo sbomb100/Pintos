@@ -298,14 +298,12 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   fn_copy = malloc(strlen(file_name) + 1);
   if (fn_copy == NULL)
   {
-    printf("fail 299 p\n");
     return false;
   }
 
   argv = malloc(4096);
   if (argv == NULL)
   {
-    printf("fail 306 p\n");
     free(fn_copy);
     return false;
   }
@@ -595,7 +593,6 @@ setup_stack(void **esp)
   
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
-    printf("NO FRAME 604\n");
     free(page);
     unlock_frame();
     thread_exit(-1);

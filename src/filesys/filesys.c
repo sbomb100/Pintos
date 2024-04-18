@@ -50,7 +50,6 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size, bool is_dir) 
 {
-  // printf("creating file with name %s that is a directory: %d\n", name, is_dir);
   block_sector_t inode_sector = 0;
   char *name_copy = get_name(name);
   struct dir *dir = filesys_get_dir(name);
@@ -73,7 +72,6 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
 
   dir_close(dir);
   free(name_copy);
-  // printf("create success: %d\n", success);
   return success;
 }
 
@@ -87,7 +85,6 @@ filesys_open (const char *name)
 {
 
   if (strcmp(name, "/") == 0) {
-    // printf("opening root directory\n");
     return file_open(inode_open(ROOT_DIR_SECTOR));
     struct inode *cur_inode = inode_open(ROOT_DIR_SECTOR);
     ASSERT(inode_is_directory(cur_inode));
@@ -111,18 +108,15 @@ filesys_open (const char *name)
   free(name_copy);
 
   if (cur_inode == NULL) {
-    // printf("cur_inode is null in filesys open\n");
     return NULL;
   }
 
   if (inode_is_directory(cur_inode)) {
-    // printf("inode is a directory\n");
     struct dir *dir = dir_open(cur_inode);
     dir_lookup(dir, ".", &cur_inode);
     dir_close(dir);
     return file_open(cur_inode);
   } else {
-    // printf("we are opening a file\n");
     return file_open(cur_inode);
   }
 }
@@ -140,7 +134,6 @@ filesys_remove (const char *name)
   bool success = dir != NULL && dir_remove(dir, name_copy);
   dir_close(dir);
   free(name_copy);
-  // printf("remove success: %d\n", success);
   return success;
 
 }
@@ -194,17 +187,6 @@ bool filesys_chdir (const char *name) {
 
 }
 
-
-
-
-// /* Creates a directory named NAME.
-//    Returns true if successful, false on failure.
-//    Fails if a directory named NAME already exists,
-//    or if an internal memory allocation fails. */
-// bool filesys_mkdir (const char *name UNUSED) {
-//   return false;
-// }
-
 struct dir *filesys_get_dir (const char *name) {
   struct dir *dir;
   char *name_copy = malloc(strlen(name) + 1);
@@ -212,7 +194,6 @@ struct dir *filesys_get_dir (const char *name) {
 
 
   if (name_copy[0] == '/' || thread_current()->cwd == NULL) {
-    // printf("this is an absolute path\n");
     dir = dir_open_root();
   } else {
     struct thread *cur = thread_current();

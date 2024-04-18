@@ -64,7 +64,7 @@ struct inode
    Returns -1 if INODE does not contain data for a byte at offset
    POS. */
 static block_sector_t
-byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remove success, remove some redundancies in if/else
+byte_to_sector (struct inode *inode, off_t pos, bool is_directory)
 {
   struct cache_block *cache_block;
   bool allocated = false;
@@ -168,7 +168,7 @@ byte_to_sector (struct inode *inode, off_t pos, bool is_directory) //TODO: remov
     block_sector_t indir_sector = next_sector; /* indirect sector */
     block_sector_t *indir_data = (block_sector_t *) cache_block->data;
     /* calcualte the idx to use in the indir sector */
-    size_t indir_sector_idx = ((pos - INODE_DIRECT_BYTES) % INODE_DOUB_INDIRECT_BYTES ) / BLOCK_SECTOR_SIZE;  //TODO double check this?? I think its right
+    size_t indir_sector_idx = ((pos - INODE_DIRECT_BYTES) % INODE_DOUB_INDIRECT_BYTES ) / BLOCK_SECTOR_SIZE;
     next_sector = indir_data[indir_sector_idx];
     cache_put_block(cache_block);
 
@@ -299,7 +299,7 @@ inode_open (block_sector_t sector)//done
   return inode;
 }
 
-/* Reopens and returns INODE. You should probably lock open_inodes_lock before using this*/
+/* Reopens and returns INODE. You should probably lock open_inodes_lock before using this. */
 struct inode *
 inode_reopen (struct inode *inode) //done
 {
@@ -450,7 +450,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   return bytes_read;
 }
 
-//maybe integrate to above TODO:
 static off_t
 update_length (struct inode *inode, off_t offset)
 {
@@ -481,44 +480,33 @@ off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
 {
-  //printf("inode_write_at size: %d\n", size);
   struct cache_block *cache_block;
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
-  // uint8_t *bounce = NULL;
   cache_block = cache_get_block(inode->sector, true);
   struct inode_disk * idisk = (struct inode_disk *) cache_block->data;
   bool is_directory = idisk->is_directory;
-  //printf("inode_write at is_directory: %d\n", is_directory);
   cache_put_block(cache_block);
   off_t length = inode_length(inode);
-  //bool is_directory;
   block_sector_t sector;
 
-  if (inode->deny_write_cnt)
+  if (inode->deny_write_cnt) {
     return 0;
+  }
 
   if(size <= 0){
     return 0;
   }
-  
-  ASSERT(is_directory == inode_is_directory(inode));
+
   is_directory = inode_is_directory(inode);
 
-  // check if it can read ahead
+  /* Try to read ahead */
   off_t next_sector = offset + BLOCK_SECTOR_SIZE - 1;
   if (size == 0 && next_sector > offset && next_sector < length && (byte_to_sector(inode, next_sector, is_directory) != 0)) {
-    // void send_read_ahead_request(block_sector_t sector);
     send_read_ahead_request(next_sector);
   }
 
   ASSERT(is_directory == inode_is_directory(inode));
-
-  //fetch the is_directory status
-  // cache_block = cache_get_block(inode->sector, true);
-  // is_directory = ( (struct inode_disk *)cache_block->data)->is_directory;
-  // cache_put_block(cache_block);
-
 
   while (size > 0) 
     {
@@ -554,7 +542,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if(length == -1){
     printf("Stop compiler warnings");
   }
-
   return bytes_written;
 }
 
@@ -582,10 +569,10 @@ inode_allow_write (struct inode *inode) //done
 
 /* Returns the length, in bytes, of INODE's data. */
 off_t
-inode_length (struct inode *inode)//done? //is it correct to modify inode->data?
+inode_length (struct inode *inode)
 {
   struct cache_block *cache_block = cache_get_block(inode->sector, true);
-  inode->data = cache_block->data;
+  inode->data = (struct inode_disk *) cache_block->data;
   off_t length = inode->data->length;
   cache_put_block(cache_block);
 
@@ -600,8 +587,6 @@ inode_is_directory (struct inode *inode){
   cache_block = cache_get_block (inode->sector, true);
   inode->data = (struct inode_disk *) cache_block->data;
   is_directory = inode->data->is_directory;
-  // if(is_directory != 0)
-  //   printf("is_directory: %d\n", inode->data->is_directory);
   cache_put_block (cache_block);
   return is_directory;
 

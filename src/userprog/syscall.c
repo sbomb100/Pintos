@@ -276,7 +276,6 @@ bool remove(const char *file)
  */
 int open(const char *file)
 {
-  // printf("trying to open %s\n", file);
   if (file == NULL || !validate_pointer(file))
   {
     thread_exit(-1);
@@ -295,18 +294,15 @@ int open(const char *file)
   if (fp == NULL)
     thread_exit(0);
 
-  // printf("printing inode sector: %d\n", inode_get_inumber(inode));
   struct file_descriptor *fd = malloc(sizeof(struct file_descriptor));
   if (inode_is_directory(inode))
   {
-    // printf("is dir in open\n");
     fd->dir = dir_open(inode);
     fd->file = NULL;
     fd->is_dir = true;
   }
   else
   {
-    // printf("is file in open\n");
     fd->file = fp;
     fd->dir = NULL;
     fd->is_dir = false;
@@ -808,27 +804,19 @@ bool readdir (int fd, char *name) {
   {
     return false;
   }
-  // if root directory
-  // printf("fd is %d in syscall_readdir\n", fd);
   struct file_descriptor *fd2 = find_fd(fd);
-  // printf("file descriptors dir: %d\n", fd2->is_dir);
-  // printf("the file is %p\n", fd2->file);
   if (fd2 == NULL)
   {
-    // printf("fd2 is null\n");
     return false;
   }
   if (!fd2->is_dir)
   {
-    printf("not a dir\n");
     return false;
   }
   if (dir_readdir(fd2->dir, name))
   {
-    // printf("readdir success\n");
     return true;
   }
-  // printf("readdir failed\n");
   return false;
   
 
@@ -840,28 +828,23 @@ bool readdir (int fd, char *name) {
 bool isdir (int fd) {
   if (fd < 2 || fd > 1025)
   {
-    // printf("fd is %d\n", fd);
     return false;
   }
   if (fd == 3)
     return true;
-  // struct file *file = thread_current()->fdToFile[fd - 2];
   struct file_descriptor *fd2 = find_fd(fd);
   if (fd2 == NULL)
   {
-    // printf("fd2 is null\n");
     return false;
   }
   struct file *file = fd2->file;
   if (file == NULL)
   {
-    // printf("file is null\n");
     return false;
   }
   struct inode *inode = file_get_inode(file);
   if (inode == NULL)
   {
-    // printf("inode is null\n");
     return false;
   }
   if (inode_is_directory(inode))
