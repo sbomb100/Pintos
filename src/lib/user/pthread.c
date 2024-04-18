@@ -1,5 +1,5 @@
 #include <pthread.h>
-
+#include <stdio.h>
 /* Opaque wrapper for create. */
 void start_thread(start_routine task, void *);
 
@@ -17,7 +17,7 @@ void pthread_exit() {
 }
 
 void start_thread(start_routine task, void * args) {
-    task(args);
+    (*task)(args);
     pthread_exit();
 }
 

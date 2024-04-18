@@ -674,9 +674,11 @@ static void start_pthread(void * args_) {
 
     if ( !setup_pthread(aux, &if_.eip, &if_.esp) ) {
         thread_current()->pcb->status = PROCESS_ABORT;
+        free(aux);
         thread_exit(-1);
     }
 
+    free(aux);
     asm volatile("movl %0, %%esp; jmp intr_exit" : : "g"(&if_) : "memory");
     NOT_REACHED();
 } 
@@ -733,10 +735,12 @@ bool setup_pthread(struct aux * aux, void (**eip)(void), void **esp) {
     *esp -= sizeof(char *);
 
     *esp -= sizeof(char *);
-    memcpy(*esp, aux->sr, sizeof(char *));
+    memcpy(*esp, &aux->args, sizeof(char *));
 
     *esp -= sizeof(char *);
-    memcpy(*esp, aux->args, sizeof(char *));
+    memcpy(*esp, &aux->sr, sizeof(char *));
+
+    *esp -= sizeof(char *);
 
     *eip = (void (*)(void))aux->wf;
     return success;
@@ -752,13 +756,9 @@ tid_t pthread_create(wrapper_func wf, start_routine sr, void * args) {
     aux->sr = sr;
     aux->args = args;
 
-    //tid_t tid = thread_create(thread_name(), NICE_DEFAULT, start_pthread, aux);
     struct process * pcb = thread_current()->pcb;
-    //lock_acquire(&pcb->counter_lock);
     pcb->threads[pcb->num_threads_up++]= *make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux);
-    tid_t tid = pcb->threads[pcb->num_threads_up].tid;
-    //lock_release(&pcb->counter_lock);
-    free(aux);
+    tid_t tid = pcb->threads[pcb->num_threads_up - 1].tid;
     return tid;
 }
 

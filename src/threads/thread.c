@@ -264,7 +264,8 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
   sf = alloc_frame(t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
-
+ 
+  wake_up_new_thread(t);
   return t;
 }
 /* Creates a new kernel thread named NAME with the given initial
