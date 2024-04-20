@@ -768,7 +768,6 @@ bool pthread_join(tid_t tid) {
         struct thread * t = pcb->threads[i];
         if ( t != NULL && t->tid == tid ) {
             sema_down(&t->join_sema);
-            bitmap_reset(pcb->used_threads, t->bit_index);
             sema_up(&t->exit_sema);
             return true;
         }
@@ -778,14 +777,9 @@ bool pthread_join(tid_t tid) {
 
 /* Exits thread and */
 void pthread_exit() {
-    struct process * pcb = thread_current()->pcb;
-    for ( int i = 0; i < MAX_THREADS; i++ ) {
-        struct thread * t = pcb->threads[i];
-        if ( t != NULL && t->tid == thread_current()->tid ) {
-            sema_up(&t->join_sema);
-            sema_down(&t->exit_sema);
-            break;
-        }
-    }
+    struct thread * t = thread_current();
+    sema_up(&t->join_sema);
+    sema_down(&t->exit_sema);
+    bitmap_reset(t->pcb->used_threads, t->bit_index);
     thread_exit(0);
 }
