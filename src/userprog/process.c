@@ -151,11 +151,9 @@ void process_exit(int status)
     munmap(cur->pcb->num_mapped);
   }
    /* Destroy the current process's spt entries */
-  lock_frame();
   lock_acquire(&cur->pcb->spt_lock);
   hash_destroy(&cur->pcb->spt, destroy_page);
   lock_release(&cur->pcb->spt_lock);
-  unlock_frame();
   /* Process Termination Message */
   char *tmp;
   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
@@ -757,20 +755,21 @@ tid_t pthread_create(wrapper_func wf, start_routine sr, void * args) {
     aux->args = args;
 
     struct process * pcb = thread_current()->pcb;
-    pcb->threads[pcb->num_threads_up++] = *make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux);
-    tid_t tid = pcb->threads[pcb->num_threads_up - 1].tid;
-    //printf("create %p %d\n", &pcb->threads[pcb->num_threads_up - 1].join_sema, pcb->threads[pcb->num_threads_up - 1].tid);
-    return tid;
+    //TODO: use vacant index to store in array.
+    struct thread * tcb = make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux);
+    pcb->threads[pcb->num_threads_up] = tcb;
+    pcb->num_threads_up++;
+    return tcb->tid;
 }
 
 bool pthread_join(tid_t tid) {
     struct process * pcb = thread_current()->pcb;
     for ( int i = 0; i < MAX_THREADS; i++ ) {
-        struct thread * t = &pcb->threads[i];
-        if ( t->tid == tid ) {
-            //printf("join %p %d\n", &t->join_sema, tid);
+        struct thread * t = pcb->threads[i];
+        if ( t != NULL && t->tid == tid ) {
             sema_down(&t->join_sema);
-            bitmap_reset(t->pcb->used_threads, t->bit_index);
+            bitmap_reset(pcb->used_threads, t->bit_index);
+            sema_up(&t->exit_sema);
             return true;
         }
     }
@@ -779,8 +778,14 @@ bool pthread_join(tid_t tid) {
 
 /* Exits thread and */
 void pthread_exit() {
-    struct thread * t = thread_current();
-    //printf("exit %p %d\n", &t->join_sema, t->tid);
-    sema_up(&t->join_sema); //TODO: why is sema always the same 2?
+    struct process * pcb = thread_current()->pcb;
+    for ( int i = 0; i < MAX_THREADS; i++ ) {
+        struct thread * t = pcb->threads[i];
+        if ( t != NULL && t->tid == thread_current()->tid ) {
+            sema_up(&t->join_sema);
+            sema_down(&t->exit_sema);
+            break;
+        }
+    }
     thread_exit(0);
 }

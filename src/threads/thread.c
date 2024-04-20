@@ -247,9 +247,6 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
 
     // add thread to processes list of threads
   }
-  lock_acquire(&t->pcb->counter_lock);
-  //t->pcb->num_threads_up++;
-  lock_release(&t->pcb->counter_lock);
 
   kf = alloc_frame(t, sizeof *kf);
   kf->eip = NULL;
@@ -316,7 +313,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   // this should init it to null pointers
   new_proc->fdToFile = calloc(128, sizeof(struct file *));
   new_proc->main_thread = t;
-  new_proc->threads = calloc(MAX_THREADS, sizeof(struct thread));
+  new_proc->threads = calloc(MAX_THREADS, sizeof(struct thread *));
   new_proc->used_threads = bitmap_create(MAX_THREADS);
   if (new_proc->fdToFile == NULL)
   {
@@ -744,7 +741,7 @@ init_thread(struct thread *t, const char *name, int nice)
   t->nice = nice;
   t->magic = THREAD_MAGIC;
   sema_init(&t->join_sema, 0);
-  // t->parent = running_thread()->parent;
+  sema_init(&t->exit_sema, 0);
   if (cpu_can_acquire_spinlock)
     spinlock_acquire(&all_lock);
   list_push_back(&all_list, &t->allelem);

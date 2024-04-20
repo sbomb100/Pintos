@@ -145,6 +145,7 @@ struct thread
 
    size_t bit_index;                /* Index returned from bitmap query. */
    struct semaphore join_sema;      /* Semaphore used to join threads to main. */
+   struct semaphore exit_sema;      /* Semaphore used to keep the thread page alive until the main thread joins with this thread. */
 };
 
 struct process
@@ -174,9 +175,9 @@ struct process
    struct lock counter_lock;
    size_t num_threads_up;
 
-   struct thread * main_thread;
-   struct thread * threads;
-   struct bitmap * used_threads;
+   struct thread * main_thread;     /* The main (external) thread. Designated in process_create. */
+   struct thread ** threads;        /* Array of thread pointers, created by pthread_create. */
+   struct bitmap * used_threads;    /* Bitmap of address blocks, to be used by spawning pthreads. */
 };
 
 /* VM MMAP */
