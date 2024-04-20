@@ -224,7 +224,7 @@ void load_swap_to_spt(struct spt_entry *page)
    page->pinned = true;
    lock_frame();
    page->frame = find_frame(page);
-   unlock_frame();
+   
    if (page->frame == NULL)
    {
       thread_exit(-1);
@@ -240,6 +240,7 @@ void load_swap_to_spt(struct spt_entry *page)
    page->page_status = 3;
 
    page->pinned = false;
+   unlock_frame();
 }
 
 void load_mmap_to_spt(struct spt_entry *page)
@@ -247,7 +248,7 @@ void load_mmap_to_spt(struct spt_entry *page)
    page->pinned = true;
    lock_frame();
    struct frame *new_frame = find_frame(page);
-   unlock_frame();
+   
    if (new_frame == NULL)
    {
       thread_exit(-1);
@@ -269,6 +270,7 @@ void load_mmap_to_spt(struct spt_entry *page)
 
    page->page_status = 3;
    page->pinned = false;
+   unlock_frame();
 }
 
 /*
@@ -279,7 +281,7 @@ void load_file_to_spt(struct spt_entry *page)
    page->pinned = true;
    lock_frame();
    struct frame *new_frame = find_frame(page);
-   unlock_frame();
+   
    if (new_frame == NULL)
    {
       thread_exit(-1);
@@ -302,11 +304,12 @@ void load_file_to_spt(struct spt_entry *page)
       /* memset the kpage + bytes read */
 
       /* TODO: */
-      memset(new_frame->paddr + page->bytes_read, 0, page->bytes_zero); /* make sure page has memory correct range */
+      
    }
-
+   memset(new_frame->paddr + page->bytes_read, 0, page->bytes_zero); /* make sure page has memory correct range */
    page->page_status = 3; /* in frame table */
    page->pinned = false;
+   unlock_frame();
 }
 
 /*

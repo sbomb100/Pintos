@@ -73,7 +73,8 @@ syscall_handler(struct intr_frame *f)
   case SYS_WAIT:
     if (!parse_arguments(f, &args[0], 1))
       thread_exit(-1);
-    int arg = *(int *)(p + 4);
+    //int arg = *(int *)(p + 4);
+    int arg = *(int *)(p + 1);
     f->eax = process_wait(arg);
     break;
   case SYS_CREATE:

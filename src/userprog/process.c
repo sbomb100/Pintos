@@ -569,7 +569,7 @@ setup_stack(void **esp)
   struct thread *curr = thread_current();
   /* Create a page, put it in a frame, then set stack */
   
-  
+  lock_acquire(&curr->parent_process->spt_lock);
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -585,10 +585,10 @@ setup_stack(void **esp)
   page->bytes_read = 0;
   page->pagedir = curr->pagedir;
   page->swap_index = -1;
-  lock_acquire(&curr->parent_process->spt_lock);
+  
   hash_insert(&curr->parent_process->spt, &page->elem);
   curr->parent_process->num_stack_pages++;
-  lock_release(&curr->parent_process->spt_lock);
+  
 
   lock_frame();
   struct frame *stack_frame = find_frame(page);
@@ -612,6 +612,7 @@ setup_stack(void **esp)
   {
     free(page);
   }
+  lock_release(&curr->parent_process->spt_lock);
   return success;
 }
 
