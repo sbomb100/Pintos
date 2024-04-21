@@ -4,10 +4,12 @@ tests/%.output: FILESYSSOURCE = --filesys-size=2
 tests/%.output: PUTFILES = $(filter-out kernel.bin loader.bin, $^)
 
 tests/parallel_TESTS = $(addprefix tests/parallel/, \
-create-join \
+create-join thread-local-var \
 )
 
 tests/parallel/create-join_SRC = tests/parallel/create-join.c tests/lib.c \
+tests/main.c
+tests/parallel/thread-local-var_SRC = tests/parallel/thread-local-var.c tests/lib.c \
 tests/main.c
 
 tests/parallel_PROGS = $(tests/parallel_TESTS)

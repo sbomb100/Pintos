@@ -1,5 +1,20 @@
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h>
+
+#define BITMASK(SHIFT, CNT) (((1ul << (CNT)) - 1) << (SHIFT))
+
+/* Page offset (bits 0:12). */
+#define PGSHIFT 0                          /* Index of first offset bit. */
+#define PGBITS  12                         /* Number of offset bits. */
+#define PGSIZE  (1 << PGBITS)              /* Bytes in a page. */
+#define PGMASK  BITMASK(PGSHIFT, PGBITS)   /* Page offset bits (0:12). */
+
+/* Round up to nearest page boundary. */
+static inline void *pg_round_up (const void *va) {
+  return (void *) (((uintptr_t) va + PGSIZE - 1) & ~PGMASK);
+}
+
 /* Opaque wrapper for create. */
 void start_thread(start_routine task, void *);
 
@@ -19,6 +34,21 @@ void pthread_exit() {
 void start_thread(start_routine task, void * args) {
     (*task)(args);
     pthread_exit();
+}
+
+void pthread_tls_store(void * storage, size_t size) {
+    void * esp;
+    asm("mov %%esp, %0" : "=g"(esp));
+
+    void * stack = pg_round_up(esp);
+    memcpy(stack, storage, size);
+}
+
+void * pthread_tls_load() {
+    void * esp;
+    asm("mov %%esp, %0" : "=g"(esp));
+
+    return pg_round_up(esp);
 }
 
 bool pthread_mutex_init(pthread_lock_t mutex UNUSED) {

@@ -405,7 +405,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   {
     goto done;
   }
-
+  
+  *esp -= TLSIZE;
+  
   for (; token != NULL; token = strtok_r(NULL, " ", &save_ptr))
   {
     *esp -= strlen(token) + 1;
@@ -728,6 +730,8 @@ bool setup_pthread(struct aux * aux, void (**eip)(void), void **esp) {
         free(page);
     }
     unlock_frame();
+
+    *esp -= TLSIZE;
 
     *esp = (void *)((int32_t)*esp & (~3));
     *esp -= sizeof(char *);
