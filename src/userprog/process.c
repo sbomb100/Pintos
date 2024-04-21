@@ -184,17 +184,17 @@ void process_exit(int status)
   /* Cleanup semantics for orphan or child process */
   if ( cur->pcb != NULL ) {
     if ( cur->pcb->status == PROCESS_ORPHAN ) {
-        lock_release(&cur->pcb->process_lock);
         free(cur->pcb);
         cur->pcb = NULL;
     }
     else {
         cur->pcb->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
-        lock_release(&cur->pcb->process_lock);
+        
         cur->pcb->exit_status = status;
         sema_up(&cur->pcb->wait_sema);
     }
   } 
+  lock_release(&cur->pcb->process_lock);
 }
 
 
@@ -580,7 +580,7 @@ setup_stack(void **esp)
   void * upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
   /* Create a page, put it in a frame, then set stack */
   
-  lock_acquire(&curr->parent_process->spt_lock);
+  lock_acquire(&curr->pcb->spt_lock);
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -597,8 +597,8 @@ setup_stack(void **esp)
   page->pagedir = curr->pcb->pagedir;
   page->swap_index = -1;
   
-  hash_insert(&curr->parent_process->spt, &page->elem);
-  curr->parent_process->num_stack_pages++;
+  hash_insert(&curr->pcb->spt, &page->elem);
+  curr->pcb->num_stack_pages++;
   
 
   lock_frame();
@@ -623,7 +623,7 @@ setup_stack(void **esp)
   {
     free(page);
   }
-  lock_release(&curr->parent_process->spt_lock);
+  lock_release(&curr->pcb->spt_lock);
   return success;
 }
 
