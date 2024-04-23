@@ -4,12 +4,16 @@ tests/%.output: FILESYSSOURCE = --filesys-size=2
 tests/%.output: PUTFILES = $(filter-out kernel.bin loader.bin, $^)
 
 tests/parallel_TESTS = $(addprefix tests/parallel/, \
-create-join thread-local-var sbrk-simple malloc-simple \
+create-join thread-local \
+locks \
+sbrk-simple malloc-simple \
 )
 
 tests/parallel/create-join_SRC = tests/parallel/create-join.c tests/lib.c \
 tests/main.c
-tests/parallel/thread-local-var_SRC = tests/parallel/thread-local-var.c tests/lib.c \
+tests/parallel/thread-local_SRC = tests/parallel/thread-local.c tests/lib.c \
+tests/main.c
+tests/parallel/locks_SRC = tests/parallel/locks.c tests/lib.c \
 tests/main.c
 tests/parallel/sbrk-simple_SRC = tests/parallel/sbrk-simple.c tests/lib.c \
 tests/main.c

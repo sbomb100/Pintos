@@ -180,6 +180,13 @@ struct process
 
    void * heap_start;
    void * heap_break;
+   
+   struct lock locks[50];           /**/
+   int lock_num;
+   struct semaphore semas[50];      /**/
+   int sema_num;
+
+   struct semaphore exit_sema;      /* Semaphore used to ensure all user threads clean up before main thread exits. */
 };
 
 /* VM MMAP */

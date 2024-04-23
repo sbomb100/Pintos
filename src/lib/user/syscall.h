@@ -19,7 +19,13 @@ typedef int tid_t;
 
 /* User synchronization identifiers. */
 typedef int pthread_lock_t;
+#define LOCK_ERROR ((pthread_lock_t) -1)
+
 typedef int pthread_sema_t;
+#define SEMA_ERROR ((pthread_sema_t) -1)
+
+typedef int pthread_cond_t;
+#define COND_ERROR ((pthread_cond_t) -1)
 
 /* Function pointer definitions. */
 typedef void (*start_routine)(void *);
@@ -66,4 +72,12 @@ bool sys_pthread_join(tid_t tid);
 /* User malloc syscalls. */
 void * sbrk(intptr_t increment);
 
+/* User synch syscalls. */
+void lock_init(pthread_lock_t *lock);
+void lock_acquire(pthread_lock_t *lock);
+void lock_release(pthread_lock_t *lock);
+
+void sema_init(pthread_sema_t *sema, int value);
+void sema_up(pthread_sema_t *sema);
+void sema_down(pthread_sema_t *sema);
 #endif /* lib/user/syscall.h */
