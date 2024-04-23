@@ -146,6 +146,12 @@ int process_wait(tid_t child_tid)
 void process_exit(int status)
 {
   struct thread *cur = thread_current();
+
+  while ( cur->pcb->num_threads_up > 1 ) {
+    sema_down(&cur->pcb->exit_sema);
+    cur->pcb->num_threads_up--;
+  }
+
   while (cur->pcb->num_mapped != 0)
   {
     munmap(cur->pcb->num_mapped);
@@ -167,20 +173,20 @@ void process_exit(int status)
   
   /* Mark orphanized child processes */
    lock_acquire(&cur->pcb->process_lock);
-  // for ( struct list_elem * e = list_begin(&cur->pcb->children); e != list_end(&cur->pcb->children);) {
-  //   struct process * p = list_entry(e, struct process, elem);
-  //   lock_acquire(&p->process_lock);
-  //   if ( p->status == PROCESS_RUNNING ) {
-  //       p->status = PROCESS_ORPHAN;
-  //       lock_release(&p->process_lock);
-  //       e = list_next(e);
-  //   }
-  //   else {
-  //       lock_release(&p->process_lock);
-  //       e = list_remove(e);
-  //       free(p);
-  //   }
-  // }
+    for ( struct list_elem * e = list_begin(&cur->pcb->children); e != list_end(&cur->pcb->children);) {
+        struct process * p = list_entry(e, struct process, elem);
+        lock_acquire(&p->process_lock);
+        if ( p->status == PROCESS_RUNNING ) {
+            p->status = PROCESS_ORPHAN;
+            lock_release(&p->process_lock);
+            e = list_next(e);
+        }
+        else {
+            lock_release(&p->process_lock);
+            e = list_remove(e);
+            free(p);
+        }
+    }
   /* Cleanup semantics for orphan or child process */
   if ( cur->pcb != NULL ) {
     if ( cur->pcb->status == PROCESS_ORPHAN ) {
@@ -777,6 +783,11 @@ bool pthread_join(tid_t tid) {
             return true;
         }
     }
+    /* printf("%d\n", tid);
+    for ( int i = 0; i < MAX_THREADS; i++ ) {
+        struct thread * t = pcb->threads[i];
+        printf("%p %d\n", t, t != NULL ? t->tid : -1);
+    } */
     return false;
 }   
 
@@ -786,5 +797,6 @@ void pthread_exit() {
     sema_up(&t->join_sema);
     sema_down(&t->exit_sema);
     bitmap_reset(t->pcb->used_threads, t->bit_index);
+    //printf("exit %d\n", t->tid);
     thread_exit(0);
 }
