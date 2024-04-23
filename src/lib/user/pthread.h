@@ -15,13 +15,13 @@ void * pthread_tls_load(void);
 
 /* User locks. */
 pthread_lock_t pthread_mutex_init(void);
-void pthread_mutex_lock(pthread_lock_t mutex UNUSED);
-void pthread_mutex_unlock(pthread_lock_t mutex UNUSED);
+void pthread_mutex_lock(pthread_lock_t mutex);
+void pthread_mutex_unlock(pthread_lock_t mutex);
 
 /* User semaphores. */
 pthread_sema_t pthread_semaphore_init(int value);
-void pthread_semaphore_down(pthread_sema_t sema UNUSED);
-void pthread_semaphore_up(pthread_sema_t sema UNUSED);
+void pthread_semaphore_down(pthread_sema_t sema);
+void pthread_semaphore_up(pthread_sema_t sema);
 
 /* User condition variables. */
 pthread_cond_t pthread_cond_init(void);
