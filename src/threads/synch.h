@@ -1,7 +1,7 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
-#include <list.h>
+#include "lib/kernel/list.h"
 #include <stdbool.h>
 #include <debug.h>
 #include "threads/spinlock.h"

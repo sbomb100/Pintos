@@ -2,9 +2,9 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
-#include <list.h>
+#include "lib/kernel/list.h"
 #include <stdint.h>
-#include <bitmap.h>
+#include "lib/kernel/bitmap.h"
 #include "filesys/file.h"
 #include "threads/synch.h"
 #include "lib/kernel/hash.h"
@@ -177,6 +177,9 @@ struct process
    struct thread * main_thread;     /* The main (external) thread. Designated in process_create. */
    struct thread ** threads;        /* Array of thread pointers, created by pthread_create. */
    struct bitmap * used_threads;    /* Bitmap of address blocks, to be used by spawning pthreads. */
+
+   void * heap_start;
+   void * heap_break;
 };
 
 /* VM MMAP */

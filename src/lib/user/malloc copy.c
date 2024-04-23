@@ -28,10 +28,6 @@
 
 #define ALIGNMENT 16
 
-static bool initialized = false;
-
-// struct lock malloc_lock;
-
 struct boundary_tag {
   int inuse : 1; // inuse bit
   int size : 31; // size of block, in words
@@ -206,12 +202,6 @@ int malloc_init(void) {
  * malloc - Allocate a block with at least size bytes of payload
  */
 void *malloc(size_t size) {
-
-  if (!initialized) {
-    malloc_init();
-    initialized = true;
-  }
-
   struct block *bp;
 
   /* Ignore spurious requests */
@@ -239,12 +229,10 @@ void *malloc(size_t size) {
   size_t extendwords =
       max(awords, CHUNKSIZE); /* Amount to extend heap if no fit */
 
+  void *brk = thread_current()->pcb->heap_break;
 
-  void * mem_brk = sbrk(0);
-  void *mem_heap_hi = (void *)(mem_brk - 1);
-  struct block *last_block = mem_heap_hi - 3;
-
-
+  struct block *last_block = (struct block *)brk - 1;
+  last_block = prev_blk(last_block);
   //! prev_blk_footer(last_block)->inuse
   if (!prev_blk_footer(last_block)->inuse) {
     extendwords -= prev_blk_footer(last_block)->size;
@@ -379,11 +367,11 @@ static struct block *find_fit(size_t asize) {
     struct block * best = NULL;
 
     for ( struct list_elem * e = list_begin(&free_list[1]); e != list_end(&free_list[1]); e = list_begin(&free_list[1]) ) {
-        if ( asize <= (size_t) prev_blk_footer((struct block *) e)->size ) {
+        if ( asize <= prev_blk_footer((struct block *) e)->size ) {
             if ( best == NULL ) {
                 best = list_entry(e, struct block, elem);
             }
-            else if ( blk_size(best) < (size_t) prev_blk_footer((struct block *) e)->size) {
+            else if ( blk_size(best) < prev_blk_footer((struct block *) e)->size) {
                 best = list_entry(e, struct block, elem);
             }
         }
@@ -399,7 +387,7 @@ static struct block *find_fit(size_t asize) {
         for (struct list_elem *e = list_begin(&free_list[i]);
             e != list_end(&free_list[i]); e = list_next(e)) {
             //struct block *b = list_entry(e, struct block, elem);
-            if (asize <= (size_t) prev_blk_footer((struct block *) e)->size ) {
+            if (asize <= prev_blk_footer((struct block *) e)->size ) {
                 return list_entry(e, struct block, elem);
             }
         }
@@ -407,3 +395,79 @@ static struct block *find_fit(size_t asize) {
 
     return NULL; /* No fit */
 }
+
+// int mm_checkheap(int verbose) {
+//   //--is every free block in the list?--
+//   // iterate through the heap
+//   // for each free block
+//   // check to see if that block is in the fblist
+//   struct block *blk = heap_listp;
+
+//   while (blk_size(blk) != 0) {
+//     if (blk_free(blk)) {
+//       struct list_elem *prev = list_prev(&blk->elem);
+//       // if the elem of the free block is not in the free list
+//       if (&blk->elem != list_next(prev)) {
+//         return 1;
+//       }
+//       struct list_elem *next = list_next(&blk->elem);
+//       if (&blk->elem != list_prev(next)) {
+//         return 1;
+//       }
+//     }
+//     // check if form is correct
+//     struct block *next_block =
+//         (struct block *)((void *)blk + WSIZE * blk->header.size);
+//     if (blk != prev_blk(next_block)) {
+//       return 1;
+//     }
+//     // What else should I check?
+//     // navigate to the next
+//     blk = next_block;
+//   }
+
+//   //--is every block in the free list marked as free?--
+//   //(at this point we know every fb is in list)
+//   // loop through free list
+//   // for every element in the list
+//   for (int i = 0; i < NUM_SEGREGATES; i++) {
+//     for (struct list_elem *e = list_begin(&free_list[i]);
+//          e != list_end(&free_list[i]); e = list_next(e)) {
+//       struct block *b = list_entry(e, struct block, elem);
+//       // check the header of the block to see if it is free
+//       if (!blk_free(b)) {
+//         return 1; // if not return non zero number and print error
+//       }
+
+//       struct block *b_pointer = get_pointer(b);
+
+//       //(double loop is inefficient but may be useful)
+//       for (struct list_elem *inner_e = list_next(e);
+//            inner_e != list_end(&free_list[i]); inner_e = list_next(e)) {
+//         struct block *inner_b = list_entry(inner_e, struct block, elem);
+//         // get the block's position and see if any copies exist in the list
+//         if (b_pointer == get_pointer(inner_b)) {
+//           return 1; // if we do have a copy return a non zero number and print
+//                     // error
+//         }
+//       }
+//     }
+//   }
+//   //--are buddies not merged?--
+//   // (at this point we know the fblist is valid and all fb's are on the list)
+//   // loop through fbllist
+//   // for each fb
+//   // check if this fb's footer is next to the next fb's header
+//   // if yes return non zero number and print error
+
+//   //--are the pointers in the free list point to valid free blocks?--
+//   // QUESTION: isnt this the same as maked as free?
+//   // not necessarily needed implement if things going crazy
+
+//   //- Any others?
+//   // think of it and ask discord
+//   return 0;
+// }
+
+// // TODO: do i actually need this?
+// static inline void *get_pointer(void *b) { return (struct block *)((void *)b); }

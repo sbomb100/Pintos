@@ -1,7 +1,7 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
 #include <stdbool.h>
-#include <list.h>
+#include "lib/kernel/list.h"
 
 struct frame {
 	struct spt_entry * page;

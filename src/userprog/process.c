@@ -393,6 +393,11 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
         if (!load_segment(file, file_page, (void *)mem_page,
                           read_bytes, zero_bytes, writable))
           goto done;
+        if (t->pcb->heap_start == NULL)
+        {
+          t->pcb->heap_start = (void *) (mem_page + read_bytes + zero_bytes);
+          t->pcb->heap_break = t->pcb->heap_start;
+        }
       }
       else
         goto done;

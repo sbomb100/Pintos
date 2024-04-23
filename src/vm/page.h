@@ -2,7 +2,7 @@
 #define VM_PAGE_H
 
 #include <stdint.h>
-#include <hash.h>
+#include "lib/kernel/hash.h"
 #include "threads/palloc.h"
 #include "filesys/file.h"
 #include "vm/frame.h"
