@@ -254,7 +254,8 @@ syscall_handler(struct intr_frame *f)
         thread_exit(-1);
         return;
     }
-    sema_up(&(thread_current()->pcb->semas[(int) args[0]]));
+    int *sema_num_ptr = (int *) args[0];
+    sema_up(&(thread_current()->pcb->semas[*sema_num_ptr]));
     break;
 
   }
@@ -264,7 +265,8 @@ syscall_handler(struct intr_frame *f)
         thread_exit(-1);
         return;
     }
-    sema_down(&(thread_current()->pcb->semas[(int) args[0]]));
+    int *sema_num_ptr = (int *) args[0];
+    sema_down(&(thread_current()->pcb->semas[*sema_num_ptr]));
     break;
   }
   default:
