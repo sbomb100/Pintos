@@ -74,3 +74,15 @@ void pthread_semaphore_down(pthread_sema_t sema UNUSED) {
 void pthread_semaphore_up(pthread_sema_t sema UNUSED) {
     return;
 }
+
+bool pthread_cond_init(pthread_cond_t cond UNUSED) {
+
+}
+
+void pthread_cond_wait(pthread_cond_t cond UNUSED) {
+
+}
+
+void pthread_cond_signal(pthread_cond_t cond UNUSED) {
+
+}
