@@ -767,7 +767,7 @@ tid_t pthread_create(wrapper_func wf, start_routine sr, void * args) {
 
     struct process * pcb = thread_current()->pcb;
     //TODO: use vacant index to store in array.
-    struct thread * tcb = make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux);
+    struct thread * tcb = make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux, false);
     pcb->threads[pcb->num_threads_up] = tcb;
     pcb->num_threads_up++;
     return tcb->tid;

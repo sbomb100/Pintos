@@ -209,7 +209,7 @@ void thread_print_stats(void);
 
 typedef void thread_func(void *aux);
 tid_t thread_create(const char *name, int priority, thread_func *, void *);
-struct thread *make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux);
+struct thread *make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux, bool isIdle);
 
 void thread_block(struct spinlock *);
 void thread_unblock(struct thread *);

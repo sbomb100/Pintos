@@ -116,7 +116,7 @@ void thread_start_idle_thread(void)
 
   /* Create the idle thread. */
   // change to MAKE_THREAD_FOR_PROCESS
-  struct thread *idle_thread = make_thread_for_proc(idle_name, NICE_MAX, idle, thread_current()->pcb, NULL);
+  struct thread *idle_thread = make_thread_for_proc(idle_name, NICE_MAX, idle, thread_current()->pcb, NULL, true);
   ASSERT(idle_thread);
   idle_thread->cpu = get_cpu();
   get_cpu()->rq.idle_thread = idle_thread;
@@ -186,7 +186,7 @@ wake_up_new_thread(struct thread *t)
 }
 
 struct thread *
-make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux)
+make_thread_for_proc(const char *name, int nice, thread_func *function, struct process *parent_proc, void *aux, bool isIdle)
 {
   struct thread *t;
   struct kernel_thread_frame *kf;
@@ -261,8 +261,10 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
   sf = alloc_frame(t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
- 
-  wake_up_new_thread(t);
+  if (!isIdle)
+  {
+    wake_up_new_thread(t);
+  }
   return t;
 }
 /* Creates a new kernel thread named NAME with the given initial
@@ -561,7 +563,7 @@ void thread_exit(int status)
 {
   ASSERT(!intr_context());
 
-  struct thread * t = thread_current();  
+  struct thread *t = thread_current();
   if (t == t->pcb->main_thread)
   {
     thread_current()->pcb->exit_status = status;
@@ -569,13 +571,13 @@ void thread_exit(int status)
   }
 
   do_thread_exit();
-} 
+}
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void thread_yield(void)
 {
-  struct thread *cur = thread_current(); 
+  struct thread *cur = thread_current();
   ASSERT(!intr_context());
 
   lock_own_ready_queue();
@@ -830,7 +832,7 @@ schedule(void)
   /* Schedule must be called with current CPU's ready queue lock held */
   ASSERT(spinlock_held_by_current_cpu(&get_cpu()->rq.lock));
 
-  /* Must not hold any other spinlocks, since interrupt handlers might 
+  /* Must not hold any other spinlocks, since interrupt handlers might
      attempt to acquire them, leading to deadlock since the outgoing
      thread would not be able to release them.
    */
