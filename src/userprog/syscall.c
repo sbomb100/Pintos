@@ -204,9 +204,10 @@ syscall_handler(struct intr_frame *f)
         return;
     }
     int *lock_num_ptr = (int *) args[0];
-    *lock_num_ptr = thread_current()->pcb->locks_num;
+    //printf("lock no. : %d\n", (int) args[0]);
+    *lock_num_ptr = thread_current()->pcb->lock_num;
     lock_init(&(thread_current()->pcb->locks[*lock_num_ptr]));
-    thread_current()->pcb->locks_num++;
+    thread_current()->pcb->lock_num++;
     break;
 
   }
@@ -216,7 +217,10 @@ syscall_handler(struct intr_frame *f)
         thread_exit(-1);
         return;
     }
-    lock_acquire(&(thread_current()->pcb->locks[(int) args[0]]));
+    int *lock_num_ptr = (int *) args[0];
+
+    printf("lock no. : %d\n", *lock_num_ptr);
+    lock_acquire(&(thread_current()->pcb->locks[*lock_num_ptr]));
     break;
 
   }
@@ -226,7 +230,9 @@ syscall_handler(struct intr_frame *f)
         thread_exit(-1);
         return;
     }
-    lock_release(&(thread_current()->pcb->locks[(int) args[0]]));
+    int *lock_num_ptr = (int *) args[0];
+    printf("lock no. : %d\n", *lock_num_ptr);
+    lock_release(&(thread_current()->pcb->locks[*lock_num_ptr]));
     break;
   }
     case SYS_INITSEMA:
@@ -237,7 +243,7 @@ syscall_handler(struct intr_frame *f)
     }
     int *sema_num_ptr = (int *) args[0];
     *sema_num_ptr = thread_current()->pcb->sema_num;
-    sema_init(&(thread_current()->pcb->semas[*sema_num_ptr], args[0]), args[1]);
+    sema_init(&(thread_current()->pcb->semas[*sema_num_ptr]), args[1]);
     thread_current()->pcb->sema_num++;
     break;
 
