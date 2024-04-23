@@ -213,7 +213,6 @@ syscall_handler(struct intr_frame *f)
         return;
     }
     int *lock_num_ptr = (int *) args[0];
-    //printf("lock no. : %d\n", (int) args[0]);
     *lock_num_ptr = thread_current()->pcb->lock_num;
     lock_init(&(thread_current()->pcb->locks[*lock_num_ptr]));
     thread_current()->pcb->lock_num++;
@@ -228,7 +227,6 @@ syscall_handler(struct intr_frame *f)
     }
     int *lock_num_ptr = (int *) args[0];
 
-    printf("lock no. : %d\n", *lock_num_ptr);
     lock_acquire(&(thread_current()->pcb->locks[*lock_num_ptr]));
     break;
 
@@ -240,7 +238,6 @@ syscall_handler(struct intr_frame *f)
         return;
     }
     int *lock_num_ptr = (int *) args[0];
-    printf("lock no. : %d\n", *lock_num_ptr);
     lock_release(&(thread_current()->pcb->locks[*lock_num_ptr]));
     break;
   }

@@ -5,23 +5,22 @@
 #define NUM_THREADS 20
 
 pthread_lock_t lock;
-pthread_lock_t lock2;
 int counter = 0;
 
 static void increment(void *) {
-    lock_acquire(&lock);
-    counter++;
-    lock_release(&lock);
+    for ( int i = 0; i < 1000; i++ ) {
+        lock_acquire(&lock);
+        counter++;
+        lock_release(&lock);
+    }
 }
 
 void test_main(void) {
     tid_t threads[NUM_THREADS];
 
     lock_init(&lock);
-    lock_init(&lock2);
 
     msg("Value of lock: %d\n", lock);
-    msg("Value of lock: %d\n", lock2);
 
     // Create threads
     for (intptr_t i = 0; i < NUM_THREADS; i++) {
@@ -34,12 +33,7 @@ void test_main(void) {
         CHECK(pthread_join(threads[i]), "pthread_join %zd", i);
     }
 
-    // Check counter value
-    for (intptr_t i = 0; i < NUM_THREADS; i++) {
-        if (counter != 20) {
-            fail("num[%zd] != 20", i);
-        }
+    if ( counter != 20000 ) {
+        fail("%d != 20000", counter);
     }
-
-
 }
