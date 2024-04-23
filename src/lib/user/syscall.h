@@ -19,7 +19,13 @@ typedef int tid_t;
 
 /* User synchronization identifiers. */
 typedef int pthread_lock_t;
+#define LOCK_ERROR ((pthread_lock_t) -1)
+
 typedef int pthread_sema_t;
+#define SEMA_ERROR ((pthread_sema_t) -1)
+
+typedef int pthread_cond_t;
+#define COND_ERROR ((pthread_cond_t) -1)
 
 /* Function pointer definitions. */
 typedef void (*start_routine)(void *);

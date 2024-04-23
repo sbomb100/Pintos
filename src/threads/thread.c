@@ -315,6 +315,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   new_proc->main_thread = t;
   new_proc->threads = calloc(MAX_THREADS, sizeof(struct thread *));
   new_proc->used_threads = bitmap_create(MAX_THREADS);
+  sema_init(&new_proc->exit_sema, 0);
   if (new_proc->fdToFile == NULL)
   {
     thread_exit(-1);
@@ -816,6 +817,9 @@ void thread_schedule_tail(struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
   {
     ASSERT(prev != cur);
+    if ( prev != prev->pcb->main_thread ) {
+        sema_up(&prev->pcb->exit_sema);
+    }
     palloc_free_page(prev);
   }
 }
