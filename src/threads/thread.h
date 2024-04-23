@@ -178,6 +178,11 @@ struct process
    struct thread * main_thread;     /* The main (external) thread. Designated in process_create. */
    struct thread ** threads;        /* Array of thread pointers, created by pthread_create. */
    struct bitmap * used_threads;    /* Bitmap of address blocks, to be used by spawning pthreads. */
+   
+   struct lock locks[50];           /**/
+   int lock_num;
+   struct semaphore semas[50];      /**/
+   int sema_num;
 };
 
 /* VM MMAP */

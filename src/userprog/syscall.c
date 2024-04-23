@@ -196,6 +196,70 @@ syscall_handler(struct intr_frame *f)
     f->eax = sys_pthread_join((tid_t) args[0]);
     break;
   }
+  case SYS_INITLOCK:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    int *lock_num_ptr = (int *) args[0];
+    *lock_num_ptr = thread_current()->pcb->locks_num;
+    lock_init(&(thread_current()->pcb->locks[*lock_num_ptr]));
+    thread_current()->pcb->locks_num++;
+    break;
+
+  }
+  case SYS_LOCK:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    lock_acquire(&(thread_current()->pcb->locks[(int) args[0]]));
+    break;
+
+  }
+  case SYS_UNLOCK:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    lock_release(&(thread_current()->pcb->locks[(int) args[0]]));
+    break;
+  }
+    case SYS_INITSEMA:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    int *sema_num_ptr = (int *) args[0];
+    *sema_num_ptr = thread_current()->pcb->sema_num;
+    sema_init(&(thread_current()->pcb->semas[*sema_num_ptr], args[0]), args[1]);
+    thread_current()->pcb->sema_num++;
+    break;
+
+  }
+  case SYS_SEMAUP:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    sema_up(&(thread_current()->pcb->semas[(int) args[0]]));
+    break;
+
+  }
+  case SYS_SEMADOWN:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    sema_down(&(thread_current()->pcb->semas[(int) args[0]]));
+    break;
+  }
   default:
     thread_exit(-1);
   }
