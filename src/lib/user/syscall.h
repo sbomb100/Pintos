@@ -73,11 +73,11 @@ bool sys_pthread_join(tid_t tid);
 void * sbrk(intptr_t increment);
 
 /* User synch syscalls. */
-void lock_init(pthread_lock_t *lock);
-void lock_acquire(pthread_lock_t *lock);
-void lock_release(pthread_lock_t *lock);
+pthread_lock_t lock_init(void);
+void lock_acquire(pthread_lock_t lock);
+void lock_release(pthread_lock_t lock);
 
-void sema_init(pthread_sema_t *sema, int value);
-void sema_up(pthread_sema_t *sema);
-void sema_down(pthread_sema_t *sema);
+pthread_sema_t sema_init(int value);
+void sema_up(pthread_sema_t sema);
+void sema_down(pthread_sema_t sema);
 #endif /* lib/user/syscall.h */

@@ -138,7 +138,7 @@ int process_wait(tid_t child_tid)
   sema_down(&cur_child->wait_sema);
   //leave
   int exit_status = cur_child->exit_status;
-  free(cur_child);
+  //free(cur_child);
   return exit_status;
 }
 

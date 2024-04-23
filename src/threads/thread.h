@@ -32,6 +32,9 @@ enum process_status
 typedef int mapid_t;
 typedef int tid_t;
 typedef int pid_t;
+typedef int pthread_lock_t;
+typedef int pthread_sema_t;
+typedef int pthread_cond_t;
 
 /* Function pointer definitions. */
 typedef void (*start_routine)(void *);
@@ -39,6 +42,9 @@ typedef void (*wrapper_func)(start_routine, void *);
 
 #define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
 #define PID_ERROR ((pid_t)-1) /* Error value for pid_t. */
+#define LOCK_ERROR ((pthread_lock_t) -1)
+#define SEMA_ERROR ((pthread_sema_t) -1)
+#define COND_ERROR ((pthread_cond_t) -1)
 #define THREAD_NAME_MAX 16
 #define MAX_THREADS 32
 

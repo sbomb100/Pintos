@@ -204,26 +204,26 @@ sbrk (intptr_t increment) {
   return (void *) syscall1(SYS_SBRK, increment);
 }
 
-void lock_init(pthread_lock_t *lock){
-  syscall1(SYS_INITLOCK, lock);
+pthread_lock_t lock_init(void){
+  return syscall0(SYS_INITLOCK);
 }
 
-void lock_acquire(pthread_lock_t *lock){
+void lock_acquire(pthread_lock_t lock){
   syscall1(SYS_LOCK, lock);
 }
 
-void lock_release(pthread_lock_t *lock){
+void lock_release(pthread_lock_t lock){
   syscall1(SYS_UNLOCK, lock);
 }
 
-void sema_init(pthread_sema_t *sema, int value){
-  syscall2(SYS_INITSEMA, sema, value);
+pthread_sema_t sema_init(int value){
+  return syscall1(SYS_INITSEMA, value);
 }
 
-void sema_up(pthread_sema_t *sema){
+void sema_up(pthread_sema_t sema){
   syscall1(SYS_SEMAUP, sema);
 }
 
-void sema_down(pthread_sema_t *sema){
+void sema_down(pthread_sema_t sema){
   syscall1(SYS_SEMADOWN, sema);
 }

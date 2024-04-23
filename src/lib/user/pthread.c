@@ -51,32 +51,32 @@ void * pthread_tls_load() {
     return pg_round_up(esp);
 }
 
-bool pthread_mutex_init(pthread_lock_t mutex UNUSED) {
-    return false;
+pthread_lock_t pthread_mutex_init() {
+    return lock_init();
 }
 
-void pthread_mutex_lock(pthread_lock_t mutex UNUSED) {
-    return;
+void pthread_mutex_lock(pthread_lock_t mutex) {
+    lock_acquire(mutex);
 }
 
-void pthread_mutex_unlock(pthread_lock_t mutex UNUSED) {
-    return;
+void pthread_mutex_unlock(pthread_lock_t mutex) {
+    lock_release(mutex);
 }
 
-bool pthread_semaphore_init(pthread_sema_t sema UNUSED) {
-    return false;
+pthread_sema_t pthread_semaphore_init(int value) {
+    return sema_init(value);
 }
 
-void pthread_semaphore_down(pthread_sema_t sema UNUSED) {
-    return;
+void pthread_semaphore_down(pthread_sema_t sema) {
+    sema_down(sema);
 }
 
-void pthread_semaphore_up(pthread_sema_t sema UNUSED) {
-    return;
+void pthread_semaphore_up(pthread_sema_t sema) {
+    sema_up(sema);
 }
 
-bool pthread_cond_init(pthread_cond_t cond UNUSED) {
-
+pthread_cond_t pthread_cond_init() {
+    return COND_ERROR;
 }
 
 void pthread_cond_wait(pthread_cond_t cond UNUSED, pthread_lock_t UNUSED) {

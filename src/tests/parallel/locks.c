@@ -7,18 +7,18 @@
 pthread_lock_t lock;
 int counter = 0;
 
-static void increment(void *) {
+static void increment(void * args UNUSED) {
     for ( int i = 0; i < 1000; i++ ) {
-        lock_acquire(&lock);
+        pthread_mutex_lock(lock);
         counter++;
-        lock_release(&lock);
+        pthread_mutex_unlock(lock);
     }
 }
 
 void test_main(void) {
     tid_t threads[NUM_THREADS];
 
-    lock_init(&lock);
+    lock = pthread_mutex_init();
 
     msg("Value of lock: %d\n", lock);
 
