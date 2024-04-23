@@ -153,11 +153,10 @@ page_fault(struct intr_frame *f)
       goto exit;
    }
    /* Pointer is good so get the page with it */
-   
-   //if (!lock_held_by_current_thread(&t->parent_process->spt_lock))
+
+   // if (!lock_held_by_current_thread(&t->parent_process->spt_lock))
    //{
-    lock_frame();
-    lock_acquire(&t->pcb->spt_lock);
+   lock_acquire(&t->pcb->spt_lock);
    //}
 
    struct spt_entry *page = get_page_from_hash(fault_addr);
@@ -170,12 +169,11 @@ page_fault(struct intr_frame *f)
       {
          load_extra_stack_page(fault_addr);
          lock_release(&t->pcb->spt_lock);
-         unlock_frame();
       }
       else
       {
          lock_release(&t->pcb->spt_lock);
-         unlock_frame();
+
          thread_exit(-1);
       }
       return;
@@ -184,25 +182,25 @@ page_fault(struct intr_frame *f)
    {
       load_file_to_spt(page);
       lock_release(&t->pcb->spt_lock);
-      unlock_frame();
+
       return;
    }
    if (page->page_status == 1) /* in swap table */
    {
       load_swap_to_spt(page);
       lock_release(&t->pcb->spt_lock);
-      unlock_frame();
+
       return;
    }
    if (page->page_status == 0) /* mmapped file */
    {
       load_mmap_to_spt(page);
       lock_release(&t->pcb->spt_lock);
-      unlock_frame();
+
       return;
    }
    lock_release(&t->pcb->spt_lock);
-   unlock_frame();
+
    if (pagedir_get_page(t->pcb->pagedir, fault_addr) == NULL)
    {
       goto exit;
@@ -223,7 +221,9 @@ exit:
 void load_swap_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
+   lock_frame();
    page->frame = find_frame(page);
+
    if (page->frame == NULL)
    {
       thread_exit(-1);
@@ -239,12 +239,15 @@ void load_swap_to_spt(struct spt_entry *page)
    page->page_status = 3;
 
    page->pinned = false;
+   unlock_frame();
 }
 
 void load_mmap_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
+   lock_frame();
    struct frame *new_frame = find_frame(page);
+
    if (new_frame == NULL)
    {
       thread_exit(-1);
@@ -266,6 +269,7 @@ void load_mmap_to_spt(struct spt_entry *page)
 
    page->page_status = 3;
    page->pinned = false;
+   unlock_frame();
 }
 
 /*
@@ -274,7 +278,9 @@ void load_mmap_to_spt(struct spt_entry *page)
 void load_file_to_spt(struct spt_entry *page)
 {
    page->pinned = true;
+   lock_frame();
    struct frame *new_frame = find_frame(page);
+
    if (new_frame == NULL)
    {
       thread_exit(-1);
@@ -297,11 +303,11 @@ void load_file_to_spt(struct spt_entry *page)
       /* memset the kpage + bytes read */
 
       /* TODO: */
-      memset(new_frame->paddr + page->bytes_read, 0, page->bytes_zero); /* make sure page has memory correct range */
    }
-
-   page->page_status = 3; /* in frame table */
+   memset(new_frame->paddr + page->bytes_read, 0, page->bytes_zero); /* make sure page has memory correct range */
+   page->page_status = 3;                                            /* in frame table */
    page->pinned = false;
+   unlock_frame();
 }
 
 /*
@@ -329,19 +335,19 @@ void load_extra_stack_page(void *fault_addr)
    if (thread_current()->pcb->num_stack_pages > 2048)
    {
       lock_release(&thread_current()->pcb->spt_lock);
-      unlock_frame();
+
       thread_exit(-3);
    }
    hash_insert(&thread_current()->pcb->spt, &new_page->elem);
    thread_current()->pcb->num_stack_pages++;
-   hash_insert(&thread_current()->pcb->spt, &new_page->elem);
-   thread_current()->pcb->num_stack_pages++;
+   lock_frame();
    struct frame *new_frame = find_frame(new_page);
+   unlock_frame();
    if (new_frame == NULL)
    {
 
       lock_release(&thread_current()->pcb->spt_lock);
-      unlock_frame();
+
       thread_exit(-4);
    }
 

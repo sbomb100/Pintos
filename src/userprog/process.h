@@ -4,6 +4,7 @@
 #include "threads/thread.h"
 
 #define THREAD_SIZE 65536 //Size of new thread stack created by pthread_create
+#define TLSIZE 512 //Size of thread local storage
 
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);

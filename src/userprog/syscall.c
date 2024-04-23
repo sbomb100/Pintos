@@ -73,7 +73,8 @@ syscall_handler(struct intr_frame *f)
   case SYS_WAIT:
     if (!parse_arguments(f, &args[0], 1))
       thread_exit(-1);
-    int arg = *(int *)(p + 4);
+    //int arg = *(int *)(p + 4);
+    int arg = *(int *)(p + 1);
     f->eax = process_wait(arg);
     break;
   case SYS_CREATE:
@@ -416,6 +417,13 @@ int read(int fd, void *buffer, unsigned size, void *esp)
       byteCount++;
     }
   }
+  //pin it
+  for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
+  {
+    struct spt_entry *page = get_page_from_hash(buffer_page);
+    page->pinned = true;
+  }
+
   /* If fd == 0, reads from keyboard using input_getc() */
   if (fd == 0)
   {
@@ -474,6 +482,13 @@ int read(int fd, void *buffer, unsigned size, void *esp)
       success += bytes_read;
     }
   }
+  //unpin
+  for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
+  {
+    struct spt_entry *page = get_page_from_hash(buffer_page);
+    page->pinned = false;
+  }
+
   lock_release(&file_lock);
   return success;
 }
@@ -492,6 +507,14 @@ int write(int fd, const void *buffer, unsigned size)
     thread_exit(-1);
   if (fd < 1 || fd > 1025)
     return -1;
+    //pin it
+  void *buffer_start = pg_round_down(buffer);
+  void *buffer_page;
+  for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
+  {
+    struct spt_entry *page = get_page_from_hash(buffer_page);
+    page->pinned = true;
+  }
 
   int ret = -1;
   if (fd == 1)
@@ -512,6 +535,12 @@ int write(int fd, const void *buffer, unsigned size)
         ret = file_write(fileDes, buffer, size);
       }
     }
+  }
+  //unpin
+  for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
+  {
+    struct spt_entry *page = get_page_from_hash(buffer_page);
+    page->pinned = false;
   }
   lock_release(&file_lock);
   return ret;

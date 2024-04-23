@@ -134,11 +134,10 @@ struct thread
    int64_t vruntime_0;
    int64_t actual_runtime;
 
-#ifdef USERPROG
    /* Owned by userprog/process.c. */
    struct file *exec_file;
    struct process *pcb;
-#endif
+
  
    /* Owned by thread.c. */
    unsigned magic; /* Detects stack overflow. */

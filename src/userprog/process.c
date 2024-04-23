@@ -184,17 +184,17 @@ void process_exit(int status)
   /* Cleanup semantics for orphan or child process */
   if ( cur->pcb != NULL ) {
     if ( cur->pcb->status == PROCESS_ORPHAN ) {
-        lock_release(&cur->pcb->process_lock);
         free(cur->pcb);
         cur->pcb = NULL;
     }
     else {
         cur->pcb->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
-        lock_release(&cur->pcb->process_lock);
+        
         cur->pcb->exit_status = status;
         sema_up(&cur->pcb->wait_sema);
     }
   } 
+  lock_release(&cur->pcb->process_lock);
 }
 
 
@@ -405,7 +405,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   {
     goto done;
   }
-
+  
+  *esp -= TLSIZE;
+  
   for (; token != NULL; token = strtok_r(NULL, " ", &save_ptr))
   {
     *esp -= strlen(token) + 1;
@@ -580,7 +582,7 @@ setup_stack(void **esp)
   void * upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
   /* Create a page, put it in a frame, then set stack */
   
-  
+  lock_acquire(&curr->pcb->spt_lock);
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -596,10 +598,10 @@ setup_stack(void **esp)
   page->bytes_read = 0;
   page->pagedir = curr->pcb->pagedir;
   page->swap_index = -1;
-  lock_acquire(&curr->pcb->spt_lock);
+  
   hash_insert(&curr->pcb->spt, &page->elem);
   curr->pcb->num_stack_pages++;
-  lock_release(&curr->pcb->spt_lock);
+  
 
   lock_frame();
   struct frame *stack_frame = find_frame(page);
@@ -623,6 +625,7 @@ setup_stack(void **esp)
   {
     free(page);
   }
+  lock_release(&curr->pcb->spt_lock);
   return success;
 }
 
@@ -728,6 +731,8 @@ bool setup_pthread(struct aux * aux, void (**eip)(void), void **esp) {
         free(page);
     }
     unlock_frame();
+
+    *esp -= TLSIZE;
 
     *esp = (void *)((int32_t)*esp & (~3));
     *esp -= sizeof(char *);
