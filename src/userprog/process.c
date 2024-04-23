@@ -147,11 +147,6 @@ void process_exit(int status)
 {
   struct thread *cur = thread_current();
 
-  while ( cur->pcb->num_threads_up > 1 ) {
-    sema_down(&cur->pcb->exit_sema);
-    cur->pcb->num_threads_up--;
-  }
-
   while (cur->pcb->num_mapped != 0)
   {
     munmap(cur->pcb->num_mapped);
