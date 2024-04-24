@@ -277,6 +277,37 @@ syscall_handler(struct intr_frame *f)
     sema_down(&(thread_current()->pcb->semas[sema]));
     break;
   }
+  case SYS_INITCOND:
+  {
+    pthread_cond_t cond_num = thread_current()->pcb->cond_num;
+    cond_init(&(thread_current()->pcb->conds[cond_num]));
+    thread_current()->pcb->cond_num++;
+    f->eax = (pthread_cond_t) cond_num;
+    break;
+  }
+  case SYS_COND_WAIT:
+  {
+    if ( !parse_arguments(f, &args[0], 2)) {
+        thread_exit(-1);
+        return;
+    }
+    pthread_cond_t cond_num = (pthread_cond_t) args[0];
+    pthread_lock_t lock_num = (pthread_lock_t) args[1];
+
+    cond_wait(&(thread_current()->pcb->conds[cond_num]), &(thread_current()->pcb->locks[lock_num]));
+    break;
+  }
+  case SYS_COND_SIGNAL:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+    pthread_cond_t cond_num = (pthread_cond_t) args[0];
+
+    cond_signal(&(thread_current()->pcb->conds[cond_num]), NULL);
+    break;
+  }
   case SYS_FUTEX_WAIT:
   {
     if ( !parse_arguments(f, &args[0], 1)) {
