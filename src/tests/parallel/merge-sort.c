@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include "lib/random.c"
 #include "lib/user/malloc.h"
+#include "lib/user/threadpool.h"
 #include "tests/lib.h"
 #include "tests/main.h"
-#include "tests/parallel/threadpool.h"
 
+#include <stdio.h>
 #define insertion_sort_threshold 16
 #define min_task_size 1000
 #define nthreads 4
@@ -148,14 +149,16 @@ mergesort_parallel(int *array, int N)
 
 void test_main (void) {
     int N = 100000;
+    printf("here\n");
     int * array = (int *) malloc(sizeof(int) * N);
+    printf("here\n");
     int * array2 = (int *) malloc(sizeof(int) * N);
     int i;
     for (i = 0; i < N; i++) {
         array[i] = random_ulong() % N;
         array2[i] = array[i];
     }
-
+    
     mergesort_serial(array, N);
     mergesort_parallel(array2, N);
 
