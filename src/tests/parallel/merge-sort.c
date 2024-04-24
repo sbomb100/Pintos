@@ -5,7 +5,7 @@
 #include "lib/user/malloc.h"
 #include "tests/lib.h"
 #include "tests/main.h"
-#include "lib/user/threadpool.h"
+#include "tests/parallel/threadpool.h"
 
 #define insertion_sort_threshold 16
 #define min_task_size 1000

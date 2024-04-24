@@ -60,5 +60,3 @@ void * future_get(struct future *);
 
 /* Deallocate this future.  Must be called after future_get() */
 void future_free(struct future *);
-
-
