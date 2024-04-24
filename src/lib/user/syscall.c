@@ -227,3 +227,11 @@ void sema_up(pthread_sema_t sema){
 void sema_down(pthread_sema_t sema){
   syscall1(SYS_SEMADOWN, sema);
 }
+
+void futex_wait(void * addr) {
+    syscall1(SYS_FUTEX_WAIT, addr);
+}
+
+void futex_wake(void * addr, int val) {
+    syscall2(SYS_FUTEX_WAIT, addr, val);
+}

@@ -48,5 +48,7 @@ tid_t sys_pthread_create(wrapper_func wf, start_routine sr, void *args);
 void sys_pthread_exit(void);
 bool sys_pthread_join(tid_t tid);
 void * sbrk(intptr_t increment);
+void futex_wait(void * addr);
+void futex_wake(void * addr, int val);
 
 #endif /* userprog/syscall.h */

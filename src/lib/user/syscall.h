@@ -80,4 +80,7 @@ void lock_release(pthread_lock_t lock);
 pthread_sema_t sema_init(int value);
 void sema_up(pthread_sema_t sema);
 void sema_down(pthread_sema_t sema);
+
+void futex_wait(void * addr);
+void futex_wake(void * addr, int val);
 #endif /* lib/user/syscall.h */

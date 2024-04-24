@@ -43,7 +43,9 @@ enum
     SYS_SIGCOND,
     SYS_INITSEMA,
     SYS_SEMAUP,
-    SYS_SEMADOWN
+    SYS_SEMADOWN,
+    SYS_FUTEX_WAIT,
+    SYS_FUTEX_WAKE
   };
 
 #endif /* lib/syscall-nr.h */

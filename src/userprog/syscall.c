@@ -270,6 +270,26 @@ syscall_handler(struct intr_frame *f)
     sema_down(&(thread_current()->pcb->semas[sema]));
     break;
   }
+  case SYS_FUTEX_WAIT:
+  {
+    if ( !parse_arguments(f, &args[0], 1)) {
+        thread_exit(-1);
+        return;
+    }
+
+    futex_wait((void *) args[0]);
+    break;
+  }
+  case SYS_FUTEX_WAKE:
+  {
+    if ( !parse_arguments(f, &args[0], 2)) {
+        thread_exit(-1);
+        return;
+    }
+
+    futex_wake((void *) args[0], (int) args[1]);
+    break;
+  }
   default:
     thread_exit(-1);
   }
@@ -809,74 +829,6 @@ bool sys_pthread_join(tid_t tid) {
     return pthread_join(tid);
 }
 
-// void * sbrk (intptr_t increment) { // this one doesn't accept negative increment values (the other one does)
-//   char * old_break = thread_current()->pcb->heap_break;
-
-//   if ((increment < 0) || (void * )(old_break + increment) < thread_current()->pcb->heap_start) {
-//     return (void *) -1;
-//   }
-
-//   thread_current()->pcb->heap_break += increment;
-//   return old_break;
-
-// }
-
-
-// void * sbrk(intptr_t increment) {
-//     struct thread * t = thread_current();
-//     struct process * pcb = t->pcb;
-//     void * old_break = pcb->heap_break;
-//     void * new_break = old_break + increment;
-//     if ( increment == 0 ) {
-//         return old_break;
-//     }
-//     if ( increment > 0 ) {
-//         if ( new_break > PHYS_BASE ) {
-//             return (void *)-1;
-//         }
-//         void * page = pg_round_down(old_break);
-//         void * new_page = pg_round_down(new_break);
-//         while ( page < new_page ) {
-//             struct spt_entry * spte = malloc(sizeof(struct spt_entry));
-//             if ( spte == NULL ) {
-//                 return (void *)-1;
-//             }
-//             spte->vaddr = page;
-//             spte->is_stack = false;
-//             spte->page_status = 1;
-//             spte->writable = true;
-//             spte->file = NULL;
-//             spte->offset = 0;
-//             spte->bytes_read = 0;
-//             spte->pagedir = pcb->pagedir;
-//             spte->swap_index = -1;
-//             lock_acquire(&pcb->spt_lock);
-//             hash_insert(&pcb->spt, &spte->elem);
-//             lock_release(&pcb->spt_lock);
-//             page += PGSIZE;
-//         }
-//         pcb->heap_break = new_break;
-//         return old_break;
-//     }
-//     else {
-//         void * page = pg_round_down(new_break);
-//         void * old_page = pg_round_down(old_break);
-//         while ( page < old_page ) {
-//             struct spt_entry * spte = get_page_from_hash(page);
-//             if ( spte == NULL ) {
-//                 return (void *)-1;
-//             }
-//             lock_acquire(&pcb->spt_lock);
-//             hash_delete(&pcb->spt, &spte->elem);
-//             lock_release(&pcb->spt_lock);
-//             free(spte);
-//             page += PGSIZE;
-//         }
-//         pcb->heap_break = new_break;
-//         return old_break;
-//     }
-// }
-
 void * sbrk(intptr_t increment) {
     struct thread * t = thread_current();
     struct process * pcb = t->pcb;
@@ -909,4 +861,12 @@ void * sbrk(intptr_t increment) {
         pcb->heap_break = new_break;
         return old_break;
     }
+}
+
+void futex_wait(void * addr UNUSED) {
+
+}
+
+void futex_wake(void * addr UNUSED, int val UNUSED) {
+
 }
