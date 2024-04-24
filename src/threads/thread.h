@@ -178,6 +178,7 @@ struct process
    struct process *parent;
    struct list children;
    struct lock counter_lock;
+   struct condition threadcond;
    size_t num_threads_up;
 
    struct thread * main_thread;     /* The main (external) thread. Designated in process_create. */
