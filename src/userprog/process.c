@@ -22,16 +22,17 @@
 #include "vm/page.h"
 #include "lib/kernel/hash.h"
 
-struct aux {
-    wrapper_func wf;
-    start_routine sr;
-    void * args;
+struct aux
+{
+  wrapper_func wf;
+  start_routine sr;
+  void *args;
 };
 
 static thread_func start_process NO_RETURN;
 static thread_func start_pthread NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
-static bool setup_pthread(struct aux * aux, void (**eip)(void), void **esp);
+static bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp);
 struct process *find_child(pid_t child_pid);
 
 /* Starts a new thread running a user program loaded from
@@ -54,20 +55,23 @@ tid_t process_execute(const char *file_name)
   strlcpy(fn_copy, file_name, PGSIZE);
 
   tid = thread_create(file_name, NICE_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR) {
+  if (tid == TID_ERROR)
+  {
     palloc_free_page(fn_copy);
     return tid;
   }
-  else {
-    struct process * child = find_child((pid_t) tid);
+  else
+  {
+    struct process *child = find_child((pid_t)tid);
     sema_down(&child->wait_sema);
 
-    if ( child->status == PROCESS_ABORT ) {
-        lock_acquire(&thread_current()->pcb->process_lock);
-        list_remove(&child->elem);
-        lock_release(&thread_current()->pcb->process_lock);
-        free(child);
-        tid = -1;
+    if (child->status == PROCESS_ABORT)
+    {
+      lock_acquire(&thread_current()->pcb->process_lock);
+      list_remove(&child->elem);
+      lock_release(&thread_current()->pcb->process_lock);
+      free(child);
+      tid = -1;
     }
   }
 
@@ -82,7 +86,6 @@ start_process(void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  
 
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
@@ -122,82 +125,67 @@ start_process(void *file_name_)
 int process_wait(tid_t child_tid)
 {
   /* Finds the child */
-  //finds a process based on its id, as this thread is run under the boot process
-  struct process *cur_child = find_child((pid_t) child_tid);
+  // finds a process based on its id, as this thread is run under the boot process
+  struct process *cur_child = find_child((pid_t)child_tid);
 
   /* exits if no child was found */
   if (cur_child == NULL)
   {
     return -1;
   }
-  //remove this process from that list to show that we are already waiting on it
+  // remove this process from that list to show that we are already waiting on it
   lock_acquire(&thread_current()->pcb->process_lock);
   list_remove(&cur_child->elem);
   lock_release(&thread_current()->pcb->process_lock);
-  //signal that we are waiting on the process_exit call
+  // signal that we are waiting on the process_exit call
   sema_down(&cur_child->wait_sema);
-  //leave
+  // leave
+  ASSERT(cur_child->num_threads_up == 0);
   int exit_status = cur_child->exit_status;
-  //free(cur_child);
+  // free(cur_child);
   return exit_status;
 }
 
 /* Free the current process's resources. */
 void process_exit(int status)
 {
-  struct thread *cur = thread_current();
 
+  struct thread *cur = thread_current();
+  ASSERT(cur->pcb->num_threads_up == 0);
   while (cur->pcb->num_mapped != 0)
   {
     munmap(cur->pcb->num_mapped);
   }
-   /* Destroy the current process's spt entries */
+  /* Destroy the current process's spt entries */
   lock_acquire(&cur->pcb->spt_lock);
   hash_destroy(&cur->pcb->spt, destroy_page);
   lock_release(&cur->pcb->spt_lock);
   /* Process Termination Message */
   char *tmp;
   printf("%s: exit(%d)\n", strtok_r(cur->name, " ", &tmp), status);
-  
+
   lock_file();
-  if ( cur->exec_file != NULL ) {
+  if (cur->exec_file != NULL)
+  {
     file_allow_write(cur->exec_file);
   }
   file_close(cur->exec_file);
   unlock_file();
-  
+
   /* Mark orphanized child processes */
-   lock_acquire(&cur->pcb->process_lock);
-    for ( struct list_elem * e = list_begin(&cur->pcb->children); e != list_end(&cur->pcb->children);) {
-        struct process * p = list_entry(e, struct process, elem);
-        lock_acquire(&p->process_lock);
-        if ( p->status == PROCESS_RUNNING ) {
-            p->status = PROCESS_ORPHAN;
-            lock_release(&p->process_lock);
-            e = list_next(e);
-        }
-        else {
-            lock_release(&p->process_lock);
-            e = list_remove(e);
-            free(p);
-        }
-    }
+  lock_acquire(&cur->pcb->process_lock);
+  
   /* Cleanup semantics for orphan or child process */
-  if ( cur->pcb != NULL ) {
-    if ( cur->pcb->status == PROCESS_ORPHAN ) {
-        free(cur->pcb);
-        cur->pcb = NULL;
-    }
-    else {
-        cur->pcb->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
-        
-        cur->pcb->exit_status = status;
-        sema_up(&cur->pcb->wait_sema);
-    }
-  } 
+  if (cur->pcb != NULL)
+  {
+
+    cur->pcb->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
+
+    cur->pcb->exit_status = status;
+    sema_up(&cur->pcb->wait_sema);
+  }
   lock_release(&cur->pcb->process_lock);
 }
-
 
 /* Sets up the CPU for running user code in the current
    thread.
@@ -396,7 +384,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
           goto done;
         if (t->pcb->heap_start == NULL)
         {
-          t->pcb->heap_start = (void *) (mem_page + read_bytes + zero_bytes);
+          t->pcb->heap_start = (void *)(mem_page + read_bytes + zero_bytes);
           t->pcb->heap_break = t->pcb->heap_start;
         }
       }
@@ -411,9 +399,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   {
     goto done;
   }
-  
+
   *esp -= TLSIZE;
-  
+
   for (; token != NULL; token = strtok_r(NULL, " ", &save_ptr))
   {
     *esp -= strlen(token) + 1;
@@ -533,7 +521,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
   ASSERT(ofs % PGSIZE == 0);
 
   struct thread *t = thread_current();
-  
+
   lock_acquire(&t->pcb->spt_lock);
   while (read_bytes > 0 || zero_bytes > 0)
   {
@@ -542,7 +530,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
        and zero the final PAGE_ZERO_BYTES bytes. */
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
-    
+
     /* Creates a page*/
     struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
     if (page == NULL)
@@ -561,7 +549,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
     page->pagedir = t->pcb->pagedir;
     page->swap_index = -1;
     hash_insert(&t->pcb->spt, &page->elem);
-    
+
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
@@ -579,15 +567,15 @@ static bool
 setup_stack(void **esp)
 {
   bool success = false;
-  
+
   struct thread *curr = thread_current();
   size_t vacant = bitmap_scan_and_flip(curr->pcb->used_threads, 0, 1, false);
-  ASSERT( vacant != BITMAP_ERROR );
-  
+  ASSERT(vacant != BITMAP_ERROR);
+
   curr->bit_index = vacant;
-  void * upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
+  void *upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
   /* Create a page, put it in a frame, then set stack */
-  
+
   lock_acquire(&curr->pcb->spt_lock);
   struct spt_entry *page = (struct spt_entry *)malloc(sizeof(struct spt_entry));
   if (page == NULL)
@@ -604,10 +592,9 @@ setup_stack(void **esp)
   page->bytes_read = 0;
   page->pagedir = curr->pcb->pagedir;
   page->swap_index = -1;
-  
+
   hash_insert(&curr->pcb->spt, &page->elem);
   curr->pcb->num_stack_pages++;
-  
 
   lock_frame();
   struct frame *stack_frame = find_frame(page);
@@ -617,7 +604,7 @@ setup_stack(void **esp)
   {
     printf("NO FRAME 604\n");
     free(page);
-    
+
     thread_exit(-1);
   }
 
@@ -639,7 +626,7 @@ setup_stack(void **esp)
 struct process *find_child(pid_t child_tid)
 {
   lock_acquire(&thread_current()->pcb->process_lock);
-  for (struct list_elem * e = list_begin(&thread_current()->pcb->children); e != list_end(&thread_current()->pcb->children); e = list_next(e))
+  for (struct list_elem *e = list_begin(&thread_current()->pcb->children); e != list_end(&thread_current()->pcb->children); e = list_next(e))
   {
     struct process *temp = list_entry(e, struct process, elem);
     if (temp->pid == child_tid)
@@ -670,133 +657,147 @@ bool install_page(void *upage, void *kpage, bool writable)
   return (pagedir_get_page(t->pcb->pagedir, upage) == NULL && pagedir_set_page(t->pcb->pagedir, upage, kpage, writable));
 }
 
-static void start_pthread(void * args_) {
-    struct aux * aux = args_;
-    struct intr_frame if_;
+static void start_pthread(void *args_)
+{
+  struct aux *aux = args_;
+  struct intr_frame if_;
 
-    memset(&if_, 0, sizeof if_);
-    if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
-    if_.cs = SEL_UCSEG;
-    if_.eflags = FLAG_IF | FLAG_MBS;
+  memset(&if_, 0, sizeof if_);
+  if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
+  if_.cs = SEL_UCSEG;
+  if_.eflags = FLAG_IF | FLAG_MBS;
 
-    if ( !setup_pthread(aux, &if_.eip, &if_.esp) ) {
-        thread_current()->pcb->status = PROCESS_ABORT;
-        free(aux);
-        thread_exit(-1);
-    }
-
+  if (!setup_pthread(aux, &if_.eip, &if_.esp))
+  {
+    thread_current()->pcb->status = PROCESS_ABORT;
     free(aux);
-    asm volatile("movl %0, %%esp; jmp intr_exit" : : "g"(&if_) : "memory");
-    NOT_REACHED();
-} 
+    thread_exit(-1);
+  }
 
-bool setup_pthread(struct aux * aux, void (**eip)(void), void **esp) {
-    struct thread * t = thread_current();
-    struct process * pcb = t->pcb;
-
-    /* Stack page setup and SPT insert. */
-    size_t vacant = bitmap_scan_and_flip(pcb->used_threads, 0, 1, false);
-    ASSERT( vacant != BITMAP_ERROR );
-
-    t->bit_index = vacant;
-    void * upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
-
-    lock_frame();
-    struct spt_entry * page = malloc(sizeof(struct spt_entry));
-    if ( page == NULL ) {
-        free(page);
-        return false;
-    }
-
-    page->is_stack = true;
-    page->vaddr = pg_round_down(upage);
-    page->page_status = 3;
-    page->writable = true;
-    page->file = NULL;
-    page->offset = 0;
-    page->bytes_read = 0;
-    page->pagedir = t->pcb->pagedir;
-    page->swap_index = -1;
-    lock_acquire(&t->pcb->spt_lock);
-    hash_insert(&t->pcb->spt, &page->elem);
-    t->pcb->num_stack_pages++;
-    lock_release(&t->pcb->spt_lock);
-
-    struct frame *stack_frame = find_frame(page);
-    if ( stack_frame == NULL || stack_frame->paddr == NULL ) {
-        free(page);
-        unlock_frame();
-        thread_exit(-1);
-    }
-
-    bool success = install_page(page->vaddr, page->frame->paddr, page->writable);
-    if ( success ) {
-        *esp = ((uint8_t *)PHYS_BASE) - (PGSIZE * vacant);
-    }
-    else {
-        free(page);
-    }
-    unlock_frame();
-
-    *esp -= TLSIZE;
-
-    *esp = (void *)((int32_t)*esp & (~3));
-    *esp -= sizeof(char *);
-
-    *esp -= sizeof(char *);
-    memcpy(*esp, &aux->args, sizeof(char *));
-
-    *esp -= sizeof(char *);
-    memcpy(*esp, &aux->sr, sizeof(char *));
-
-    *esp -= sizeof(char *);
-
-    *eip = (void (*)(void))aux->wf;
-    return success;
+  free(aux);
+  asm volatile("movl %0, %%esp; jmp intr_exit" : : "g"(&if_) : "memory");
+  NOT_REACHED();
 }
 
-tid_t pthread_create(wrapper_func wf, start_routine sr, void * args) {
-    struct aux * aux = malloc(sizeof(struct aux));
-    if ( aux == NULL ) {
-        return TID_ERROR;
-    }
+bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp)
+{
+  struct thread *t = thread_current();
+  struct process *pcb = t->pcb;
 
-    aux->wf = wf;
-    aux->sr = sr;
-    aux->args = args;
+  /* Stack page setup and SPT insert. */
+  size_t vacant = bitmap_scan_and_flip(pcb->used_threads, 0, 1, false);
+  ASSERT(vacant != BITMAP_ERROR);
 
-    struct process * pcb = thread_current()->pcb;
-    //TODO: use vacant index to store in array.
-    struct thread * tcb = make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux, false);
-    pcb->threads[pcb->num_threads_up] = tcb;
-    pcb->num_threads_up++;
-    return tcb->tid;
-}
+  t->bit_index = vacant;
+  void *upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
 
-bool pthread_join(tid_t tid) {
-    struct process * pcb = thread_current()->pcb;
-    for ( int i = 0; i < MAX_THREADS; i++ ) {
-        struct thread * t = pcb->threads[i];
-        if ( t != NULL && t->tid == tid ) {
-            sema_down(&t->join_sema);
-            sema_up(&t->exit_sema);
-            return true;
-        }
-    }
-    /* printf("%d\n", tid);
-    for ( int i = 0; i < MAX_THREADS; i++ ) {
-        struct thread * t = pcb->threads[i];
-        printf("%p %d\n", t, t != NULL ? t->tid : -1);
-    } */
+  lock_frame();
+  struct spt_entry *page = malloc(sizeof(struct spt_entry));
+  if (page == NULL)
+  {
+    free(page);
     return false;
-}   
+  }
+
+  page->is_stack = true;
+  page->vaddr = pg_round_down(upage);
+  page->page_status = 3;
+  page->writable = true;
+  page->file = NULL;
+  page->offset = 0;
+  page->bytes_read = 0;
+  page->pagedir = t->pcb->pagedir;
+  page->swap_index = -1;
+  lock_acquire(&t->pcb->spt_lock);
+  hash_insert(&t->pcb->spt, &page->elem);
+  t->pcb->num_stack_pages++;
+  lock_release(&t->pcb->spt_lock);
+
+  struct frame *stack_frame = find_frame(page);
+  if (stack_frame == NULL || stack_frame->paddr == NULL)
+  {
+    free(page);
+    unlock_frame();
+    thread_exit(-1);
+  }
+
+  bool success = install_page(page->vaddr, page->frame->paddr, page->writable);
+  if (success)
+  {
+    *esp = ((uint8_t *)PHYS_BASE) - (PGSIZE * vacant);
+  }
+  else
+  {
+    free(page);
+  }
+  unlock_frame();
+
+  *esp -= TLSIZE;
+
+  *esp = (void *)((int32_t)*esp & (~3));
+  *esp -= sizeof(char *);
+
+  *esp -= sizeof(char *);
+  memcpy(*esp, &aux->args, sizeof(char *));
+
+  *esp -= sizeof(char *);
+  memcpy(*esp, &aux->sr, sizeof(char *));
+
+  *esp -= sizeof(char *);
+
+  *eip = (void (*)(void))aux->wf;
+  return success;
+}
+
+tid_t pthread_create(wrapper_func wf, start_routine sr, void *args)
+{
+  struct aux *aux = malloc(sizeof(struct aux));
+  if (aux == NULL)
+  {
+    return TID_ERROR;
+  }
+
+  aux->wf = wf;
+  aux->sr = sr;
+  aux->args = args;
+
+  struct process *pcb = thread_current()->pcb;
+  // TODO: use vacant index to store in array.
+  struct thread *tcb = make_thread_for_proc(thread_name(), NICE_DEFAULT, start_pthread, thread_current()->pcb, aux, false);
+  lock_acquire(&pcb->counter_lock);
+  pcb->threads[pcb->num_threads_up - 1] = tcb;
+  lock_release(&pcb->counter_lock);
+  return tcb->tid;
+}
+
+bool pthread_join(tid_t tid)
+{
+  struct process *pcb = thread_current()->pcb;
+  for (int i = 0; i < MAX_THREADS; i++)
+  {
+    struct thread *t = pcb->threads[i];
+    if (t != NULL && t->tid == tid)
+    {
+      sema_down(&t->join_sema);
+      sema_up(&t->exit_sema);
+      return true;
+    }
+  }
+  /* printf("%d\n", tid);
+  for ( int i = 0; i < MAX_THREADS; i++ ) {
+      struct thread * t = pcb->threads[i];
+      printf("%p %d\n", t, t != NULL ? t->tid : -1);
+  } */
+  return false;
+}
 
 /* Exits thread and */
-void pthread_exit() {
-    struct thread * t = thread_current();
-    sema_up(&t->join_sema);
-    sema_down(&t->exit_sema);
-    bitmap_reset(t->pcb->used_threads, t->bit_index);
-    //printf("exit %d\n", t->tid);
-    thread_exit(0);
+void pthread_exit()
+{
+  struct thread *t = thread_current();
+  sema_up(&t->join_sema);
+  sema_down(&t->exit_sema);
+  bitmap_reset(t->pcb->used_threads, t->bit_index);
+  // printf("exit %d\n", t->tid);
+  thread_exit(0);
 }
