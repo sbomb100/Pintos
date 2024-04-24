@@ -76,13 +76,13 @@ void pthread_semaphore_up(pthread_sema_t sema) {
 }
 
 pthread_cond_t pthread_cond_init() {
-    return COND_ERROR;
+    return cond_init();
 }
 
-void pthread_cond_wait(pthread_cond_t cond UNUSED, pthread_lock_t UNUSED) {
-
+void pthread_cond_wait(pthread_cond_t cond, pthread_lock_t mutex) {
+    cond_wait(cond, mutex);
 }
 
-void pthread_cond_signal(pthread_cond_t cond UNUSED) {
-
+void pthread_cond_signal(pthread_cond_t cond) {
+    cond_signal(cond);
 }

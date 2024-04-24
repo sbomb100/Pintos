@@ -81,6 +81,10 @@ pthread_sema_t sema_init(int value);
 void sema_up(pthread_sema_t sema);
 void sema_down(pthread_sema_t sema);
 
+pthread_cond_t cond_init(void);
+void cond_wait(pthread_cond_t cond, pthread_lock_t lock);
+void cond_signal(pthread_cond_t cond);
+
 void futex_wait(void * addr);
 void futex_wake(void * addr, int val);
 #endif /* lib/user/syscall.h */

@@ -194,6 +194,8 @@ struct process
    int lock_num;
    struct semaphore semas[50];      /**/
    int sema_num;
+   struct condition conds[50];
+   int cond_num;
 };
 
 /* VM MMAP */

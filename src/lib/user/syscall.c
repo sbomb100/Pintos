@@ -228,6 +228,18 @@ void sema_down(pthread_sema_t sema){
   syscall1(SYS_SEMADOWN, sema);
 }
 
+pthread_cond_t cond_init() {
+    return syscall0(SYS_INITCOND);
+}
+
+void cond_wait(pthread_cond_t cond, pthread_lock_t lock) {
+    syscall2(SYS_COND_WAIT, cond, lock);
+}
+
+void cond_signal(pthread_cond_t cond) {
+    syscall1(SYS_COND_SIGNAL, cond);
+}
+
 void futex_wait(void * addr) {
     syscall1(SYS_FUTEX_WAIT, addr);
 }

@@ -25,7 +25,7 @@ void pthread_semaphore_up(pthread_sema_t sema);
 
 /* User condition variables. */
 pthread_cond_t pthread_cond_init(void);
-void pthread_cond_wait(pthread_cond_t cond UNUSED, pthread_lock_t UNUSED);
-void pthread_cond_signal(pthread_cond_t cond UNUSED);
+void pthread_cond_wait(pthread_cond_t cond, pthread_lock_t mutex);
+void pthread_cond_signal(pthread_cond_t cond);
 
 #endif
