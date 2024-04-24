@@ -171,7 +171,20 @@ static struct cpu *
 choose_cpu_for_new_thread(struct thread *t)
 {
   if (atomic_load(&cpu_started_others))
-    return &cpus[t->tid % ncpu];
+  {
+    for (unsigned int i = 1; i < ncpu; i++) // go through all cpus to find which has highest weight /cpu_load
+    {
+      spinlock_acquire(&cpus[i].rq.lock);
+      if (list_empty(&cpus[i].rq.ready_list))
+      {
+        spinlock_release(&cpus[i].rq.lock);
+        
+        return &cpus[i];
+      }
+      spinlock_release(&cpus[i].rq.lock);
+    }
+    return &cpus[0];
+  }
   else
     return &cpus[0];
 }
@@ -267,7 +280,9 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
   if (!isIdle)
   {
     wake_up_new_thread(t);
+    // add to an idle CPU
   }
+
   return t;
 }
 /* Creates a new kernel thread named NAME with the given initial
