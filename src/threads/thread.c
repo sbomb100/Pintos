@@ -212,7 +212,6 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
     initial_process->status = PROCESS_RUNNING;
     initial_process->parent = NULL;
     /*children init*/
-    cond_init(&initial_process->threadcond);
     list_init(&initial_process->children);
     sema_init(&initial_process->wait_sema, 0);
     lock_init(&initial_process->process_lock);
@@ -242,18 +241,12 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
   {
     thread_current()->pcb = initial_process;
     t->pcb = initial_process;
-    lock_acquire(&t->pcb->counter_lock);
-    t->pcb->num_threads_up++;
-    lock_release(&t->pcb->counter_lock);
   }
   else
   {
 
     ASSERT(parent_proc != NULL);
     t->pcb = parent_proc;
-    lock_acquire(&t->pcb->counter_lock);
-    t->pcb->num_threads_up++;
-    lock_release(&t->pcb->counter_lock);
 
     // add thread to processes list of threads
   }
@@ -314,7 +307,6 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   lock_init(&new_proc->counter_lock);
   new_proc->num_threads_up = 0;
   new_proc->num_stack_pages = 0;
-  cond_init(&new_proc->threadcond);
   /*hash init*/
   hash_init(&new_proc->spt, page_hash, is_page_before, NULL);
   hash_init(&new_proc->futex_hash, futex_hash, futex_less_than, NULL);
@@ -358,7 +350,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     list_init(&initial_process->children);
     sema_init(&initial_process->wait_sema, 0);
     lock_init(&initial_process->process_lock);
-    cond_init(&initial_process->threadcond);
+
     // prob dont need this stuff but for now just leaving it TODO
     /*hash init*/
     hash_init(&initial_process->spt, page_hash, is_page_before, NULL);
@@ -579,22 +571,12 @@ void thread_exit(int status)
   ASSERT(!intr_context());
 
   struct thread *t = thread_current();
-  lock_acquire(&t->pcb->counter_lock);
-  t->pcb->num_threads_up--;
-  cond_signal(&t->pcb->threadcond, &t->pcb->counter_lock);
-  while (t == t->pcb->main_thread)
+  if (t == t->pcb->main_thread)
   {
-    if (t->pcb->num_threads_up == 0)
-    {
-      thread_current()->pcb->exit_status = status;
-      process_exit(status);
-      break;
-    }
-    cond_wait(&t->pcb->threadcond, &t->pcb->counter_lock);
-    
+    thread_current()->pcb->exit_status = status;
+    process_exit(status);
   }
-  lock_release(&t->pcb->counter_lock);
-  
+
   do_thread_exit();
 }
 
