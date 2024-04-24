@@ -184,6 +184,9 @@ struct process
    struct thread * main_thread;     /* The main (external) thread. Designated in process_create. */
    struct thread ** threads;        /* Array of thread pointers, created by pthread_create. */
    struct bitmap * used_threads;    /* Bitmap of address blocks, to be used by spawning pthreads. */
+   
+   struct hash futex_hash;          /* Hash table for blocked threads via futex_wait, k = addr, v = thread. */
+   struct spinlock futex_lock;          /* Lock for futex_hash. */
 
    void * heap_start;
    void * heap_break;

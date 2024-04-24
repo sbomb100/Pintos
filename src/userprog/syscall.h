@@ -51,4 +51,7 @@ void * sbrk(intptr_t increment);
 void futex_wait(void * addr);
 void futex_wake(void * addr, int val);
 
+unsigned futex_hash(const struct hash_elem *elem, void *aux UNUSED);
+bool futex_less_than(const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED);
+
 #endif /* userprog/syscall.h */

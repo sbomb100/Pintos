@@ -16,6 +16,7 @@
 #include "threads/scheduler.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "userprog/syscall.h"
 #endif
 #include "threads/cpu.h"
 #include "threads/mp.h"
@@ -220,7 +221,9 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
     // prob dont need this stuff but for now just leaving it TODO
     /*hash init*/
     hash_init(&initial_process->spt, page_hash, is_page_before, NULL);
+    hash_init(&initial_process->futex_hash, futex_hash, futex_less_than, NULL);
     lock_init(&initial_process->spt_lock);
+    spinlock_init(&initial_process->futex_lock);
     /* init mmap */
     list_init(&initial_process->mmap_list);
     lock_init(&initial_process->mmap_lock);
@@ -314,7 +317,9 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   cond_init(&new_proc->threadcond);
   /*hash init*/
   hash_init(&new_proc->spt, page_hash, is_page_before, NULL);
+  hash_init(&new_proc->futex_hash, futex_hash, futex_less_than, NULL);
   lock_init(&new_proc->spt_lock);
+  spinlock_init(&new_proc->futex_lock);
   /* init mmap */
   list_init(&new_proc->mmap_list);
   lock_init(&new_proc->mmap_lock);
@@ -357,7 +362,9 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     // prob dont need this stuff but for now just leaving it TODO
     /*hash init*/
     hash_init(&initial_process->spt, page_hash, is_page_before, NULL);
+    hash_init(&initial_process->futex_hash, futex_hash, futex_less_than, NULL);
     lock_init(&initial_process->spt_lock);
+    spinlock_init(&initial_process->futex_lock);
     /* init mmap */
     list_init(&initial_process->mmap_list);
     lock_init(&initial_process->mmap_lock);

@@ -5,6 +5,13 @@
 #include "threads/vaddr.h"
 
 #include "threads/cpu.h"
+
+struct futex_object {
+    struct hash_elem elem;
+    void * addr;
+    struct thread * t;
+};
+
 struct lock file_lock;
 
 static void syscall_handler(struct intr_frame *);
@@ -863,10 +870,46 @@ void * sbrk(intptr_t increment) {
     }
 }
 
-void futex_wait(void * addr UNUSED) {
+void futex_wait(void * addr) {
+    struct thread * t = thread_current();
+    struct futex_object * f = malloc(sizeof(struct futex_object));
 
+    f->addr = addr;
+    f->t = t;
+
+    spinlock_acquire(&t->pcb->futex_lock);
+    hash_insert(&t->pcb->futex_hash, &f->elem);
+    thread_block(&t->pcb->futex_lock);
+    spinlock_release(&t->pcb->futex_lock);
 }
 
-void futex_wake(void * addr UNUSED, int val UNUSED) {
+void futex_wake(void * addr, int val) {
+    struct thread * t = thread_current();
+    struct futex_object fo;
+    fo.addr = addr;
 
+    spinlock_acquire(&t->pcb->futex_lock);
+    for ( int i = 0; i < val; i++ ) {
+        struct hash_elem * h = hash_delete(&t->pcb->futex_hash, &fo.elem);
+        if ( h == NULL ) {
+            break;
+        }
+
+        struct futex_object * f = hash_entry(h, struct futex_object, elem);
+        thread_unblock(f->t);
+        free(f);
+    }
+    spinlock_release(&t->pcb->futex_lock);
+}
+
+unsigned futex_hash(const struct hash_elem *elem, void *aux UNUSED) {
+    const struct futex_object * f = hash_entry(elem, struct futex_object, elem);
+    return hash_bytes(&f->addr, sizeof f->addr);
+}
+
+bool futex_less_than(const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED) {
+    const struct futex_object * f_1 = hash_entry(elem1, struct futex_object, elem);
+    const struct futex_object * f_2 = hash_entry(elem2, struct futex_object, elem);
+
+    return f_1->addr < f_2->addr;
 }
