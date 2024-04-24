@@ -32,19 +32,27 @@ start:
 # Set string instructions to go upward.
 	cld
 
-#### Get memory size, via interrupt 15h function 88h (see [IntrList]),
-#### which returns AX = (kB of physical memory) - 1024.  This only
-#### works for memory sizes <= 65 MB, which should be fine for our
-#### purposes.  We cap memory at 64 MB because that's all we prepare
-#### page tables for, below.
+#### Get memory size, via interrupt 15h function E801h (see [IntrList]),
+#### which returns AX = (kB of physical memory) between 1 MB and 16 MB and
+#### BX = (64kB blocks of memory after 16 MB). We cap memory at 984 MB
+#### due to the limitations of real mode x86 addressing and kernel size.
 
-	movb $0x88, %ah
+	xor %cx, %cx
+	xor %dx, %dx
+	mov $0xE801, %ax
 	int $0x15
-	addl $1024, %eax	# Total kB memory
-	cmp $0x10000, %eax	# Cap at 64 MB
+	jcxz 1f
+
+	mov %cx, %ax
+	mov %dx, %bx
+1:
+	shll $6, %ebx
+	addl %ebx, %eax
+	addl $0x400, %eax
+	cmp $0xF6000, %eax # Cap at 984 MB due to identity map limits
 	jbe 1f
-	mov $0x10000, %eax
-1:	shrl $2, %eax		# Total 4 kB pages
+	mov $0xF6000, %eax
+1:	shrl $2, %eax
 	addr32 movl %eax, init_ram_pages - LOADER_PHYS_BASE - 0x20000
 
 #### Enable A20.  Address line 20 is tied low when the machine boots,
@@ -102,6 +110,26 @@ start:
 	addw $4, %di
 	addl $0x1000, %eax
 	loop 1b
+
+# If we have more than 64 MB of RAM, build the rest of the PDEs that
+# will point at second-level page tables starting at 1 MB (without
+# actually writing the tables yet because we can't address that high).
+
+	addr32 movl init_ram_pages - LOADER_PHYS_BASE - 0x20000, %ecx
+	cmp $0x4000, %ecx
+	jbe 1f
+
+	movl $0x100007, %eax
+	subl $0x4000, %ecx
+	shrl $10, %ecx
+	addl $1, %ecx
+	mov $0x40, %di
+2:	movl %eax, %es:(%di)
+	movl %eax, %es:LOADER_PHYS_BASE >> 20(%di)
+	addw $4, %di
+	addl $0x1000, %eax
+	loop 2b
+1:
 
 # Set up page tables for one-to-map linear to physical map for the
 # first 64 MB of RAM.
@@ -175,6 +203,23 @@ start:
 	addl $LOADER_PHYS_BASE, %esp
 	movl $0, %ebp			# Null-terminate main()'s backtrace
 
+# Set up rest of page table identity map if we have more than 64 MB.
+# We can also use init_ram_pages directly because we've mapped the
+# first 64 MB after 0xC0000000, very convenient!
+
+	movl (init_ram_pages), %ecx
+	cmp $0x4000, %ecx
+	jbe 1f
+
+	movl $0x4000007, %eax
+	subl $0x4000, %ecx
+	movl $0x100000, %edi
+2:	movl %eax, (%edi)
+	addl $4, %edi
+	addl $0x1000, %eax
+	loop 2b
+1:
+
 #### Call main().
 
 	call main
@@ -201,4 +246,3 @@ gdtdesc:
 .globl init_ram_pages
 init_ram_pages:
 	.long 0
-

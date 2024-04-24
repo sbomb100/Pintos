@@ -29,8 +29,8 @@
 #define PDMASK  BITMASK(PDSHIFT, PDBITS)   /* Page directory bits (22:31). */
 
 /* memory dedicated to PCI - make sure this is 4MB aligned */
-#define PCI_ADDR_ZONE_BEGIN     0xe0000000
-#define PCI_ADDR_ZONE_END       0xe0800000
+#define PCI_ADDR_ZONE_BEGIN     0xfd800000
+#define PCI_ADDR_ZONE_END       0xfe000000
 #define PCI_ADDR_ZONE_PDES      2
 #define PCI_ADDR_ZONE_PAGES     (PCI_ADDR_ZONE_END-PCI_ADDR_ZONE_BEGIN)/PGSIZE
 #define APIC_ZONE_PDES          8192
