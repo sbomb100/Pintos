@@ -147,7 +147,6 @@ static struct block *next_blk(struct block *blk) {
 
 /* Given a block, obtain its footer boundary tag */
 static struct boundary_tag *get_footer(struct block *blk) {
-  printf("footer break \n");
   return ((void *)blk + WSIZE * blk->header.size) - sizeof(struct boundary_tag);
 }
 
@@ -157,7 +156,6 @@ static void set_header_and_footer(struct block *blk, int size, int inuse) {
   blk->header.size = size;
   *get_footer(blk) = blk->header; /* Copy header to footer */
   
-  printf("footer break 1\n");
 }
 
 /* Mark a block as used and set its size. */
@@ -214,11 +212,10 @@ int malloc_init(void) {
  */
 void *malloc(size_t size) {
   if (!initialized) {
-    printf("initializing\n");
     malloc_init();
     initialized = true;
   }
-printf("allocating\n");
+
   struct block *bp;
 
   /* Ignore spurious requests */
@@ -265,15 +262,12 @@ printf("allocating\n");
   if (!prev_blk_footer(last_block)->inuse) {
     extendwords -= prev_blk_footer(last_block)->size;
   }
-  printf("allocating 2 %d\n", extendwords);
   if ((bp = extend_heap(extendwords)) == NULL) {
     pthread_mutex_unlock(malloc_lock);
     // lock_release(malloc_lock);
     return NULL;
   }
-  printf("allocating 3\n");
   bp = place(bp, awords);
-  printf("allocating 4\n");
   ASSERT(is_aligned(blk_size(bp) * WSIZE));
   pthread_mutex_unlock(malloc_lock);
   // lock_release(malloc_lock);
@@ -353,11 +347,10 @@ static struct block *extend_heap(size_t words) {
 
   /* Initialize free block header/footer and the epilogue header.
    * Note that we overwrite the previous epilogue here. */
-  printf("allocating 4\n");
+  
   struct block *blk = bp - sizeof(FENCE);
   mark_block_free(blk, words);
   next_blk(blk)->header = FENCE;
-  printf("allocating 5\n");
   /* Coalesce if the previous block was free */
   blk = coalesce(blk);
   list_push_back(&free_list[1], &blk->elem);

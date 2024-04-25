@@ -149,9 +149,9 @@ mergesort_parallel(int *array, int N)
 
 void test_main (void) {
     int N = 10;
-    printf("here\n");
+
     int * array = (int *) malloc(sizeof(int) * N);
-    printf("here\n");
+
     int * array2 = (int *) malloc(sizeof(int) * N);
     int i;
     for (i = 0; i < N; i++) {
@@ -159,7 +159,10 @@ void test_main (void) {
         array2[i] = array[i];
     }
     
+    printf("serial----------\n");
     mergesort_serial(array, N);
+    printf("parallel--------\n");
+
     mergesort_parallel(array2, N);
 
     for (i = 0; i < N; i++) {
