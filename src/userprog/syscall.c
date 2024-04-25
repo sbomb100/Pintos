@@ -217,9 +217,7 @@ syscall_handler(struct intr_frame *f)
   {
     pthread_lock_t lock_num = thread_current()->pcb->lock_num;
     lock_init(&(thread_current()->pcb->locks[lock_num]));
-    lock_acquire(& thread_current()->pcb->process_lock);
     thread_current()->pcb->lock_num++;
-    lock_release(& thread_current()->pcb->process_lock);
     f->eax = (pthread_lock_t) lock_num;
     break;
   }
@@ -255,9 +253,7 @@ syscall_handler(struct intr_frame *f)
 
     pthread_sema_t sema = thread_current()->pcb->sema_num;
     sema_init(&(thread_current()->pcb->semas[sema]), args[0]);
-    lock_acquire(& thread_current()->pcb->process_lock);
     thread_current()->pcb->sema_num++;
-    lock_release(& thread_current()->pcb->process_lock);
     break;
   }
   case SYS_SEMAUP:
@@ -285,9 +281,7 @@ syscall_handler(struct intr_frame *f)
   {
     pthread_cond_t cond_num = thread_current()->pcb->cond_num;
     cond_init(&(thread_current()->pcb->conds[cond_num]));
-    lock_acquire(& thread_current()->pcb->process_lock);
     thread_current()->pcb->cond_num++;
-    lock_release(& thread_current()->pcb->process_lock);
     f->eax = (pthread_cond_t) cond_num;
     break;
   }
@@ -884,6 +878,27 @@ void * sbrk(intptr_t increment) {
     if ( increment > 0 ) {
         if ( new_break > PHYS_BASE ) {
             return (void *)-1;
+        }
+        void * page = pg_round_down(old_break);
+        void * new_page = pg_round_down(new_break);
+        while ( page < new_page ) {
+            struct spt_entry * spte = malloc(sizeof(struct spt_entry));
+            if ( spte == NULL ) {
+                return (void *)-1;
+            }
+            spte->vaddr = page;
+            spte->is_stack = false;
+            spte->page_status = 1;
+            spte->writable = true;
+            spte->file = NULL;
+            spte->offset = 0;
+            spte->bytes_read = 0;
+            spte->pagedir = pcb->pagedir;
+            spte->swap_index = -1;
+            lock_acquire(&pcb->spt_lock);
+            hash_insert(&pcb->spt, &spte->elem);
+            lock_release(&pcb->spt_lock);
+            page += PGSIZE;
         }
         pcb->heap_break = new_break;
         return old_break;
