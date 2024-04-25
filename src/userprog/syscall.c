@@ -217,7 +217,9 @@ syscall_handler(struct intr_frame *f)
   {
     pthread_lock_t lock_num = thread_current()->pcb->lock_num;
     lock_init(&(thread_current()->pcb->locks[lock_num]));
+    lock_acquire(& thread_current()->pcb->process_lock);
     thread_current()->pcb->lock_num++;
+    lock_release(& thread_current()->pcb->process_lock);
     f->eax = (pthread_lock_t) lock_num;
     break;
   }
@@ -253,7 +255,9 @@ syscall_handler(struct intr_frame *f)
 
     pthread_sema_t sema = thread_current()->pcb->sema_num;
     sema_init(&(thread_current()->pcb->semas[sema]), args[0]);
+    lock_acquire(& thread_current()->pcb->process_lock);
     thread_current()->pcb->sema_num++;
+    lock_release(& thread_current()->pcb->process_lock);
     break;
   }
   case SYS_SEMAUP:
@@ -281,7 +285,9 @@ syscall_handler(struct intr_frame *f)
   {
     pthread_cond_t cond_num = thread_current()->pcb->cond_num;
     cond_init(&(thread_current()->pcb->conds[cond_num]));
+    lock_acquire(& thread_current()->pcb->process_lock);
     thread_current()->pcb->cond_num++;
+    lock_release(& thread_current()->pcb->process_lock);
     f->eax = (pthread_cond_t) cond_num;
     break;
   }
