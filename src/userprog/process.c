@@ -301,6 +301,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  void * break_line = NULL;
 
   char *fn_copy;
   char **argv;
@@ -416,12 +417,10 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
           unlock_file();
           goto done;
-        }
-        if (t->pcb->heap_start == NULL)
-        {
-          // not correct
-          t->pcb->heap_start = (void *)(mem_page + read_bytes + zero_bytes);
-          t->pcb->heap_break = t->pcb->heap_start;
+
+      if (phdr.p_vaddr + phdr.p_memsz > (uint32_t)break_line) {
+        break_line = (void *)phdr.p_vaddr + phdr.p_memsz;
+      }
         }
       }
       else
@@ -429,6 +428,9 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
       break;
     }
   }
+
+  t->pcb->heap_start = break_line + 1;
+  t->pcb->heap_break = break_line + 1;
 
   /* Set up stack. */
   if (!setup_stack(esp))
