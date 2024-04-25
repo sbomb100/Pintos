@@ -23,14 +23,15 @@
 #include "lib/user/list.h"
 #include <string.h>
 #include <stdbool.h>
+#include <pthread.h>
+#include "lib/user/syscall.h"
 #include <stdio.h>
-#include "userprog/syscall.h"
 
 #define ALIGNMENT 16
 
 static bool initialized = false;
 
-// struct lock malloc_lock;
+pthread_lock_t malloc_lock;
 
 struct boundary_tag {
   int inuse : 1; // inuse bit
@@ -178,6 +179,9 @@ int malloc_init(void) {
     list_init(&free_list[i]);
   }
 
+  // malloc_lock = lock_init();
+  malloc_lock = pthread_mutex_init();
+
   left_or_right = true;
 
   struct boundary_tag *initial = sbrk(4 * sizeof(struct boundary_tag));
@@ -218,11 +222,18 @@ void *malloc(size_t size) {
   if (size == 0)
     return NULL;
 
+  // printf("in malloc\n");
+
+  pthread_mutex_lock(malloc_lock);
+  // lock_acquire(malloc_lock);
+
   /* Adjust block size to include overhead and alignment reqs. */
   /* account for tags */
   size_t bsize = align(size + 2 * sizeof(struct boundary_tag));
   if (bsize < size)
     return NULL; /* integer overflow */
+
+  // printf("no integer overflow\n");
 
   /* Adjusted block size in words */
   size_t awords =
@@ -232,6 +243,8 @@ void *malloc(size_t size) {
   if ((bp = find_fit(awords)) != NULL) {
     bp = place(bp, awords);
     ASSERT(is_aligned(blk_size(bp) * WSIZE));
+    pthread_mutex_unlock(malloc_lock);
+    // lock_release(malloc_lock);
     return bp->payload;
   }
 
@@ -250,11 +263,16 @@ void *malloc(size_t size) {
     extendwords -= prev_blk_footer(last_block)->size;
   }
 
-  if ((bp = extend_heap(extendwords)) == NULL)
+  if ((bp = extend_heap(extendwords)) == NULL) {
+    pthread_mutex_unlock(malloc_lock);
+    // lock_release(malloc_lock);
     return NULL;
+  }
 
   bp = place(bp, awords);
   ASSERT(is_aligned(blk_size(bp) * WSIZE));
+  pthread_mutex_unlock(malloc_lock);
+  // lock_release(malloc_lock);
   return bp->payload;
 }
 
@@ -266,12 +284,17 @@ void free(void *bp) {
   if (bp == 0)
     return;
 
+  pthread_mutex_lock(malloc_lock);
+  // lock_acquire(malloc_lock);
+
   /* Find block from user pointer */
   struct block *blk = bp - offsetof(struct block, payload);
 
   mark_block_free(blk, blk_size(blk));
   blk = coalesce(blk);
   list_push_front(&free_list[1], &blk->elem);
+  pthread_mutex_unlock(malloc_lock);
+  // lock_release(malloc_lock);
 }
 
 /*
