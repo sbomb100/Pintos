@@ -417,18 +417,15 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
           unlock_file();
           goto done;
-
-      if (phdr.p_vaddr + phdr.p_memsz > (uint32_t)break_line) {
-        break_line = (void *)phdr.p_vaddr + phdr.p_memsz;
-      }
         }
+        break_line = (void *)phdr.p_vaddr + phdr.p_memsz;
+        printf("break_line: %p\n", break_line);
       }
       else
         goto done;
       break;
     }
   }
-
   t->pcb->heap_start = break_line + 1;
   t->pcb->heap_break = break_line + 1;
 
