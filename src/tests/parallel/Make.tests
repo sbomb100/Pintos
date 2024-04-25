@@ -8,6 +8,8 @@ create-join thread-local \
 locks \
 sbrk-simple malloc-simple \
 merge-sort \
+matrix-multi \
+mm-seq \
 )
 
 tests/parallel/create-join_SRC = tests/parallel/create-join.c tests/lib.c \
@@ -21,6 +23,10 @@ tests/main.c
 tests/parallel/malloc-simple_SRC = tests/parallel/malloc-simple.c tests/lib.c \
 tests/main.c
 tests/parallel/merge-sort_SRC = tests/parallel/merge-sort.c tests/lib.c \
+tests/main.c
+tests/parallel/matrix-multi_SRC = tests/parallel/matrix-multi.c tests/lib.c \
+tests/main.c
+tests/parallel/mm-seq_SRC = tests/parallel/mm-seq.c tests/lib.c \
 tests/main.c
 
 tests/parallel_PROGS = $(tests/parallel_TESTS)
