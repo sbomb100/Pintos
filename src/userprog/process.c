@@ -138,7 +138,7 @@ int process_wait(tid_t child_tid)
   sema_down(&cur_child->wait_sema);
   //leave
   int exit_status = cur_child->exit_status;
-  //free(cur_child);
+  free(cur_child);
   return exit_status;
 }
 
@@ -185,17 +185,18 @@ void process_exit(int status)
   /* Cleanup semantics for orphan or child process */
   if ( cur->pcb != NULL ) {
     if ( cur->pcb->status == PROCESS_ORPHAN ) {
+        lock_release(&cur->pcb->process_lock);
         free(cur->pcb);
         cur->pcb = NULL;
     }
     else {
         cur->pcb->status = status == PID_ERROR ? PROCESS_ABORT : PROCESS_EXIT;
-        
+        lock_release(&cur->pcb->process_lock);
         cur->pcb->exit_status = status;
         sema_up(&cur->pcb->wait_sema);
     }
   } 
-  lock_release(&cur->pcb->process_lock);
+  
 }
 
 
@@ -396,6 +397,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
           goto done;
         if (t->pcb->heap_start == NULL)
         {
+          //not correct
           t->pcb->heap_start = (void *) (mem_page + read_bytes + zero_bytes);
           t->pcb->heap_break = t->pcb->heap_start;
         }

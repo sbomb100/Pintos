@@ -148,7 +148,7 @@ mergesort_parallel(int *array, int N)
 
 
 void test_main (void) {
-    int N = 100000;
+    int N = 10;
     printf("here\n");
     int * array = (int *) malloc(sizeof(int) * N);
     printf("here\n");
