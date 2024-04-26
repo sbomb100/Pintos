@@ -27,404 +27,69 @@
 #include "lib/user/syscall.h"
 #include <stdio.h>
 
-#define ALIGNMENT 16
+#define ALIGNMENT 8
+#define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
 
-static bool initialized = false;
+typedef struct block {
+    size_t size;
+    struct block *next;
+} block_t;
+
+block_t *head = NULL;
 
 pthread_lock_t malloc_lock;
+static bool initialized = false;
 
-struct boundary_tag {
-  int inuse : 1; // inuse bit
-  int size : 31; // size of block, in words
-                 // block size
-};
-
-/* FENCE is used for heap prologue/epilogue. */
-const struct boundary_tag FENCE = {.inuse = 1, .size = 0};
-
-/* A C struct describing the beginning of each block.
- * For implicit lists, used and free blocks have the same
- * structure, so one struct will suffice for this example.
- *
- * If each block is aligned at 12 mod 16, each payload will
- * be aligned at 0 mod 16.
- */
-struct /*__attribute__((__packed__)) */ block {
-  struct boundary_tag header; /* offset 0, at address 12 mod 16 */
-  union {            // a union forces us to have a payload or just an elem
-    char payload[0]; /* offset 4, at address 0 mod 16 */
-    struct list_elem elem; /* pointer elem for explicit list */
-  };
-};
-
-/* Basic constants and macros */
-#define WSIZE                                                                  \
-  sizeof(struct boundary_tag)  /* Word and header/footer size (bytes) */
-#define MIN_BLOCK_SIZE_WORDS 8 /* Minimum block size in words */
-#define CHUNKSIZE (1 << 9)    /* Extend heap by this amount (words) */
-#define NUM_SEGREGATES 20      /* Size of the array of free lists 70 10 */
-
-static inline size_t max(size_t x, size_t y) { return x > y ? x : y; }
-
-static inline size_t log_2(size_t n) {
-    size_t i = 30 - __builtin_clz(n);
-
-    if (i > NUM_SEGREGATES - 1) {
-        return NUM_SEGREGATES - 1;
-    }
-
-    return i;
-}
-
-/* Pointer comparison to allow address-ordered freeing */
-static inline bool compare_pointer(const struct list_elem *a,
-                                   const struct list_elem *b, void *aux UNUSED) {
-  return b <= a;
-}
-// takes bytes and converts to size in words
-//QUESTION: how does this work?
-static size_t align(size_t size) {
-  return (size + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
-}
-
-static bool is_aligned(size_t size) __attribute__((__unused__));
-//block size in bytes
-static bool is_aligned(size_t size) { return size % ALIGNMENT == 0; }
-
-/* Global variables */
-static struct block *heap_listp = 0; /* Pointer to first block */
-static struct list free_list[NUM_SEGREGATES];
-static bool left_or_right;
-
-/* Function prototypes for internal helper routines */
-static struct block *extend_heap(size_t words);
-static struct block *place(struct block *bp, size_t asize);
-static struct block *find_fit(size_t asize);
-static struct block *coalesce(struct block *bp);
-
-/* Helpful Helpers*/
-// static struct block *
-// mergeblocks_add_remaining_to_free_list(struct block *left_most_block,
-//                                        size_t merged_length,
-//                                        size_t b_requested_size);
-// static inline void *get_pointer(void *b);
-
-/* Given a block, obtain previous's block footer.
-   Works for left-most block also. */
-static struct boundary_tag *prev_blk_footer(struct block *blk) {
-  return &blk->header - 1;
-}
-
-/* Return if block is free */
-static bool blk_free(struct block *blk) { return !blk->header.inuse; }
-
-/* Return size of block in words */
-static size_t blk_size(struct block *blk) { return blk->header.size; }
-
-/* Given a block, obtain pointer to previous block.
-   Not meaningful for left-most block. */
-static struct block *prev_blk(struct block *blk) {
-  struct boundary_tag *prevfooter = prev_blk_footer(blk);
-  ASSERT(prevfooter->size != 0);
-  return (struct block *)((void *)blk - WSIZE * prevfooter->size);
-}
-
-/* Given a block, obtain pointer to previous block.
-   returns zero for left-most block. 
-static struct block *prev_blk_or_return_zero(struct block *blk) {
-  struct boundary_tag *prevfooter = prev_blk_footer(blk);
-  if (prevfooter->size != 0)
-    return 0; //
-  return (struct block *)((void *)blk - WSIZE * prevfooter->size);
-}*/
-
-/* Given a block, obtain pointer to next block.
-   Not meaningful for right-most block. */
-static struct block *next_blk(struct block *blk) {
-  ASSERT(blk_size(blk) != 0);
-  return (struct block *)((void *)blk + WSIZE * blk->header.size);
-}
-
-/* Given a block, obtain its footer boundary tag */
-static struct boundary_tag *get_footer(struct block *blk) {
-  return ((void *)blk + WSIZE * blk->header.size) - sizeof(struct boundary_tag);
-}
-
-/* Set a block's size and inuse bit in header and footer */
-static void set_header_and_footer(struct block *blk, int size, int inuse) {
-  blk->header.inuse = inuse;
-  blk->header.size = size;
-  *get_footer(blk) = blk->header; /* Copy header to footer */
-  
-}
-
-/* Mark a block as used and set its size. */
-static void mark_block_used(struct block *blk, int size) {
-  set_header_and_footer(blk, size, 1);
-}
-
-/* Mark a block as free and set its size. */
-static void mark_block_free(struct block *blk, int size) {
-  set_header_and_footer(blk, size, 0);
-}
-
-/*
- * malloc_init - Initialize the memory manager
- */
+// create init function
 int malloc_init(void) {
-  ASSERT(offsetof(struct block, payload) == 4);
-  ASSERT(sizeof(struct boundary_tag) == 4);
-
-  /* Create the initial empty heap */
-  for (int i = 0; i < NUM_SEGREGATES; i++) {
-    list_init(&free_list[i]);
-  }
-
-  // malloc_lock = lock_init();
-  malloc_lock = pthread_mutex_init();
-
-  left_or_right = true;
-
-  struct boundary_tag *initial = sbrk(4 * sizeof(struct boundary_tag));
-  if (initial == NULL)
-    return -1;
-
-  /* We use a slightly different strategy than suggested in the book.
-   * Rather than placing a min-sized prologue block at the beginning
-   * of the heap, we simply place two fences.
-   * The consequence is that coalesce() must call prev_blk_footer()
-   * and not prev_blk() because prev_blk() cannot be called on the
-   * left-most block.
-   */
-  initial[2] = FENCE; /* Prologue footer */
-  heap_listp = (struct block *)&initial[3];
-  initial[3] = FENCE; /* Epilogue header */
-
-  /* Extend the empty heap with a free block of CHUNKSIZE bytes */
-  if (extend_heap(CHUNKSIZE) == NULL)
-    return -1;
-
-  return 0;
+    malloc_lock = lock_init();
+    return 0;
 }
 
-/*
- * malloc - Allocate a block with at least size bytes of payload
- */
 void *malloc(size_t size) {
   if (!initialized) {
     malloc_init();
     initialized = true;
   }
+    size_t total_size;
+    block_t *block;
 
-  struct block *bp;
+    lock_acquire(malloc_lock);
 
-  /* Ignore spurious requests */
-  if (size == 0)
-    return NULL;
+    // Align the size
+    size = ALIGN(size);
 
-  // printf("in malloc\n");
-
-  pthread_mutex_lock(malloc_lock);
-  // lock_acquire(malloc_lock);
-
-  /* Adjust block size to include overhead and alignment reqs. */
-  /* account for tags */
-  size_t bsize = align(size + 2 * sizeof(struct boundary_tag));
-  if (bsize < size)
-    return NULL; /* integer overflow */
-
-  // printf("no integer overflow\n");
-
-  /* Adjusted block size in words */
-  size_t awords =
-      max(MIN_BLOCK_SIZE_WORDS, bsize / WSIZE); /* respect minimum size */
-
-  /* Search the free list for a fit */
-  if ((bp = find_fit(awords)) != NULL) {
-    bp = place(bp, awords);
-    ASSERT(is_aligned(blk_size(bp) * WSIZE));
-    pthread_mutex_unlock(malloc_lock);
-    // lock_release(malloc_lock);
-    return bp->payload;
-  }
-
-  /* No fit found. Get more memory and place the block */
-  size_t extendwords =
-      max(awords, CHUNKSIZE); /* Amount to extend heap if no fit */
-
-
-  void * mem_brk = sbrk(0);
-  void *mem_heap_hi = (void *)(mem_brk - 1);
-  struct block *last_block = mem_heap_hi - 3;
-
-
-  //! prev_blk_footer(last_block)->inuse
-  if (!prev_blk_footer(last_block)->inuse) {
-    extendwords -= prev_blk_footer(last_block)->size;
-  }
-  if ((bp = extend_heap(extendwords)) == NULL) {
-    pthread_mutex_unlock(malloc_lock);
-    // lock_release(malloc_lock);
-    return NULL;
-  }
-  bp = place(bp, awords);
-  ASSERT(is_aligned(blk_size(bp) * WSIZE));
-  pthread_mutex_unlock(malloc_lock);
-  // lock_release(malloc_lock);
-  return bp->payload;
-}
-
-/*
- * free - Free a block
- */
-void free(void *bp) {
-  ASSERT(heap_listp != 0); // assert that malloc_init was called
-  if (bp == 0)
-    return;
-
-  pthread_mutex_lock(malloc_lock);
-  // lock_acquire(malloc_lock);
-
-  /* Find block from user pointer */
-  struct block *blk = bp - offsetof(struct block, payload);
-
-  mark_block_free(blk, blk_size(blk));
-  blk = coalesce(blk);
-  list_push_front(&free_list[1], &blk->elem);
-  pthread_mutex_unlock(malloc_lock);
-  // lock_release(malloc_lock);
-}
-
-/*
- * coalesce - Boundary tag coalescing. Return ptr to coalesced block
- */
-static struct block *coalesce(struct block *bp) {
-  bool prev_alloc =
-      prev_blk_footer(bp)->inuse;            /* is previous block allocated? */
-  bool next_alloc = !blk_free(next_blk(bp)); /* is next block allocated? */
-  size_t size = blk_size(bp);
-
-  if (prev_alloc && next_alloc) { /* Case 1 */
-    // both are allocated, nothing to coalesce
-    return bp;
-  }
-
-  else if (prev_alloc && !next_alloc) { /* Case 2 */
-    // combine this block and next block by extending it
-    list_remove(&next_blk(bp)->elem);
-    mark_block_free(bp, size + blk_size(next_blk(bp)));
-  }
-
-  else if (!prev_alloc && next_alloc) { /* Case 3 */
-    // combine previous and this block by extending previous
-    bp = prev_blk(bp);
-    list_remove(&bp->elem);
-    mark_block_free(bp, size + blk_size(bp));
-  }
-
-  else { /* Case 4 */
-    // combine all previous, this, and next block into one
-    list_remove(&next_blk(bp)->elem);
-    mark_block_free(prev_blk(bp),
-                    size + blk_size(next_blk(bp)) + blk_size(prev_blk(bp)));
-    bp = prev_blk(bp);
-    list_remove(&bp->elem);
-  }
-  return bp;
-}
-/*
- * The remaining routines are internal helper routines
- */
-
-/*
- * extend_heap - Extend heap with free block and return its block pointer
- */
-static struct block *extend_heap(size_t words) {
-  void *bp = sbrk(words * WSIZE);
-
-  if (bp == NULL)
-    return NULL;
-
-  /* Initialize free block header/footer and the epilogue header.
-   * Note that we overwrite the previous epilogue here. */
-  
-  struct block *blk = bp - sizeof(FENCE);
-  mark_block_free(blk, words);
-  next_blk(blk)->header = FENCE;
-  /* Coalesce if the previous block was free */
-  blk = coalesce(blk);
-  list_push_back(&free_list[1], &blk->elem);
-  return blk;
-}
-
-/*
- * place - Place block of asize words at start of free block bp
- *         and split if remainder would be at least minimum block size
-
- idea: alternate left/right allocate?
- */
-static struct block *place(struct block *bp, size_t asize) {
-  size_t csize = blk_size(bp);
-
-    if ((csize - asize) >= MIN_BLOCK_SIZE_WORDS) {
-        if ( left_or_right ) {
-            list_remove(&bp->elem);
-            mark_block_free(bp, csize - asize);
-            list_push_front(&free_list[1], &bp->elem);
-            //list_insert_ordered(&free_list[log_2(blk_size(bp))], &bp->elem, compare_pointer, NULL);
-            bp = next_blk(bp);
-            mark_block_used(bp, asize);
-        } else {
-            mark_block_used(bp, asize);
-            list_remove(&bp->elem);
-            struct block *next = next_blk(bp);
-            mark_block_free(next, csize - asize);
-            list_push_front(&free_list[1], &next->elem);
-            //list_insert_ordered(&free_list[log_2(blk_size(next))], &next->elem, compare_pointer, NULL);
+    if (head == NULL) {
+        // First call to malloc, initialize head
+        block = sbrk(0);
+        if (sbrk(sizeof(block_t) + size) == (void *)-1) {
+            lock_release(malloc_lock);
+            return NULL;
         }
-        left_or_right = !left_or_right;
+        block->size = size;
+        block->next = NULL;
+        head = block;
     } else {
-        mark_block_used(bp, csize);
-        list_remove(&bp->elem);
+        block = head;
+        while (block->next != NULL)
+            block = block->next;
+
+        total_size = sizeof(block_t) + size;
+        if (sbrk(total_size) == (void *)-1) {
+            lock_release(malloc_lock);
+            return NULL;
+        }
+
+        block->next = sbrk(0);
+        block->next->size = size;
+        block->next->next = NULL;
     }
 
-  ASSERT(is_aligned(blk_size(bp) * WSIZE ));
-  return bp;
+    lock_release(malloc_lock);
+
+    return (void *)(block + 1);
 }
 
-/*
- * find_fit - Find a fit for a block with asize words
- */
-static struct block *find_fit(size_t asize) {
-    /* First fit search */
-    struct block * best = NULL;
-
-    for ( struct list_elem * e = list_begin(&free_list[1]); e != list_end(&free_list[1]); e = list_begin(&free_list[1]) ) {
-        if ( asize <= (size_t) prev_blk_footer((struct block *) e)->size ) {
-            if ( best == NULL ) {
-                best = list_entry(e, struct block, elem);
-            }
-            else if ( blk_size(best) < (size_t) prev_blk_footer((struct block *) e)->size) {
-                best = list_entry(e, struct block, elem);
-            }
-        }
-        list_remove(e);
-        
-        struct block * b = list_entry(e, struct block, elem);
-        list_push_front(&free_list[log_2(blk_size(b))], &b->elem);
-    }
-
-    if ( best != NULL ) return best;
-
-    for (int i = log_2(asize); i < NUM_SEGREGATES; i++) {
-        for (struct list_elem *e = list_begin(&free_list[i]);
-            e != list_end(&free_list[i]); e = list_next(e)) {
-            //struct block *b = list_entry(e, struct block, elem);
-            if (asize <= (size_t) prev_blk_footer((struct block *) e)->size ) {
-                return list_entry(e, struct block, elem);
-            }
-        }
-    }
-
-    return NULL; /* No fit */
+void free(void *ptr UNUSED) {
+    return;
 }
