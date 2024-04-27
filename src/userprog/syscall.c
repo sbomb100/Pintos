@@ -6,10 +6,11 @@
 
 #include "threads/cpu.h"
 
-struct futex_object {
-    struct hash_elem elem;
-    void * addr;
-    struct thread * t;
+struct futex_object
+{
+  struct hash_elem elem;
+  void *addr;
+  struct thread *t;
 };
 
 struct lock file_lock;
@@ -80,7 +81,7 @@ syscall_handler(struct intr_frame *f)
   case SYS_WAIT:
     if (!parse_arguments(f, &args[0], 1))
       thread_exit(-1);
-    //int arg = *(int *)(p + 4);
+    // int arg = *(int *)(p + 4);
     int arg = *(int *)(p + 1);
     f->eax = process_wait(arg);
     break;
@@ -183,11 +184,12 @@ syscall_handler(struct intr_frame *f)
   }
   case SYS_PTHREAD_CREATE:
   {
-    if ( !parse_arguments(f, &args[0], 3)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 3))
+    {
+      thread_exit(-1);
+      return;
     }
-    f->eax = sys_pthread_create((wrapper_func) args[0], (start_routine) args[1], (void *) args[2]);
+    f->eax = sys_pthread_create((wrapper_func)args[0], (start_routine)args[1], (void *)args[2]);
     break;
   }
   case SYS_PTHREAD_EXIT:
@@ -197,20 +199,22 @@ syscall_handler(struct intr_frame *f)
   }
   case SYS_PTHREAD_JOIN:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
-    f->eax = sys_pthread_join((tid_t) args[0]);
+    f->eax = sys_pthread_join((tid_t)args[0]);
     break;
   }
   case SYS_SBRK:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
-    f->eax = (uint32_t) sbrk((intptr_t) args[0]);
+    f->eax = (uint32_t)sbrk((intptr_t)args[0]);
     break;
   }
   case SYS_INITLOCK:
@@ -218,37 +222,39 @@ syscall_handler(struct intr_frame *f)
     pthread_lock_t lock_num = thread_current()->pcb->lock_num;
     lock_init(&(thread_current()->pcb->locks[lock_num]));
     thread_current()->pcb->lock_num++;
-    f->eax = (pthread_lock_t) lock_num;
+    f->eax = (pthread_lock_t)lock_num;
     break;
   }
   case SYS_LOCK:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
-    pthread_lock_t lock_num = (pthread_lock_t) args[0];
+    pthread_lock_t lock_num = (pthread_lock_t)args[0];
 
     lock_acquire(&(thread_current()->pcb->locks[lock_num]));
     break;
-
   }
   case SYS_UNLOCK:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
-    pthread_lock_t lock_num = (pthread_lock_t) args[0];
+    pthread_lock_t lock_num = (pthread_lock_t)args[0];
 
     lock_release(&(thread_current()->pcb->locks[lock_num]));
     break;
   }
   case SYS_INITSEMA:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
 
     pthread_sema_t sema = thread_current()->pcb->sema_num;
@@ -258,22 +264,23 @@ syscall_handler(struct intr_frame *f)
   }
   case SYS_SEMAUP:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
-    pthread_sema_t sema = (pthread_sema_t) args[0];
+    pthread_sema_t sema = (pthread_sema_t)args[0];
     sema_up(&(thread_current()->pcb->semas[sema]));
     break;
-
   }
   case SYS_SEMADOWN:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
-    pthread_sema_t sema = (pthread_sema_t) args[0];
+    pthread_sema_t sema = (pthread_sema_t)args[0];
     sema_down(&(thread_current()->pcb->semas[sema]));
     break;
   }
@@ -282,50 +289,54 @@ syscall_handler(struct intr_frame *f)
     pthread_cond_t cond_num = thread_current()->pcb->cond_num;
     cond_init(&(thread_current()->pcb->conds[cond_num]));
     thread_current()->pcb->cond_num++;
-    f->eax = (pthread_cond_t) cond_num;
+    f->eax = (pthread_cond_t)cond_num;
     break;
   }
   case SYS_COND_WAIT:
   {
-    if ( !parse_arguments(f, &args[0], 2)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 2))
+    {
+      thread_exit(-1);
+      return;
     }
-    pthread_cond_t cond_num = (pthread_cond_t) args[0];
-    pthread_lock_t lock_num = (pthread_lock_t) args[1];
+    pthread_cond_t cond_num = (pthread_cond_t)args[0];
+    pthread_lock_t lock_num = (pthread_lock_t)args[1];
 
     cond_wait(&(thread_current()->pcb->conds[cond_num]), &(thread_current()->pcb->locks[lock_num]));
     break;
   }
   case SYS_COND_SIGNAL:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
-    pthread_cond_t cond_num = (pthread_cond_t) args[0];
+    pthread_cond_t cond_num = (pthread_cond_t)args[0];
 
     cond_signal(&(thread_current()->pcb->conds[cond_num]), NULL);
     break;
   }
   case SYS_FUTEX_WAIT:
   {
-    if ( !parse_arguments(f, &args[0], 1)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
     }
 
-    futex_wait((void *) args[0]);
+    futex_wait((void *)args[0]);
     break;
   }
   case SYS_FUTEX_WAKE:
   {
-    if ( !parse_arguments(f, &args[0], 2)) {
-        thread_exit(-1);
-        return;
+    if (!parse_arguments(f, &args[0], 2))
+    {
+      thread_exit(-1);
+      return;
     }
 
-    futex_wake((void *) args[0], (int) args[1]);
+    futex_wake((void *)args[0], (int)args[1]);
     break;
   }
   default:
@@ -484,7 +495,7 @@ int read(int fd, void *buffer, unsigned size, void *esp)
       byteCount++;
     }
   }
-  //pin it
+  // pin it
   for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
   {
     struct spt_entry *page = get_page_from_hash(buffer_page);
@@ -549,7 +560,7 @@ int read(int fd, void *buffer, unsigned size, void *esp)
       success += bytes_read;
     }
   }
-  //unpin
+  // unpin
   for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
   {
     struct spt_entry *page = get_page_from_hash(buffer_page);
@@ -574,7 +585,7 @@ int write(int fd, const void *buffer, unsigned size)
     thread_exit(-1);
   if (fd < 1 || fd > 1025)
     return -1;
-    //pin it
+  // pin it
   void *buffer_start = pg_round_down(buffer);
   void *buffer_page;
   for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
@@ -603,7 +614,7 @@ int write(int fd, const void *buffer, unsigned size)
       }
     }
   }
-  //unpin
+  // unpin
   for (buffer_page = buffer_start; buffer_page <= buffer + size; buffer_page += PGSIZE)
   {
     struct spt_entry *page = get_page_from_hash(buffer_page);
@@ -794,11 +805,11 @@ bool munmap(mapid_t mapping)
   lock_acquire(&file_lock);
   if (mapping <= 0)
   {
-    
+
     lock_release(&file_lock);
     return false;
   }
-  
+
   lock_acquire(&thread_current()->pcb->mmap_lock);
   struct list *map_list = &(thread_current()->pcb->mmap_list);
   struct list_elem *e = list_begin(map_list);
@@ -855,113 +866,155 @@ bool put_mmap_in_list(struct spt_entry *page)
   return true;
 }
 
-tid_t sys_pthread_create(wrapper_func wf, start_routine sr, void *args) {
-    return pthread_create(wf, sr, args);
+tid_t sys_pthread_create(wrapper_func wf, start_routine sr, void *args)
+{
+  return pthread_create(wf, sr, args);
 }
 
-void sys_pthread_exit() {
-    pthread_exit();
+void sys_pthread_exit()
+{
+  pthread_exit();
 }
 
-bool sys_pthread_join(tid_t tid) {
-    return pthread_join(tid);
+bool sys_pthread_join(tid_t tid)
+{
+  return pthread_join(tid);
 }
 
-void * sbrk(intptr_t increment) {
-    struct thread * t = thread_current();
-    struct process * pcb = t->pcb;
-    void * old_break = pcb->heap_break;
-    void * new_break = old_break + increment;
-    if ( increment == 0 ) {
-        return old_break;
+void *sbrk(intptr_t increment)
+{
+  struct thread *t = thread_current();
+  struct process *pcb = t->pcb;
+  void *old_break = pcb->heap_break;
+  void *new_break = old_break + increment;
+  if (increment == 0)
+  {
+    return old_break;
+  }
+  if (increment > 0)
+  {
+    if (new_break > PHYS_BASE)
+    {
+      return (void *)-1;
     }
-    if ( increment > 0 ) {
-        if ( new_break > PHYS_BASE ) {
-            return (void *)-1;
-        }
-        void * page = pg_round_down(old_break);
-        void * new_page = pg_round_down(new_break);
-        while ( page < new_page ) {
-            struct spt_entry * spte = malloc(sizeof(struct spt_entry));
-            if ( spte == NULL ) {
-                return (void *)-1;
-            }
-            spte->vaddr = page;
-            spte->is_stack = false;
-            spte->page_status = 1;
-            spte->writable = true;
-            spte->file = NULL;
-            spte->offset = 0;
-            spte->bytes_read = 0;
-            spte->pagedir = pcb->pagedir;
-            spte->swap_index = -1;
-            lock_acquire(&pcb->spt_lock);
-            hash_insert(&pcb->spt, &spte->elem);
-            lock_release(&pcb->spt_lock);
-            page += PGSIZE;
-        }
-        pcb->heap_break = new_break;
-        return old_break;
+    void *page = pg_round_down(old_break);
+    void *new_page = pg_round_down(new_break);
+
+    lock_acquire(&pcb->spt_lock);
+    if (get_page_from_hash(page) != NULL)
+    {
+      page += PGSIZE;
     }
-    else {
-        void * page = pg_round_down(new_break);
-        void * old_page = pg_round_down(old_break);
-        while ( page < old_page ) {
-            struct spt_entry * spte = get_page_from_hash(page);
-            if ( spte == NULL ) {
-                return (void *)-1;
-            }
-            lock_acquire(&pcb->spt_lock);
-            hash_delete(&pcb->spt, &spte->elem);
-            lock_release(&pcb->spt_lock);
-            free(spte);
-            page += PGSIZE;
-        }
-        pcb->heap_break = new_break;
-        return old_break;
+    while (page < new_page)
+    {
+      struct spt_entry *spte = malloc(sizeof(struct spt_entry));
+      if (spte == NULL)
+      {
+        return (void *)-1;
+      }
+      spte->vaddr = page;
+      spte->is_stack = false;
+      spte->page_status = 3;
+      spte->page_status = 1;
+      spte->writable = true;
+      spte->file = NULL;
+      spte->offset = 0;
+      spte->bytes_read = 0;
+      spte->pagedir = pcb->pagedir;
+      spte->swap_index = -1;
+      hash_insert(&pcb->spt, &spte->elem);
+      lock_frame();
+      struct frame *new_frame = find_frame(spte); // page fault
+      unlock_frame();
+      if (new_frame == NULL)
+      {
+
+        lock_release(&thread_current()->pcb->spt_lock);
+
+        thread_exit(-4);
+      }
+
+      /* Install */
+      if (!install_page(spte->vaddr, new_frame->paddr, spte->writable))
+      {
+        PANIC("Error growing heap page!");
+      }
+
+      page += PGSIZE;
     }
-}
 
-void futex_wait(void * addr) {
-    struct thread * t = thread_current();
-    struct futex_object * f = malloc(sizeof(struct futex_object));
-
-    f->addr = addr;
-    f->t = t;
-
-    spinlock_acquire(&t->pcb->futex_lock);
-    hash_insert(&t->pcb->futex_hash, &f->elem);
-    thread_block(&t->pcb->futex_lock);
-    spinlock_release(&t->pcb->futex_lock);
-}
-
-void futex_wake(void * addr, int val) {
-    struct thread * t = thread_current();
-    struct futex_object fo;
-    fo.addr = addr;
-
-    spinlock_acquire(&t->pcb->futex_lock);
-    for ( int i = 0; i < val; i++ ) {
-        struct hash_elem * h = hash_delete(&t->pcb->futex_hash, &fo.elem);
-        if ( h == NULL ) {
-            break;
-        }
-
-        struct futex_object * f = hash_entry(h, struct futex_object, elem);
-        thread_unblock(f->t);
-        free(f);
+    lock_release(&pcb->spt_lock);
+    pcb->heap_break = new_break;
+    return old_break;
+  }
+  else
+  {
+    void *page = pg_round_down(new_break);
+    void *old_page = pg_round_down(old_break - 1);
+    while (page < old_page)
+    {
+      struct spt_entry *spte = get_page_from_hash(page);
+      if (spte == NULL)
+      {
+        return (void *)-1;
+      }
+      lock_acquire(&pcb->spt_lock);
+      hash_delete(&pcb->spt, &spte->elem);
+      lock_release(&pcb->spt_lock);
+      free(spte);
+      page += PGSIZE;
     }
-    spinlock_release(&t->pcb->futex_lock);
+    pcb->heap_break = new_break;
+    return old_break;
+  }
 }
 
-unsigned futex_hash(const struct hash_elem *elem, void *aux UNUSED) {
-    const struct futex_object * f = hash_entry(elem, struct futex_object, elem);
-    return hash_bytes(&f->addr, sizeof f->addr);
+void futex_wait(void *addr)
+{
+  struct thread *t = thread_current();
+  struct futex_object *f = malloc(sizeof(struct futex_object));
+
+  f->addr = addr;
+  f->t = t;
+
+  spinlock_acquire(&t->pcb->futex_lock);
+  hash_insert(&t->pcb->futex_hash, &f->elem);
+  thread_block(&t->pcb->futex_lock);
+  spinlock_release(&t->pcb->futex_lock);
 }
 
-bool futex_less_than(const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED) {
-    const struct futex_object * f_1 = hash_entry(elem1, struct futex_object, elem);
-    const struct futex_object * f_2 = hash_entry(elem2, struct futex_object, elem);
+void futex_wake(void *addr, int val)
+{
+  struct thread *t = thread_current();
+  struct futex_object fo;
+  fo.addr = addr;
 
-    return f_1->addr < f_2->addr;
+  spinlock_acquire(&t->pcb->futex_lock);
+  for (int i = 0; i < val; i++)
+  {
+    struct hash_elem *h = hash_delete(&t->pcb->futex_hash, &fo.elem);
+    if (h == NULL)
+    {
+      break;
+    }
+
+    struct futex_object *f = hash_entry(h, struct futex_object, elem);
+    thread_unblock(f->t);
+    free(f);
+  }
+  spinlock_release(&t->pcb->futex_lock);
+}
+
+unsigned futex_hash(const struct hash_elem *elem, void *aux UNUSED)
+{
+  const struct futex_object *f = hash_entry(elem, struct futex_object, elem);
+  return hash_bytes(&f->addr, sizeof f->addr);
+}
+
+bool futex_less_than(const struct hash_elem *elem1, const struct hash_elem *elem2, void *aux UNUSED)
+{
+  const struct futex_object *f_1 = hash_entry(elem1, struct futex_object, elem);
+  const struct futex_object *f_2 = hash_entry(elem2, struct futex_object, elem);
+
+  return f_1->addr < f_2->addr;
 }
