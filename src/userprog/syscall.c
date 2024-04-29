@@ -898,14 +898,14 @@ void *sbrk(intptr_t increment)
       return (void *)-1;
     }
     void *page = pg_round_down(old_break);
-    void *new_page = pg_round_down(new_break);
+    void *new_page = pg_round_down(new_break - 1);
 
     lock_acquire(&pcb->spt_lock);
     if (get_page_from_hash(page) != NULL)
     {
       page += PGSIZE;
     }
-    while (page < new_page)
+    while (page <= new_page)
     {
       struct spt_entry *spte = malloc(sizeof(struct spt_entry));
       if (spte == NULL)
@@ -933,7 +933,7 @@ void *sbrk(intptr_t increment)
 
         thread_exit(-4);
       }
-
+      ASSERT(get_page_from_hash(page) != NULL);
       /* Install */
       if (!install_page(spte->vaddr, new_frame->paddr, spte->writable))
       {
