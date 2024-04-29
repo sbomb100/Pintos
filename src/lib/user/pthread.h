@@ -12,6 +12,7 @@ void pthread_exit(void) NO_RETURN;
 /* Thread-local storage. */
 void pthread_tls_store(void * storage, size_t size);
 void * pthread_tls_load(void);
+bool is_main_thread(void);
 
 /* User locks. */
 pthread_lock_t pthread_mutex_init(void);

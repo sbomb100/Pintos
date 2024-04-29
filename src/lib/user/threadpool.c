@@ -141,7 +141,7 @@ struct thread_pool * thread_pool_new(int nthreads) {
     struct thread_pool * thread_pool = malloc(sizeof(struct thread_pool));
 
     thread_pool->global_mutex = pthread_mutex_init();
-
+    thread_pool->cond = pthread_cond_init();
     struct list * g_tasks = malloc(sizeof(struct list));
     list_init(g_tasks);
     thread_pool->global_tasks = g_tasks;
@@ -162,12 +162,6 @@ struct thread_pool * thread_pool_new(int nthreads) {
     for ( int i = 0; i < nthreads; i++ ) {
         thread_pool->workers[i].t = pthread_create(worker_function, &thread_pool->workers[i]);
     }
-
-    struct worker external = {
-        .internal = false
-    };
-
-    pthread_tls_store(&external, sizeof(struct worker));
 
     return thread_pool;
 }
@@ -215,8 +209,7 @@ void thread_pool_shutdown_and_destroy(struct thread_pool * pool) {
  */
 struct future * thread_pool_submit(struct thread_pool *pool, fork_join_task_t task, void * data) {
     struct future * future;
-    struct worker * current_worker = pthread_tls_load();
-    if ( !current_worker->internal ) {
+    if ( is_main_thread() ) {
         future = malloc(sizeof(struct future));
         future->f_cond = pthread_cond_init();
         future->task = task;
@@ -228,6 +221,7 @@ struct future * thread_pool_submit(struct thread_pool *pool, fork_join_task_t ta
         pthread_mutex_unlock(pool->global_mutex);
     }
     else {
+        struct worker * current_worker = pthread_tls_load();
         future = malloc(sizeof(struct future));
         future->f_cond = pthread_cond_init();
         future->task = task;
@@ -249,9 +243,7 @@ struct future * thread_pool_submit(struct thread_pool *pool, fork_join_task_t ta
  * Returns the value returned by this task.
  */
 void * future_get(struct future * fut) {
-    struct worker * current_worker = pthread_tls_load();
-
-    if ( !current_worker->internal ) {
+    if ( is_main_thread() ) {
         pthread_mutex_lock(fut->pool->global_mutex);
         if ( fut->status != COMPLETED ) {
             pthread_cond_wait(fut->f_cond, fut->pool->global_mutex);

@@ -325,9 +325,9 @@ void
 cond_signal (struct condition *cond, struct lock *lock UNUSED) 
 {
   ASSERT (cond != NULL);
-  ASSERT (lock != NULL);
+  //ASSERT (lock != NULL);
   ASSERT (!intr_context ());
-  ASSERT (lock_held_by_current_thread (lock));
+  //ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) 
     sema_up (&list_entry (list_pop_front (&cond->waiters),

@@ -9,6 +9,7 @@
 #define PGBITS  12                         /* Number of offset bits. */
 #define PGSIZE  (1 << PGBITS)              /* Bytes in a page. */
 #define PGMASK  BITMASK(PGSHIFT, PGBITS)   /* Page offset bits (0:12). */
+#define PHYS_BASE 0xc0000000
 
 /* Round up to nearest page boundary. */
 static inline void *pg_round_up (const void *va) {
@@ -49,6 +50,13 @@ void * pthread_tls_load() {
     asm("mov %%esp, %0" : "=g"(esp));
 
     return pg_round_up(esp);
+}
+
+/* Checks if the top of the stack is PHYS_BASE. */
+bool is_main_thread() {
+    void * esp;
+    asm("mov %%esp, %0" : "=g"(esp));
+    return pg_round_up(esp) == (void *) PHYS_BASE;
 }
 
 pthread_lock_t pthread_mutex_init() {

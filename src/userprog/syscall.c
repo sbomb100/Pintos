@@ -301,7 +301,6 @@ syscall_handler(struct intr_frame *f)
     }
     pthread_cond_t cond_num = (pthread_cond_t)args[0];
     pthread_lock_t lock_num = (pthread_lock_t)args[1];
-
     cond_wait(&(thread_current()->pcb->conds[cond_num]), &(thread_current()->pcb->locks[lock_num]));
     break;
   }
