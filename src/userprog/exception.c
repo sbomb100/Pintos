@@ -165,7 +165,7 @@ page_fault(struct intr_frame *f)
    {
       // uint32_t *esp = f->esp;
       /* if its not in stack range */
-      if (((PHYS_BASE - pg_round_down(fault_addr)) <= (1 << 23) && fault_addr >= (f->esp - 32)))
+      if (fault_addr >= (f->esp - 32)) // (PHYS_BASE - pg_round_down(fault_addr)) <= (1 << 23) && 
       {
          load_extra_stack_page(fault_addr);
          lock_release(&t->pcb->spt_lock);
@@ -173,7 +173,6 @@ page_fault(struct intr_frame *f)
       else
       {
          lock_release(&t->pcb->spt_lock);
-
          thread_exit(-1);
       }
       return;
@@ -209,7 +208,7 @@ page_fault(struct intr_frame *f)
 exit:
    not_present = (f->error_code & PF_P) == 0;
    write = (f->error_code & PF_W) != 0;
-
+   
    if (!not_present && write)
    {
       thread_exit(-1);
@@ -332,12 +331,12 @@ void load_extra_stack_page(void *fault_addr)
    new_page->pagedir = thread_current()->pcb->pagedir;
    new_page->swap_index = -1;
 
-   if (thread_current()->pcb->num_stack_pages > 2048)
+   /*if (thread_current()->pcb->num_stack_pages > 2048)
    {
       lock_release(&thread_current()->pcb->spt_lock);
 
       thread_exit(-3);
-   }
+   }*/
    hash_insert(&thread_current()->pcb->spt, &new_page->elem);
    thread_current()->pcb->num_stack_pages++;
    lock_frame();
