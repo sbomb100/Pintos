@@ -3,8 +3,8 @@
 #include "threads/malloc.h"
 #include "userprog/exception.h"
 #include "threads/vaddr.h"
-
 #include "threads/cpu.h"
+#include "devices/timer.h"
 
 struct futex_object
 {
@@ -336,6 +336,23 @@ syscall_handler(struct intr_frame *f)
     }
 
     futex_wake((void *)args[0], (int)args[1]);
+    break;
+  }
+  case SYS_TIMER_TICKS:
+  {
+    int64_t t = timer_ticks();
+    f->eax = t;
+    break;
+  }
+  case SYS_TIMER_ELAPSED:
+  {
+    if (!parse_arguments(f, &args[0], 1))
+    {
+      thread_exit(-1);
+      return;
+    }
+
+    f->eax = timer_elapsed((int64_t) args[0]);
     break;
   }
   default:
