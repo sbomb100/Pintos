@@ -45,7 +45,9 @@ enum
     SYS_SEMAUP,
     SYS_SEMADOWN,
     SYS_FUTEX_WAIT,
-    SYS_FUTEX_WAKE
+    SYS_FUTEX_WAKE,
+    SYS_TIMER_TICKS,
+    SYS_TIMER_ELAPSED
   };
 
 #endif /* lib/syscall-nr.h */

@@ -247,3 +247,11 @@ void futex_wait(void * addr) {
 void futex_wake(void * addr, int val) {
     syscall2(SYS_FUTEX_WAIT, addr, val);
 }
+
+int64_t sys_timer_ticks(void) {
+    return syscall0(SYS_TIMER_TICKS);
+}
+
+int64_t sys_timer_elapsed(int64_t ticks) {
+    return syscall1(SYS_TIMER_ELAPSED, ticks);
+}

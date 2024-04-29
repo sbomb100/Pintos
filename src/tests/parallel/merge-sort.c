@@ -1,13 +1,14 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "lib/random.c"
 #include "lib/user/malloc.h"
 #include "lib/user/threadpool.h"
 #include "tests/lib.h"
 #include "tests/main.h"
+//#include "devices/timer.h"
 
-#include <stdio.h>
 #define insertion_sort_threshold 16
 #define min_task_size 1000
 #define nthreads 4
@@ -148,7 +149,7 @@ mergesort_parallel(int *array, int N)
 
 
 void test_main (void) {
-    int N = 10;
+    int N = 1000;
 
     int * array = (int *) malloc(sizeof(int) * N);
 
@@ -163,13 +164,17 @@ void test_main (void) {
     mergesort_serial(array, N);
     printf("parallel--------\n");
 
+    int64_t start = sys_timer_ticks();
     mergesort_parallel(array2, N);
+    int64_t end = sys_timer_elapsed(start);
 
     for (i = 0; i < N; i++) {
         if (array[i] != array2[i]) {
             fail("arrays differ at index %d", i);
         }
+        //printf("%d %d\n", array[i], array2[i]);
     }
 
+    msg("Using %d threads: %lld total ticks elapsed.", nthreads, end);
     // pass();
 }

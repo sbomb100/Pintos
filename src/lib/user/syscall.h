@@ -87,4 +87,7 @@ void cond_signal(pthread_cond_t cond);
 
 void futex_wait(void * addr);
 void futex_wake(void * addr, int val);
+
+int64_t sys_timer_ticks(void);
+int64_t sys_timer_elapsed(int64_t ticks);
 #endif /* lib/user/syscall.h */
