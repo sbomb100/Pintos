@@ -68,6 +68,7 @@ static bool attempt_work_steal() {
             struct future * fut = list_entry(e, struct future, elem);
             complete_task(fut, w_i->local_mutex);
             pthread_mutex_unlock(w_i->local_mutex);
+            return true;
         }
         pthread_mutex_unlock(w_i->local_mutex);
     }
@@ -228,6 +229,7 @@ struct future * thread_pool_submit(struct thread_pool *pool, fork_join_task_t ta
         future->args = data;
         future->status = NOT_STARTED;
         future->pool = pool;
+        future->w = current_worker;
         pthread_mutex_lock(current_worker->local_mutex);
         list_push_front(current_worker->local_tasks, &future->elem);
         pthread_mutex_unlock(current_worker->local_mutex);

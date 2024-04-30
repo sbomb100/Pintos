@@ -149,7 +149,7 @@ mergesort_parallel(int *array, int N)
 
 
 void test_main (void) {
-    int N = 1000;
+    int N = 10000;
 
     int * array = (int *) malloc(sizeof(int) * N);
 
@@ -159,12 +159,10 @@ void test_main (void) {
         array[i] = random_ulong() % N;
         array2[i] = array[i];
     }
-    
-    printf("serial----------\n");
     mergesort_serial(array, N);
-    printf("parallel--------\n");
 
     int64_t start = sys_timer_ticks();
+    msg("Running mergesort_parallel...");
     mergesort_parallel(array2, N);
     int64_t end = sys_timer_elapsed(start);
 
@@ -172,9 +170,7 @@ void test_main (void) {
         if (array[i] != array2[i]) {
             fail("arrays differ at index %d", i);
         }
-        //printf("%d %d\n", array[i], array2[i]);
     }
 
-    msg("Using %d threads: %lld total ticks elapsed.", nthreads, end);
-    // pass();
+    msg("Using %d threads: Sorted %d elements; %lld total ticks elapsed.", nthreads, N, end);
 }
