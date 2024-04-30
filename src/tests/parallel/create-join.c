@@ -1,5 +1,5 @@
 /* Tests pthread_create and pthread_join with no shared data. */
-
+#include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -12,6 +12,10 @@ int nums[NUM_THREADS];
 
 static void worker_function(void * args) {
     intptr_t i = (intptr_t) args;
+    for (long long j = 0; j < 20000000000L; j++){
+        volatile long long k = j + j;
+    }
+    printf("output text\n");
     nums[i]++;
 }
 

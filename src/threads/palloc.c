@@ -47,17 +47,19 @@ static bool page_from_pool (const struct pool *, void *page);
 void
 palloc_init (size_t user_page_limit)
 {
+  //NOTE
   /* Free memory starts at 1 MB and runs to the end of RAM. */
   uint8_t *free_start = init_ram_pages > 16 * 1024 ? ptov(2 * 1024 * 1024) : ptov(1 * 1024 * 1024);
   uint8_t *free_end = ptov (init_ram_pages * PGSIZE);
   size_t free_pages = (free_end - free_start) / PGSIZE;
-  size_t user_pages = free_pages / 2;
+  size_t user_pages = free_pages / 2; //CUT SPACE IN HALF, you can specify a new ratio (ex: * 3/4 etc.)
   size_t kernel_pages;
   if (user_pages > user_page_limit)
     user_pages = user_page_limit;
   kernel_pages = free_pages - user_pages;
 
   /* Give half of memory to kernel, half to user. */
+  //bottom half kernel, top is user
   init_pool (&kernel_pool, free_start, kernel_pages, "kernel pool");
   init_pool (&user_pool, free_start + kernel_pages * PGSIZE,
              user_pages, "user pool");

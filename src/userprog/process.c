@@ -419,7 +419,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
           goto done;
         }
         break_line = (void *)phdr.p_vaddr + phdr.p_memsz;
-        printf("break_line: %p for %d\n", break_line, t->pcb->pid);
+        //printf("break_line: %p for %d\n", break_line, t->pcb->pid);
       }
       else
         goto done;

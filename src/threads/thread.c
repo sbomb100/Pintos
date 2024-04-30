@@ -172,18 +172,7 @@ choose_cpu_for_new_thread(struct thread *t)
 {
   if (atomic_load(&cpu_started_others))
   {
-    for (unsigned int i = 1; i < ncpu; i++) // go through all cpus to find which has highest weight /cpu_load
-    {
-      spinlock_acquire(&cpus[i].rq.lock);
-      if (list_empty(&cpus[i].rq.ready_list))
-      {
-        spinlock_release(&cpus[i].rq.lock);
-        
-        return &cpus[i];
-      }
-      spinlock_release(&cpus[i].rq.lock);
-    }
-    return &cpus[0];
+    return &cpus[t->tid % ncpu];
   }
   else
     return &cpus[0];
