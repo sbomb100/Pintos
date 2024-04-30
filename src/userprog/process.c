@@ -172,20 +172,22 @@ void process_exit(int status)
 
   /* Mark orphanized child processes */
   lock_acquire(&cur->pcb->process_lock);
-  // for ( struct list_elem * e = list_begin(&cur->pcb->children); e != list_end(&cur->pcb->children);) {
-  //     struct process * p = list_entry(e, struct process, elem);
-  //     lock_acquire(&p->process_lock);
-  //     if ( p->status == PROCESS_RUNNING ) {
-  //         p->status = PROCESS_ORPHAN;
-  //         lock_release(&p->process_lock);
-  //         e = list_next(e);
-  //     }
-  //     else {
-  //         lock_release(&p->process_lock);
-  //         e = list_remove(e);
-  //         free(p);
-  //     }
+  // for (struct list_elem *e = list_begin(&thread_current()->pcb->children); e != list_end(&thread_current()->pcb->children); e = list_next(e))
+  // {
+  //   struct process *temp = list_entry(e, struct process, elem);
+  //   if (temp->pid == child_tid)
+  //   {
+  //     lock_release(&thread_current()->pcb->process_lock);
+  //     return temp;
+  //   }
   // }
+  while(!list_empty(&cur->pcb->children)){
+    struct list_elem *e = list_begin(&thread_current()->pcb->children);
+    struct process *temp = list_entry(e, struct process, elem);
+    lock_release(&cur->pcb->process_lock);
+    process_wait(temp->pid); //wait on child processes to finish
+    lock_acquire(&cur->pcb->process_lock);
+  }
   /* Cleanup semantics for orphan or child process */
   if (cur->pcb != NULL)
   {
