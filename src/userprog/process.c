@@ -181,12 +181,14 @@ void process_exit(int status)
   //     return temp;
   //   }
   // }
-  while(!list_empty(&cur->pcb->children)){
+  while (!list_empty(&cur->pcb->children))
+  {
     struct list_elem *e = list_begin(&thread_current()->pcb->children);
     struct process *temp = list_entry(e, struct process, elem);
-    lock_release(&cur->pcb->process_lock);
-    process_wait(temp->pid); //wait on child processes to finish
-    lock_acquire(&cur->pcb->process_lock);
+
+    list_remove(&temp->elem);
+    // signal that we are waiting on the process_exit call
+    sema_down(&temp->wait_sema);
   }
   /* Cleanup semantics for orphan or child process */
   if (cur->pcb != NULL)
@@ -303,7 +305,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
-  void * break_line = NULL;
+  void *break_line = NULL;
 
   char *fn_copy;
   char **argv;
@@ -421,7 +423,7 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
           goto done;
         }
         break_line = (void *)phdr.p_vaddr + phdr.p_memsz;
-        //printf("break_line: %p for %d\n", break_line, t->pcb->pid);
+        // printf("break_line: %p for %d\n", break_line, t->pcb->pid);
       }
       else
         goto done;
