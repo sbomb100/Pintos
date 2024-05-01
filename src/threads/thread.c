@@ -297,7 +297,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   t->tid = allocate_tid();
   /* Parent-child structure setup */
   /* Parent-child structure setup */
-  struct process *new_proc = malloc(sizeof(struct process));
+  struct process *new_proc = malloc(sizeof(struct process) + 4096);
   if (new_proc == NULL)
     return NULL;
   new_proc->pid = allocate_pid();
@@ -443,7 +443,7 @@ tid_t thread_create(const char *name, int nice, thread_func *function, void *aux
 
   /* Add to ready queue. */
   wake_up_new_thread(t);
-  //for (;;);
+
   return tid;
 }
 
