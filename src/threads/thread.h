@@ -47,6 +47,7 @@ typedef void (*wrapper_func)(start_routine, void *);
 #define COND_ERROR ((pthread_cond_t) -1)
 #define THREAD_NAME_MAX 16
 #define MAX_THREADS 32
+#define INIT_USER_SIZE 256      /* Initial size of user synch arrays. */
 
 /* Thread priorities. */
 #define NICE_MIN -20   /* Highest priority. */
@@ -190,12 +191,19 @@ struct process
    void * heap_start;
    void * heap_break;
    
-   struct lock locks[50];           /**/
+   struct lock * locks;
+   struct semaphore * semas;
+   struct condition * conds;
+   
    int lock_num;
-   struct semaphore semas[50];      /**/
    int sema_num;
-   struct condition conds[50];
    int cond_num;
+
+   int lock_size;
+   int sema_size;
+   int cond_size;
+
+   struct lock user_synch_lock;
 };
 
 /* VM MMAP */

@@ -219,10 +219,18 @@ syscall_handler(struct intr_frame *f)
   }
   case SYS_INITLOCK:
   {
-    pthread_lock_t lock_num = thread_current()->pcb->lock_num;
-    lock_init(&(thread_current()->pcb->locks[lock_num]));
-    thread_current()->pcb->lock_num++;
-    f->eax = (pthread_lock_t)lock_num;
+    struct process * pcb = thread_current()->pcb;
+    lock_acquire(&pcb->user_synch_lock);
+    if ( pcb->lock_num == pcb->lock_size ) {
+        pcb->lock_size *= 2;
+        pcb->locks = realloc(pcb->locks, pcb->lock_size * sizeof(struct lock));
+    }
+
+    struct lock * lock = &pcb->locks[pcb->lock_num];
+    lock_init(lock);
+    f->eax = (pthread_lock_t) pcb->lock_num;
+    pcb->lock_num++;
+    lock_release(&pcb->user_synch_lock);
     break;
   }
   case SYS_LOCK:
@@ -232,9 +240,9 @@ syscall_handler(struct intr_frame *f)
       thread_exit(-1);
       return;
     }
-    pthread_lock_t lock_num = (pthread_lock_t)args[0];
-
-    lock_acquire(&(thread_current()->pcb->locks[lock_num]));
+    pthread_lock_t lock_num = (pthread_lock_t) args[0];
+    
+    lock_acquire(&thread_current()->pcb->locks[lock_num]);
     break;
   }
   case SYS_UNLOCK:
@@ -244,9 +252,9 @@ syscall_handler(struct intr_frame *f)
       thread_exit(-1);
       return;
     }
-    pthread_lock_t lock_num = (pthread_lock_t)args[0];
+    pthread_lock_t lock_num = (pthread_lock_t) args[0];
 
-    lock_release(&(thread_current()->pcb->locks[lock_num]));
+    lock_release(&thread_current()->pcb->locks[lock_num]);
     break;
   }
   case SYS_INITSEMA:
@@ -257,9 +265,18 @@ syscall_handler(struct intr_frame *f)
       return;
     }
 
-    pthread_sema_t sema = thread_current()->pcb->sema_num;
-    sema_init(&(thread_current()->pcb->semas[sema]), args[0]);
-    thread_current()->pcb->sema_num++;
+    struct process * pcb = thread_current()->pcb;
+    lock_acquire(&pcb->user_synch_lock);
+    if ( pcb->sema_num == pcb->sema_size ) {
+        pcb->sema_size *= 2;
+        pcb->semas = realloc(pcb->semas, pcb->sema_size * sizeof(struct semaphore));
+    }
+
+    struct semaphore * sema = &pcb->semas[pcb->sema_num];
+    sema_init(sema, args[0]);
+    f->eax = (pthread_sema_t) pcb->sema_num;
+    pcb->sema_num++;
+    lock_release(&pcb->user_synch_lock);
     break;
   }
   case SYS_SEMAUP:
@@ -270,7 +287,7 @@ syscall_handler(struct intr_frame *f)
       return;
     }
     pthread_sema_t sema = (pthread_sema_t)args[0];
-    sema_up(&(thread_current()->pcb->semas[sema]));
+    sema_up(&thread_current()->pcb->semas[sema]);
     break;
   }
   case SYS_SEMADOWN:
@@ -281,15 +298,23 @@ syscall_handler(struct intr_frame *f)
       return;
     }
     pthread_sema_t sema = (pthread_sema_t)args[0];
-    sema_down(&(thread_current()->pcb->semas[sema]));
+    sema_down(&thread_current()->pcb->semas[sema]);
     break;
   }
   case SYS_INITCOND:
   {
-    pthread_cond_t cond_num = thread_current()->pcb->cond_num;
-    cond_init(&(thread_current()->pcb->conds[cond_num]));
-    thread_current()->pcb->cond_num++;
-    f->eax = (pthread_cond_t)cond_num;
+    struct process * pcb = thread_current()->pcb;
+    lock_acquire(&pcb->user_synch_lock);
+    if ( pcb->cond_num == pcb->cond_size ) {
+        pcb->cond_size *= 2;
+        pcb->conds = realloc(pcb->conds, pcb->cond_size * sizeof(struct condition));
+    }
+
+    struct condition * cond = &pcb->conds[pcb->cond_num];
+    cond_init(cond);
+    f->eax = (pthread_cond_t) pcb->cond_num;
+    pcb->cond_num++;
+    lock_release(&pcb->user_synch_lock);
     break;
   }
   case SYS_COND_WAIT:
@@ -301,7 +326,7 @@ syscall_handler(struct intr_frame *f)
     }
     pthread_cond_t cond_num = (pthread_cond_t)args[0];
     pthread_lock_t lock_num = (pthread_lock_t)args[1];
-    cond_wait(&(thread_current()->pcb->conds[cond_num]), &(thread_current()->pcb->locks[lock_num]));
+    cond_wait(&thread_current()->pcb->conds[cond_num], &thread_current()->pcb->locks[lock_num]);
     break;
   }
   case SYS_COND_SIGNAL:
@@ -313,7 +338,7 @@ syscall_handler(struct intr_frame *f)
     }
     pthread_cond_t cond_num = (pthread_cond_t)args[0];
 
-    cond_signal(&(thread_current()->pcb->conds[cond_num]), NULL);
+    cond_signal(&thread_current()->pcb->conds[cond_num], NULL);
     break;
   }
   case SYS_FUTEX_WAIT:

@@ -326,6 +326,21 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   new_proc->main_thread = t;
   new_proc->threads = calloc(MAX_THREADS, sizeof(struct thread *));
   new_proc->used_threads = bitmap_create(MAX_THREADS);
+  
+  new_proc->locks = malloc(INIT_USER_SIZE * sizeof(struct lock));
+  new_proc->semas = malloc(INIT_USER_SIZE * sizeof(struct semaphore));
+  new_proc->conds = malloc(INIT_USER_SIZE * sizeof(struct condition));
+
+  new_proc->lock_size = INIT_USER_SIZE;
+  new_proc->sema_size = INIT_USER_SIZE;
+  new_proc->cond_size = INIT_USER_SIZE;
+
+  new_proc->lock_num = 0;
+  new_proc->sema_num = 0;
+  new_proc->cond_num = 0;
+  
+  lock_init(&new_proc->user_synch_lock);
+  
   if (new_proc->fdToFile == NULL)
   {
     thread_exit(-1);
@@ -428,6 +443,7 @@ tid_t thread_create(const char *name, int nice, thread_func *function, void *aux
 
   /* Add to ready queue. */
   wake_up_new_thread(t);
+  //for (;;);
   return tid;
 }
 

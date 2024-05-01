@@ -52,7 +52,7 @@ palloc_init (size_t user_page_limit)
   uint8_t *free_start = init_ram_pages > 16 * 1024 ? ptov(2 * 1024 * 1024) : ptov(1 * 1024 * 1024);
   uint8_t *free_end = ptov (init_ram_pages * PGSIZE);
   size_t free_pages = (free_end - free_start) / PGSIZE;
-  size_t user_pages = free_pages / 2; //CUT SPACE IN HALF, you can specify a new ratio (ex: * 3/4 etc.)
+  size_t user_pages = (free_pages * 3) / 4;
   size_t kernel_pages;
   if (user_pages > user_page_limit)
     user_pages = user_page_limit;
