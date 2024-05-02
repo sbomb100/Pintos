@@ -297,13 +297,16 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   t->tid = allocate_tid();
   /* Parent-child structure setup */
   /* Parent-child structure setup */
-  struct process *new_proc = malloc(sizeof(struct process) + 4096);
-  if (new_proc == NULL)
+  struct process *new_proc = malloc(sizeof(struct process));
+  if (new_proc == NULL){
+    
     return NULL;
+  }
   new_proc->pid = allocate_pid();
   new_proc->exit_status = -1;
   new_proc->status = PROCESS_RUNNING;
   new_proc->parent = thread_current()->pcb;
+  
   /*children init*/
   list_init(&new_proc->children);
   sema_init(&new_proc->wait_sema, 0);
@@ -343,6 +346,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   
   if (new_proc->fdToFile == NULL)
   {
+    
     thread_exit(-1);
   }
   t->pcb = new_proc;
@@ -355,12 +359,20 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     list_push_back(&thread_current()->pcb->children, &new_proc->elem);
     lock_release(&thread_current()->pcb->process_lock);
   }
+  //TESTING TODO
+  new_proc->pagedir = pagedir_create();
+  if (new_proc->pagedir == NULL){
+    
+    return NULL;
+  }
+  process_activate();
   if (!boot_process_created)
   {
     boot_process_created = true;
     initial_process = malloc(sizeof(struct process));
-    if (initial_process == NULL)
+    if (initial_process == NULL){
       return NULL;
+    }
     initial_process->pid = allocate_pid();
     initial_process->exit_status = -1;
     initial_process->status = PROCESS_RUNNING;
@@ -395,6 +407,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     thread_current()->pcb = initial_process;
     t->pcb = initial_process;
   }
+  
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
   kf->eip = NULL;

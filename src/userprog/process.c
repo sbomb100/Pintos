@@ -43,7 +43,7 @@ tid_t process_execute(const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-
+  
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page(0);
@@ -53,8 +53,9 @@ tid_t process_execute(const char *file_name)
     return TID_ERROR;
   }
   strlcpy(fn_copy, file_name, PGSIZE);
-
+  
   tid = thread_create(file_name, NICE_DEFAULT, start_process, fn_copy);
+ 
   if (tid == TID_ERROR)
   {
     palloc_free_page(fn_copy);
@@ -70,7 +71,7 @@ tid_t process_execute(const char *file_name)
       lock_acquire(&thread_current()->pcb->process_lock);
       list_remove(&child->elem);
       lock_release(&thread_current()->pcb->process_lock);
-      free(child);
+      //free(child);
       tid = -1;
     }
   }
@@ -141,7 +142,7 @@ int process_wait(tid_t child_tid)
   sema_down(&cur_child->wait_sema);
   // leave
   int exit_status = cur_child->exit_status;
-  // free(cur_child);
+  //free(cur_child);
   return exit_status;
 }
 
@@ -332,10 +333,10 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   token = strtok_r(fn_copy, " ", &save_ptr);
 
   /* Allocate and activate page directory. */
-  t->pcb->pagedir = pagedir_create();
-  if (t->pcb->pagedir == NULL)
-    goto done;
-  process_activate();
+  // t->pcb->pagedir = pagedir_create();
+  // if (t->pcb->pagedir == NULL)
+  //   goto done;
+  //  process_activate();
 
   /* Open executable file. */
   lock_file();
@@ -349,7 +350,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   /* Read and verify executable header. */
   if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 3 || ehdr.e_version != 1 || ehdr.e_phentsize != sizeof(struct Elf32_Phdr) || ehdr.e_phnum > 1024)
   {
-
     unlock_file();
     printf("load: %s: error loading executable\n", token);
     goto done;
