@@ -9,18 +9,16 @@ int counter = 0;
 
 static void increment(void * args UNUSED) {
     for ( int i = 0; i < 1000; i++ ) {
-        pthread_mutex_lock(lock);
+        pthread_mutex_lock(&lock);
         counter++;
-        pthread_mutex_unlock(lock);
+        pthread_mutex_unlock(&lock);
     }
 }
 
 void test_main(void) {
     tid_t threads[NUM_THREADS];
 
-    lock = pthread_mutex_init();
-
-    msg("Value of lock: %d\n", lock);
+    pthread_mutex_init(&lock);
 
     // Create threads
     for (intptr_t i = 0; i < NUM_THREADS; i++) {

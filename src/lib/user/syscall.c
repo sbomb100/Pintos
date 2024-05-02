@@ -204,48 +204,12 @@ sbrk (intptr_t increment) {
   return (void *) syscall1(SYS_SBRK, increment);
 }
 
-pthread_lock_t lock_init(void){
-  return syscall0(SYS_INITLOCK);
-}
-
-void lock_acquire(pthread_lock_t lock){
-  syscall1(SYS_LOCK, lock);
-}
-
-void lock_release(pthread_lock_t lock){
-  syscall1(SYS_UNLOCK, lock);
-}
-
-pthread_sema_t sema_init(int value){
-  return syscall1(SYS_INITSEMA, value);
-}
-
-void sema_up(pthread_sema_t sema){
-  syscall1(SYS_SEMAUP, sema);
-}
-
-void sema_down(pthread_sema_t sema){
-  syscall1(SYS_SEMADOWN, sema);
-}
-
-pthread_cond_t cond_init() {
-    return syscall0(SYS_INITCOND);
-}
-
-void cond_wait(pthread_cond_t cond, pthread_lock_t lock) {
-    syscall2(SYS_COND_WAIT, cond, lock);
-}
-
-void cond_signal(pthread_cond_t cond) {
-    syscall1(SYS_COND_SIGNAL, cond);
-}
-
 void futex_wait(void * addr) {
     syscall1(SYS_FUTEX_WAIT, addr);
 }
 
 void futex_wake(void * addr, int val) {
-    syscall2(SYS_FUTEX_WAIT, addr, val);
+    syscall2(SYS_FUTEX_WAKE, addr, val);
 }
 
 int64_t sys_timer_ticks(void) {

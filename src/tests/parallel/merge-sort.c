@@ -146,13 +146,10 @@ mergesort_parallel(int *array, int N)
     free (tmp);
 }
 
-
-
 void test_main (void) {
-    int N = 10000;
+    int N = 100000;
 
     int * array = (int *) malloc(sizeof(int) * N);
-
     int * array2 = (int *) malloc(sizeof(int) * N);
     int i;
     for (i = 0; i < N; i++) {

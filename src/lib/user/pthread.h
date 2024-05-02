@@ -15,18 +15,18 @@ void * pthread_tls_load(void);
 bool is_main_thread(void);
 
 /* User locks. */
-pthread_lock_t pthread_mutex_init(void);
-void pthread_mutex_lock(pthread_lock_t mutex);
-void pthread_mutex_unlock(pthread_lock_t mutex);
+void pthread_mutex_init(pthread_lock_t * mutex);
+void pthread_mutex_lock(pthread_lock_t * mutex);
+void pthread_mutex_unlock(pthread_lock_t * mutex);
 
 /* User semaphores. */
-pthread_sema_t pthread_semaphore_init(int value);
-void pthread_semaphore_down(pthread_sema_t sema);
-void pthread_semaphore_up(pthread_sema_t sema);
+void pthread_semaphore_init(pthread_sema_t * sema, int value);
+void pthread_semaphore_post(pthread_sema_t * sema);
+void pthread_semaphore_wait(pthread_sema_t * sema);
 
 /* User condition variables. */
-pthread_cond_t pthread_cond_init(void);
-void pthread_cond_wait(pthread_cond_t cond, pthread_lock_t mutex);
-void pthread_cond_signal(pthread_cond_t cond);
+void pthread_cond_init(pthread_cond_t * cond);
+void pthread_cond_wait(pthread_cond_t * cond, pthread_lock_t * mutex);
+void pthread_cond_signal(pthread_cond_t * cond);
 
 #endif

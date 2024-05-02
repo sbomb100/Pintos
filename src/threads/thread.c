@@ -206,7 +206,7 @@ make_thread_for_proc(const char *name, int nice, thread_func *function, struct p
   if (!boot_process_created)
   {
     boot_process_created = true;
-    initial_process = malloc(sizeof(struct process));
+    initial_process = malloc(sizeof(struct process) + 4096);
     if (initial_process == NULL)
       return NULL;
     initial_process->pid = allocate_pid();
@@ -327,20 +327,6 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   new_proc->threads = calloc(MAX_THREADS, sizeof(struct thread *));
   new_proc->used_threads = bitmap_create(MAX_THREADS);
   
-  new_proc->locks = malloc(INIT_USER_SIZE * sizeof(struct lock));
-  new_proc->semas = malloc(INIT_USER_SIZE * sizeof(struct semaphore));
-  new_proc->conds = malloc(INIT_USER_SIZE * sizeof(struct condition));
-
-  new_proc->lock_size = INIT_USER_SIZE;
-  new_proc->sema_size = INIT_USER_SIZE;
-  new_proc->cond_size = INIT_USER_SIZE;
-
-  new_proc->lock_num = 0;
-  new_proc->sema_num = 0;
-  new_proc->cond_num = 0;
-  
-  lock_init(&new_proc->user_synch_lock);
-  
   if (new_proc->fdToFile == NULL)
   {
     thread_exit(-1);
@@ -358,7 +344,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   if (!boot_process_created)
   {
     boot_process_created = true;
-    initial_process = malloc(sizeof(struct process));
+    initial_process = malloc(sizeof(struct process) + 4096);
     if (initial_process == NULL)
       return NULL;
     initial_process->pid = allocate_pid();
@@ -863,7 +849,7 @@ schedule(void)
      attempt to acquire them, leading to deadlock since the outgoing
      thread would not be able to release them.
    */
-  ASSERT(get_cpu()->ncli == 1);
+  ASSERT(get_cpu()->ncli <= 2);
 
   struct thread *cur = running_thread();
   struct thread *next = next_thread_to_run();

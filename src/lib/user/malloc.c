@@ -42,7 +42,7 @@ static bool initialized = false;
 
 // create init function
 int malloc_init(void) {
-    malloc_lock = lock_init();
+    pthread_mutex_init(&malloc_lock);
     return 0;
 }
 
@@ -54,7 +54,7 @@ void *malloc(size_t size) {
     size_t total_size;
     block_t *block;
 
-    lock_acquire(malloc_lock);
+    pthread_mutex_lock(&malloc_lock);
 
     // Align the size
     size = ALIGN(size);
@@ -63,7 +63,7 @@ void *malloc(size_t size) {
         // First call to malloc, initialize head
         block = sbrk(0);
         if (sbrk(sizeof(block_t) + size) == (void *)-1) {
-            lock_release(malloc_lock);
+            pthread_mutex_unlock(&malloc_lock);
             return NULL;
         }
         block->size = size;
@@ -76,7 +76,7 @@ void *malloc(size_t size) {
 
         total_size = sizeof(block_t) + size;
         if (sbrk(total_size) == (void *)-1) {
-            lock_release(malloc_lock);
+            pthread_mutex_unlock(&malloc_lock);
             return NULL;
         }
 
@@ -85,7 +85,7 @@ void *malloc(size_t size) {
         block->next->next = NULL;
     }
 
-    lock_release(malloc_lock);
+    pthread_mutex_unlock(&malloc_lock);
 
     return (void *)(block + 1);
 }

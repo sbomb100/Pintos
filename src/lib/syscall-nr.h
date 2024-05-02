@@ -34,20 +34,11 @@ enum
     SYS_PTHREAD_CREATE,         /* Creates a user thread. */
     SYS_PTHREAD_EXIT,           /* Terminates the calling user thread. */
     SYS_PTHREAD_JOIN,           /* Blocks the calling thread until a requested TID exits. */
-    SYS_SBRK,                    /* Changes the data segment size. */
-    SYS_LOCK,
-    SYS_UNLOCK,
-    SYS_INITLOCK,
-    SYS_INITCOND,
-    SYS_COND_WAIT,
-    SYS_COND_SIGNAL,
-    SYS_INITSEMA,
-    SYS_SEMAUP,
-    SYS_SEMADOWN,
-    SYS_FUTEX_WAIT,
-    SYS_FUTEX_WAKE,
-    SYS_TIMER_TICKS,
-    SYS_TIMER_ELAPSED
+    SYS_SBRK,                   /* Changes the data segment size. */
+    SYS_FUTEX_WAIT,             /* Blocks thread and waits on an address. */
+    SYS_FUTEX_WAKE,             /* Wakes up threads waiting on an address. */
+    SYS_TIMER_TICKS,            /* Syscall for timer.c:timer_ticks. */
+    SYS_TIMER_ELAPSED           /* Syscall for timer.c:timer_elapsed. */
   };
 
 #endif /* lib/syscall-nr.h */

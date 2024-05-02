@@ -18,14 +18,19 @@ typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)
 
 /* User synchronization identifiers. */
-typedef int pthread_lock_t;
-#define LOCK_ERROR ((pthread_lock_t) -1)
+typedef struct pthread_lock_s {
+    int val;
+} pthread_lock_t;
 
-typedef int pthread_sema_t;
-#define SEMA_ERROR ((pthread_sema_t) -1)
+typedef struct pthread_sema_s {
+    pthread_lock_t lock;
+    int count;
+} pthread_sema_t;
 
-typedef int pthread_cond_t;
-#define COND_ERROR ((pthread_cond_t) -1)
+typedef struct pthread_cond_s {
+    pthread_lock_t * lock;
+    int seq;
+} pthread_cond_t;
 
 /* Function pointer definitions. */
 typedef void (*start_routine)(void *);
@@ -73,18 +78,6 @@ bool sys_pthread_join(tid_t tid);
 void * sbrk(intptr_t increment);
 
 /* User synch syscalls. */
-pthread_lock_t lock_init(void);
-void lock_acquire(pthread_lock_t lock);
-void lock_release(pthread_lock_t lock);
-
-pthread_sema_t sema_init(int value);
-void sema_up(pthread_sema_t sema);
-void sema_down(pthread_sema_t sema);
-
-pthread_cond_t cond_init(void);
-void cond_wait(pthread_cond_t cond, pthread_lock_t lock);
-void cond_signal(pthread_cond_t cond);
-
 void futex_wait(void * addr);
 void futex_wake(void * addr, int val);
 

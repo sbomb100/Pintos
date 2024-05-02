@@ -190,20 +190,6 @@ struct process
 
    void * heap_start;
    void * heap_break;
-   
-   struct lock * locks;
-   struct semaphore * semas;
-   struct condition * conds;
-   
-   int lock_num;
-   int sema_num;
-   int cond_num;
-
-   int lock_size;
-   int sema_size;
-   int cond_size;
-
-   struct lock user_synch_lock;
 };
 
 /* VM MMAP */
