@@ -289,8 +289,10 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
 
   /* Allocate thread. */
   t = palloc_get_page(PAL_ZERO);
-  if (t == NULL)
+  if (t == NULL){
+    printf("get page fail!\n");
     return NULL;
+  }
 
   /* Initialize thread. */
   init_thread(t, name, nice);
@@ -299,7 +301,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   /* Parent-child structure setup */
   struct process *new_proc = malloc(sizeof(struct process));
   if (new_proc == NULL){
-    
+    printf("proc malloc fail!\n");
     return NULL;
   }
   new_proc->pid = allocate_pid();
@@ -346,7 +348,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   
   if (new_proc->fdToFile == NULL)
   {
-    
+    printf("fd array fail!\n");
     thread_exit(-1);
   }
   t->pcb = new_proc;
@@ -362,7 +364,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
   //TESTING TODO
   new_proc->pagedir = pagedir_create();
   if (new_proc->pagedir == NULL){
-    
+    printf("pagedir fail!\n");
     return NULL;
   }
   process_activate();
@@ -371,6 +373,7 @@ do_thread_create(const char *name, int nice, thread_func *function, void *aux)
     boot_process_created = true;
     initial_process = malloc(sizeof(struct process));
     if (initial_process == NULL){
+      printf("boot proc malloc fail!\n");
       return NULL;
     }
     initial_process->pid = allocate_pid();
