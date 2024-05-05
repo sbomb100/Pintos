@@ -204,8 +204,8 @@ sbrk (intptr_t increment) {
   return (void *) syscall1(SYS_SBRK, increment);
 }
 
-void futex_wait(void * addr) {
-    syscall1(SYS_FUTEX_WAIT, addr);
+void futex_wait(void * addr, int val) {
+    syscall2(SYS_FUTEX_WAIT, addr, val);
 }
 
 void futex_wake(void * addr, int val) {

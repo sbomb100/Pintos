@@ -129,7 +129,7 @@ static void worker_function(void * arg) {
 /* Create a new thread pool with no more than n threads. */
 struct thread_pool * thread_pool_new(int nthreads) {
     struct thread_pool * thread_pool = malloc(sizeof(struct thread_pool));
-    thread_pool->nthreads = nthreads;
+
     pthread_mutex_init(&thread_pool->global_mutex);
     pthread_mutex_init(&thread_pool->shutdown_mutex);
     thread_pool->shutting_down = false;

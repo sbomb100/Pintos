@@ -80,7 +80,7 @@ bool sys_pthread_join(tid_t tid);
 void * sbrk(intptr_t increment);
 
 /* User synch syscalls. */
-void futex_wait(void * addr);
+void futex_wait(void * addr, int val);
 void futex_wake(void * addr, int val);
 
 int64_t sys_timer_ticks(void);

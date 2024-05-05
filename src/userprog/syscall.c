@@ -219,13 +219,13 @@ syscall_handler(struct intr_frame *f)
   }
   case SYS_FUTEX_WAIT:
   {
-    if (!parse_arguments(f, &args[0], 1))
+    if (!parse_arguments(f, &args[0], 2))
     {
       thread_exit(-1);
       return;
     }
 
-    futex_wait((void *)args[0]);
+    futex_wait((void *)args[0], (int) args[1]);
     break;
   }
   case SYS_FUTEX_WAKE:
@@ -886,7 +886,7 @@ void *sbrk(intptr_t increment)
   }
 }
 
-void futex_wait(void *addr)
+void futex_wait(void *addr, int val)
 {
   struct thread *t = thread_current();
   struct futex_object *f = malloc(sizeof(struct futex_object));
@@ -895,8 +895,10 @@ void futex_wait(void *addr)
   f->t = t;
 
   spinlock_acquire(&t->pcb->futex_lock);
-  hash_insert(&t->pcb->futex_hash, &f->elem);
-  thread_block(&t->pcb->futex_lock);
+  if ( *(int *) addr == val ) {
+    hash_insert(&t->pcb->futex_hash, &f->elem);
+    thread_block(&t->pcb->futex_lock);
+  }
   free(f);
   spinlock_release(&t->pcb->futex_lock);
 }

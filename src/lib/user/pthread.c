@@ -83,14 +83,14 @@ void pthread_mutex_lock(pthread_lock_t * mutex) {
         }
 
         while ( c != 0 ) {
-            futex_wait(&mutex->val);
+            futex_wait(&mutex->val, 2);
             c = atomic_xchg(&mutex->val, 2);
         }
     }
 }
 
 void pthread_mutex_unlock(pthread_lock_t * mutex) {
-    if ( atomic_deci(&mutex->val) != 1 ) {
+    if ( atomic_deci(&mutex->val) == 1 ) {
         mutex->val = 0;
         futex_wake(&mutex->val, 1);
     }
@@ -117,7 +117,7 @@ void pthread_semaphore_wait(pthread_sema_t * sema) {
     for ( ;; ) {
         if ( sema->count == 0 ) {
             pthread_mutex_unlock(&sema->lock);
-            futex_wait(&sema->count);
+            futex_wait(&sema->count, 0);
             pthread_mutex_lock(&sema->lock);
         }
         else {
@@ -144,7 +144,7 @@ void pthread_cond_wait(pthread_cond_t * cond, pthread_lock_t * mutex) {
     for ( ;; ) {
         if ( cond->wakeup_seq == val ) {
             pthread_mutex_unlock(mutex);
-            futex_wait(&cond->wakeup_seq);
+            futex_wait(&cond->wakeup_seq, val);
             pthread_mutex_lock(mutex);
         }
         
