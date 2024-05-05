@@ -738,7 +738,7 @@ bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp)
   t->bit_index = vacant;
   void *upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
 
-  lock_frame();
+  
   struct spt_entry *page = malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -759,7 +759,7 @@ bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp)
   hash_insert(&t->pcb->spt, &page->elem);
   t->pcb->num_stack_pages++;
   lock_release(&t->pcb->spt_lock);
-
+  lock_frame();
   struct frame *stack_frame = find_frame(page);
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
