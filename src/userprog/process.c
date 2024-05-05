@@ -34,7 +34,7 @@ static thread_func start_pthread NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
 static bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp);
 struct process *find_child(pid_t child_pid);
-
+void free_process(struct process* p);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -143,9 +143,14 @@ int process_wait(tid_t child_tid)
   // leave
   int exit_status = cur_child->exit_status;
   //free(cur_child);
+  //free_process(cur_child);
   return exit_status;
 }
 
+void free_process(struct process* p){
+  pagedir_destroy(p->pagedir);
+  free(p);
+}
 /* Free the current process's resources. */
 void process_exit(int status)
 {
