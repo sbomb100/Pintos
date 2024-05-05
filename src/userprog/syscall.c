@@ -897,6 +897,7 @@ void futex_wait(void *addr)
   spinlock_acquire(&t->pcb->futex_lock);
   hash_insert(&t->pcb->futex_hash, &f->elem);
   thread_block(&t->pcb->futex_lock);
+  free(f);
   spinlock_release(&t->pcb->futex_lock);
 }
 
@@ -917,7 +918,6 @@ void futex_wake(void *addr, int val)
 
     struct futex_object *f = hash_entry(h, struct futex_object, elem);
     thread_unblock(f->t);
-    free(f);
   }
   spinlock_release(&t->pcb->futex_lock);
 }

@@ -28,5 +28,6 @@ void pthread_semaphore_wait(pthread_sema_t * sema);
 void pthread_cond_init(pthread_cond_t * cond);
 void pthread_cond_wait(pthread_cond_t * cond, pthread_lock_t * mutex);
 void pthread_cond_signal(pthread_cond_t * cond);
+void pthread_cond_broadcast(pthread_cond_t * cond);
 
 #endif

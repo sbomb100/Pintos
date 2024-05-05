@@ -733,7 +733,6 @@ bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp)
   t->bit_index = vacant;
   void *upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
 
-  lock_frame();
   struct spt_entry *page = malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -754,7 +753,8 @@ bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp)
   hash_insert(&t->pcb->spt, &page->elem);
   t->pcb->num_stack_pages++;
   lock_release(&t->pcb->spt_lock);
-
+  
+  lock_frame();
   struct frame *stack_frame = find_frame(page);
   if (stack_frame == NULL || stack_frame->paddr == NULL)
   {
@@ -824,11 +824,6 @@ bool pthread_join(tid_t tid)
       return true;
     }
   }
-  /* printf("%d\n", tid);
-  for ( int i = 0; i < MAX_THREADS; i++ ) {
-      struct thread * t = pcb->threads[i];
-      printf("%p %d\n", t, t != NULL ? t->tid : -1);
-  } */
   return false;
 }
 
@@ -839,6 +834,5 @@ void pthread_exit()
   sema_up(&t->join_sema);
   sema_down(&t->exit_sema);
   bitmap_reset(t->pcb->used_threads, t->bit_index);
-  // printf("exit %d\n", t->tid);
   thread_exit(0);
 }

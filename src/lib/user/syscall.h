@@ -28,8 +28,10 @@ typedef struct pthread_sema_s {
 } pthread_sema_t;
 
 typedef struct pthread_cond_s {
-    pthread_lock_t * lock;
-    int seq;
+    int total_seq;
+    int wakeup_seq;
+    int woken_seq;
+    int broadcast_seq;
 } pthread_cond_t;
 
 /* Function pointer definitions. */
