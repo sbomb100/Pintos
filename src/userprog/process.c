@@ -34,7 +34,7 @@ static thread_func start_pthread NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
 static bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp);
 struct process *find_child(pid_t child_pid);
-
+void free_process(struct process* p);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -143,9 +143,14 @@ int process_wait(tid_t child_tid)
   // leave
   int exit_status = cur_child->exit_status;
   //free(cur_child);
+  //free_process(cur_child);
   return exit_status;
 }
 
+void free_process(struct process* p){
+  pagedir_destroy(p->pagedir);
+  free(p);
+}
 /* Free the current process's resources. */
 void process_exit(int status)
 {
@@ -733,6 +738,7 @@ bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp)
   t->bit_index = vacant;
   void *upage = ((uint8_t *)PHYS_BASE) - (PGSIZE * (vacant + 1));
 
+  
   struct spt_entry *page = malloc(sizeof(struct spt_entry));
   if (page == NULL)
   {
@@ -753,7 +759,6 @@ bool setup_pthread(struct aux *aux, void (**eip)(void), void **esp)
   hash_insert(&t->pcb->spt, &page->elem);
   t->pcb->num_stack_pages++;
   lock_release(&t->pcb->spt_lock);
-  
   lock_frame();
   struct frame *stack_frame = find_frame(page);
   if (stack_frame == NULL || stack_frame->paddr == NULL)
