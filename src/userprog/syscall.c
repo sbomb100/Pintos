@@ -893,7 +893,6 @@ void futex_wait(void *addr, int val)
 
   f->addr = addr;
   f->t = t;
-  
   intr_disable();
   spinlock_acquire(&t->pcb->futex_lock);
   if ( *(int *) addr == val ) {
