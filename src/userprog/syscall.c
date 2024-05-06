@@ -893,14 +893,18 @@ void futex_wait(void *addr, int val)
 
   f->addr = addr;
   f->t = t;
-
+  
+  intr_disable();
   spinlock_acquire(&t->pcb->futex_lock);
   if ( *(int *) addr == val ) {
     hash_insert(&t->pcb->futex_hash, &f->elem);
     thread_block(&t->pcb->futex_lock);
   }
   free(f);
-  spinlock_release(&t->pcb->futex_lock);
+
+  if (spinlock_held_by_current_cpu (&t->pcb->futex_lock)) {
+    spinlock_release(&t->pcb->futex_lock);
+  }
 }
 
 void futex_wake(void *addr, int val)

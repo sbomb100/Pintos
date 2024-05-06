@@ -164,12 +164,7 @@ struct thread_pool * thread_pool_new(int nthreads) {
  */
 void thread_pool_shutdown_and_destroy(struct thread_pool * pool) {
     int i;
-    pthread_mutex_lock(&pool->global_mutex);
-    pthread_mutex_lock(&pool->shutdown_mutex);
     pool->shutting_down = true;
-    pthread_mutex_unlock(&pool->shutdown_mutex);
-    pthread_cond_broadcast(&pool->cond);
-    pthread_mutex_unlock(&pool->global_mutex);
 
     for ( i = 0; i < pool->nthreads; i++ ) {
         pthread_join(pool->workers[i].t);
